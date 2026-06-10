@@ -3,16 +3,16 @@ import { useState } from "react";
 import { PersonalInformationForm } from "@/components/form/PersonalInformationForm";
 import { CompanyInformationForm } from "@/components/form/CompanyInformationForm";
 import { ChangePasswordForm } from "@/components/form/ChangePasswordForm";
-import { PaymentMethodForm } from "@/components/form/PaymentMethodForm";
+import PaymentMethodForm from "@/components/form/PaymentMethodForm";
 import TwoFASetupSection from "@/components/form/TwoFASetupSection";
 import { User, Building2, Lock, CreditCard, Shield } from "lucide-react";
 
 const TABS = [
-  { id: "personal",  label: "Personal Info",    icon: User },
-  { id: "company",   label: "Company Info",      icon: Building2 },
-  { id: "security",  label: "Password",          icon: Lock },
-  { id: "twofa",     label: "2FA Security",      icon: Shield },
-  { id: "payment",   label: "Payment Method",    icon: CreditCard },
+  { id: "personal", label: "Personal Info", icon: User },
+  { id: "company", label: "Company Info", icon: Building2 },
+  { id: "security", label: "Password", icon: Lock },
+  { id: "twofa", label: "2FA Security", icon: Shield },
+  { id: "payment", label: "Payment Method", icon: CreditCard },
 ];
 
 export default function SettingsPage() {
@@ -46,10 +46,10 @@ export default function SettingsPage() {
       {/* Content */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 md:p-8">
         {active === "personal" && <PersonalInformationForm />}
-        {active === "company"  && <CompanyInformationForm />}
+        {active === "company" && <CompanyInformationForm />}
         {active === "security" && <ChangePasswordForm />}
-        {active === "twofa"    && <TwoFASetupSection />}
-        {active === "payment"  && <PaymentMethodForm />}
+        {active === "twofa" && <TwoFASetupSection />}
+        {active === "payment" && <PaymentMethodForm />}
       </div>
     </div>
   );
