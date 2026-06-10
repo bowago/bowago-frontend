@@ -83,6 +83,7 @@ export const QuickActionDropdown = ({ role }: QuickActionProps) => {
       <CreateShipmentModal
         isOpen={isOpenShipment}
         setIsOpen={setIsOpenShipment}
+        initialValue={null}
       />
     </>
   );

@@ -1,24 +1,10 @@
 import type { Metadata } from "next";
-import { Geist, Roboto } from "next/font/google";
 import { StoreProvider } from "@/store/storeProvider";
 import { cn } from "@/lib/utils";
 import "./globals.css";
 import { UserChat } from "@/components/ui/Chat";
 import { ToastProvider } from "@/components/ui/toast/ToastProvider";
 import { ToastBridge } from "@/components/ui/toast/ToastBridge";
-
-const geist = Geist({
-  subsets: ["latin"],
-  variable: "--font-sans",
-  display: "swap",
-});
-
-const robotoSans = Roboto({
-  weight: ["300", "400", "500", "700"],
-  variable: "--font-roboto-sans",
-  subsets: ["latin"],
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "BowaGO — Fast Nigerian Logistics",
@@ -32,8 +18,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("font-sans", geist.variable)}>
-      <body className={`${robotoSans.variable} antialiased`}>
+    <html lang="en">
+      <head>
+        {/* Preconnect for performance */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        {/* Load fonts via standard HTML — not next/font — so build never fails */}
+        <link
+          href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Roboto:wght@300;400;500;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className="antialiased">
         <StoreProvider>
           <ToastProvider>
             <ToastBridge />
