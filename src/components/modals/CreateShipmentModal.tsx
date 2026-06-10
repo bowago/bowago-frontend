@@ -217,8 +217,6 @@ function ReviewStep({ data }: { data: ShipmentReviewData }) {
   const shipment = data.shipment;
   const quote = data.quote;
 
-  console.log({ shipment, quote });
-
   const service = shipment?.serviceType ?? "STANDARD";
   const deliveryTime = SERVICE_DELIVERY_MAP[service] ?? "—";
   const serviceLabel =
@@ -237,15 +235,20 @@ function ReviewStep({ data }: { data: ShipmentReviewData }) {
       </div>
     ));
 
+  // ── FIX: guard both total and totalSurcharge before arithmetic ──
+  const total = quote?.total ?? 0;
+  const totalSurcharge = quote?.totalSurcharge ?? 0;
+  const subtotal = total - totalSurcharge;
+
   return (
     <div>
-      {/* 💰 Price card */}
+      {/* Price card */}
       <div className="bg-gray-900 rounded-2xl p-5 mb-5 text-center">
         <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-1">
           Total Price
         </p>
         <p className="text-4xl font-bold text-white tracking-tight font-mono">
-          ₦{quote?.total?.toLocaleString() ?? "—"}
+          ₦{total > 0 ? total.toLocaleString() : "—"}
         </p>
 
         <div className="border-t border-dashed border-gray-700 my-3" />
@@ -263,14 +266,14 @@ function ReviewStep({ data }: { data: ShipmentReviewData }) {
             <p className="text-[10px] text-gray-400">Distance</p>
             <p className="text-sm font-semibold text-white">
               {quote?.distanceKm
-                ? `${quote?.distanceKm?.toLocaleString()} km`
+                ? `${quote.distanceKm.toLocaleString()} km`
                 : "—"}
             </p>
           </div>
         </div>
       </div>
 
-      {/* 📦 Order Details */}
+      {/* Order Details */}
       <div className="mb-4">
         <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">
           Order Details
@@ -279,9 +282,7 @@ function ReviewStep({ data }: { data: ShipmentReviewData }) {
         {rows([
           {
             label: "Route",
-            value: `${quote?.fromCity?.name ?? "—"} → ${
-              quote?.toCity?.name ?? "—"
-            }`,
+            value: `${quote?.fromCity?.name ?? "—"} → ${quote?.toCity?.name ?? "—"}`,
           },
           {
             label: "Weight",
@@ -301,11 +302,11 @@ function ReviewStep({ data }: { data: ShipmentReviewData }) {
           },
           {
             label: "Sub Total",
-            value: `₦${Number(quote?.total - quote?.totalSurcharge) ?? "0"}`,
+            value: subtotal > 0 ? `₦${subtotal.toLocaleString()}` : "—",
           },
         ])}
 
-        {/* 🔥 Dynamic Surcharges */}
+        {/* Surcharges */}
         <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2 mt-4">
           Surcharges
         </p>
@@ -324,14 +325,14 @@ function ReviewStep({ data }: { data: ShipmentReviewData }) {
         <div className="flex justify-between items-center py-[5px]">
           <span className="text-xs font-semibold text-gray-900">Total</span>
           <span className="text-sm font-bold text-gray-900">
-            ₦{quote?.total?.toLocaleString() ?? "—"}
+            ₦{total > 0 ? total.toLocaleString() : "—"}
           </span>
         </div>
       </div>
 
       <div className="h-px bg-gray-100 my-4" />
 
-      {/* 🚚 Delivery Details */}
+      {/* Delivery Details */}
       <div>
         <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">
           Delivery Details
@@ -364,12 +365,11 @@ function ReviewStep({ data }: { data: ShipmentReviewData }) {
 export default function CreateShipmentModal({
   isOpen,
   setIsOpen,
-  initialValue
-
+  initialValue,
 }: {
   isOpen: boolean;
   setIsOpen: (v: boolean) => void;
-  initialValue: any
+  initialValue: any;
 }) {
   const [handleInitiateShipmentPayment] = useInitiateShipmentPaymentMutation();
   const [handleCreateShipment, { isLoading: isCreatingShipment }] =
@@ -387,7 +387,6 @@ export default function CreateShipmentModal({
     getValues,
     reset,
     setValue,
-
     formState: { errors },
   } = useForm<CreateShipmentFormData>({
     resolver: yupResolver(
@@ -414,11 +413,9 @@ export default function CreateShipmentModal({
       setIsOpen(true);
       return;
     }
-
     handleClose();
   };
 
-  // Validate only the fields relevant to the current step before advancing
   const STEP_FIELDS: Record<Step, (keyof CreateShipmentFormData)[]> = {
     1: [
       "serviceType",
@@ -445,7 +442,6 @@ export default function CreateShipmentModal({
 
   const formatPickupDate = (value?: Date | string | null) => {
     if (!value) return "";
-
     const date = value instanceof Date ? value : new Date(value);
     return Number.isNaN(date.getTime()) ? "" : date.toISOString();
   };
@@ -476,32 +472,21 @@ export default function CreateShipmentModal({
 
   const getReviewData = (response: unknown): ShipmentReviewData => {
     if (!response || typeof response !== "object") return {};
-
     const responseObject = response as {
       data?: unknown;
       shipment?: ShipmentSummary;
       quote?: QuoteSummary;
     };
-
     if (responseObject.data && typeof responseObject.data === "object") {
       const data = responseObject.data as ShipmentReviewData;
-
-      if (data.shipment || data.quote) {
-        return data;
-      }
-
+      if (data.shipment || data.quote) return data;
       return { shipment: data as ShipmentSummary };
     }
-
-    return {
-      shipment: responseObject.shipment,
-      quote: responseObject.quote,
-    };
+    return { shipment: responseObject.shipment, quote: responseObject.quote };
   };
 
   const getCreatedShipmentId = () => {
     const shipment = createdShipmentData?.shipment;
-
     return shipment?.id ?? shipment?.shipmentId;
   };
 
@@ -517,32 +502,26 @@ export default function CreateShipmentModal({
   const handleNext = async () => {
     const valid = await trigger(STEP_FIELDS[step]);
     if (!valid) return;
-
     if (step === 2) {
       await createShipment();
       return;
     }
-
     setStep((s) => (s < 3 ? ((s + 1) as Step) : s));
   };
 
   const handleBack = () => {
-    if (step === 3) {
-      setCreatedShipmentData(null);
-    }
-
+    if (step === 3) setCreatedShipmentData(null);
     setStep((s) => (s > 1 ? ((s - 1) as Step) : s));
   };
 
   const handleGenerateInvoice = async () => {
-    // TODO: replace with your invoice generation mutation
     const data = getValues();
     console.log("Invoice data:", data);
   };
+
   const handlePayment = async () => {
     const shipmentId = getCreatedShipmentId();
     if (!shipmentId) return;
-
     const callbackUrl = `${window.location.origin}/dashboard/payment/callback`;
     const data = (await handleInitiateShipmentPayment({
       shipmentId,
@@ -550,10 +529,7 @@ export default function CreateShipmentModal({
     }).unwrap()) as PaymentResponse;
     const authorizationUrl =
       data.authorizationUrl ?? data.data?.authorizationUrl;
-
-    if (authorizationUrl) {
-      window.location.href = authorizationUrl;
-    }
+    if (authorizationUrl) window.location.href = authorizationUrl;
   };
 
   const stepSubtitle = [
@@ -564,19 +540,15 @@ export default function CreateShipmentModal({
 
   const { data: dimensionData, isLoading: isLoadingBox } =
     useGetDimensionsQuery({});
-
   const selectedBoxId = useWatch({ control, name: "boxSize" });
   const hasInsurance = useWatch({ control, name: "hasInsurance" });
+
   const cities = useMemo(
     () => (citiesData?.data?.cities ?? []) as CityOption[],
     [citiesData?.data?.cities],
   );
   const cityOptions = useMemo(
-    () =>
-      cities.map((item) => ({
-        label: item.name,
-        value: item.name,
-      })),
+    () => cities.map((item) => ({ label: item.name, value: item.name })),
     [cities],
   );
   const dimensions = useMemo(
@@ -609,7 +581,7 @@ export default function CreateShipmentModal({
               <p className="text-xs text-gray-400 mt-0.5">{stepSubtitle}</p>
             </div>
             <Dialog.Close asChild>
-              <button className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 hover:bg-gray-50 text-gray-400 transition-colors">
+              <button className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 hover:bg-gray-50 text-gray-400 transition-colors cursor-pointer">
                 ✕
               </button>
             </Dialog.Close>
@@ -617,7 +589,6 @@ export default function CreateShipmentModal({
 
           {/* Stepper */}
           <StepIndicator current={step} />
-
           <div className="h-px bg-gray-100 shrink-0" />
 
           {/* Body */}
@@ -629,7 +600,6 @@ export default function CreateShipmentModal({
             {/* ── STEP 1 ── */}
             {step === 1 && (
               <>
-                {/* Service Type */}
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">
                     Service Type
@@ -654,7 +624,6 @@ export default function CreateShipmentModal({
                   )}
                 </div>
 
-                {/* Route */}
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">
                     Route
@@ -663,7 +632,6 @@ export default function CreateShipmentModal({
                     <Controller
                       control={control}
                       name="originCity"
-                      rules={{ required: "Origin city is required" }}
                       render={({ field }) => (
                         <SelectInput
                           label="Origin City"
@@ -678,18 +646,16 @@ export default function CreateShipmentModal({
                         />
                       )}
                     />
-
                     <Controller
                       control={control}
                       name="destinationCity"
-                      rules={{ required: "Destination city is required" }}
                       render={({ field }) => (
                         <SelectInput
                           label="Destination City"
                           disabled={isLoading}
                           options={cityOptions}
                           placeholder={
-                            isLoading ? "...loading cities" : "e.g Lagos"
+                            isLoading ? "...loading cities" : "e.g Abuja"
                           }
                           value={field.value}
                           onValueChange={field.onChange}
@@ -709,7 +675,6 @@ export default function CreateShipmentModal({
                   </div>
                 </div>
 
-                {/* Dimensions */}
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">
                     Dimension
@@ -718,25 +683,20 @@ export default function CreateShipmentModal({
                     <Controller
                       control={control}
                       name="boxSize"
-                      rules={{ required: "Box is required" }}
                       render={({ field }) => (
                         <SelectInput
                           label="Select Box"
                           disabled={isLoadingBox}
                           options={dimensions.map((item) => ({
                             value: item.id,
-                            label: `${item.displayName} (Max ${item.weightKgLimit}kg • ${(
-                              item.weightKgLimit / 1000
-                            ).toFixed(3)}t • ${item.bestFor})`,
+                            label: `${item.displayName} (Max ${item.weightKgLimit}kg • ${(item.weightKgLimit / 1000).toFixed(3)}t • ${item.bestFor})`,
                           }))}
                           value={field.value as string}
                           onValueChange={(val) => {
                             field.onChange(val);
-
                             const selected = dimensions.find(
-                              (dimension) => dimension.id === val,
+                              (d) => d.id === val,
                             );
-
                             if (selected) {
                               setValue("width", selected.widthCm);
                               setValue("height", selected.heightCm);
@@ -769,15 +729,15 @@ export default function CreateShipmentModal({
                     />
                     <Input
                       label={`Width / cm (Max ${maxWidth})`}
-                      max={maxWidth}
                       type="number"
+                      max={maxWidth}
                       {...register("width", { valueAsNumber: true })}
                       error={errors.width?.message}
                     />
                     <Input
                       label={`Height / cm (Max ${maxHeight})`}
-                      max={maxHeight}
                       type="number"
+                      max={maxHeight}
                       {...register("height", { valueAsNumber: true })}
                       error={errors.height?.message}
                     />
@@ -791,8 +751,8 @@ export default function CreateShipmentModal({
                     />
                     <Input
                       label={`Tons (Max ${maxTons})`}
-                      max={maxTons}
                       type="number"
+                      max={maxTons}
                       {...register("tons", { valueAsNumber: true })}
                       error={errors.tons?.message}
                     />
@@ -834,7 +794,6 @@ export default function CreateShipmentModal({
                   )}
                 </div>
 
-                {/* Others */}
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">
                     Others
@@ -852,7 +811,6 @@ export default function CreateShipmentModal({
             {/* ── STEP 2 ── */}
             {step === 2 && (
               <>
-                {/* Sender */}
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">
                     Sender
@@ -885,7 +843,6 @@ export default function CreateShipmentModal({
                     <Controller
                       control={control}
                       name="senderCity"
-                      rules={{ required: "Origin city is required" }}
                       render={({ field }) => (
                         <SelectInput
                           label="Sender City"
@@ -897,14 +854,9 @@ export default function CreateShipmentModal({
                           value={field.value as string}
                           onValueChange={(val) => {
                             field.onChange(val);
-
-                            const selected = cities.find(
-                              (city) => city.name === val,
-                            );
-
-                            if (selected) {
+                            const selected = cities.find((c) => c.name === val);
+                            if (selected)
                               setValue("senderState", selected.state);
-                            }
                           }}
                           error={errors.senderCity?.message}
                         />
@@ -922,7 +874,6 @@ export default function CreateShipmentModal({
 
                 <div className="h-px bg-gray-100" />
 
-                {/* Receiver */}
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">
                     Receiver
@@ -955,7 +906,6 @@ export default function CreateShipmentModal({
                     <Controller
                       control={control}
                       name="receiverCity"
-                      rules={{ required: "Recipient city is required" }}
                       render={({ field }) => (
                         <SelectInput
                           label="Recipient City"
@@ -967,14 +917,9 @@ export default function CreateShipmentModal({
                           value={field.value as string}
                           onValueChange={(val) => {
                             field.onChange(val);
-
-                            const selected = cities.find(
-                              (city) => city.name === val,
-                            );
-
-                            if (selected) {
+                            const selected = cities.find((c) => c.name === val);
+                            if (selected)
                               setValue("receiverState", selected.state);
-                            }
                           }}
                           error={errors.receiverCity?.message}
                         />
@@ -992,7 +937,6 @@ export default function CreateShipmentModal({
 
                 <div className="h-px bg-gray-100" />
 
-                {/* Notes */}
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">
                     Notes
