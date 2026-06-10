@@ -1,0 +1,52 @@
+export const REGION_STATES: Record<string, { label: string; value: string }[]> =
+  {
+    "North Central": [
+      { label: "Benue", value: "benue" },
+      { label: "Kogi", value: "kogi" },
+      { label: "Kwara", value: "kwara" },
+      { label: "Nasarawa", value: "nasarawa" },
+      { label: "Niger", value: "niger" },
+      { label: "Plateau", value: "plateau" },
+      { label: "FCT (Abuja)", value: "abuja" },
+    ],
+    "North East": [
+      { label: "Adamawa", value: "adamawa" },
+      { label: "Bauchi", value: "bauchi" },
+      { label: "Borno", value: "borno" },
+      { label: "Gombe", value: "gombe" },
+      { label: "Taraba", value: "taraba" },
+      { label: "Yobe", value: "yobe" },
+    ],
+    "North West": [
+      { label: "Jigawa", value: "jigawa" },
+      { label: "Kaduna", value: "kaduna" },
+      { label: "Kano", value: "kano" },
+      { label: "Katsina", value: "katsina" },
+      { label: "Kebbi", value: "kebbi" },
+      { label: "Sokoto", value: "sokoto" },
+      { label: "Zamfara", value: "zamfara" },
+    ],
+    "South East": [
+      { label: "Abia", value: "abia" },
+      { label: "Anambra", value: "anambra" },
+      { label: "Ebonyi", value: "ebonyi" },
+      { label: "Enugu", value: "enugu" },
+      { label: "Imo", value: "imo" },
+    ],
+    "South South": [
+      { label: "Akwa Ibom", value: "akwa-ibom" },
+      { label: "Bayelsa", value: "bayelsa" },
+      { label: "Cross River", value: "cross-river" },
+      { label: "Delta", value: "delta" },
+      { label: "Edo", value: "edo" },
+      { label: "Rivers", value: "rivers" },
+    ],
+    "South West": [
+      { label: "Ekiti", value: "ekiti" },
+      { label: "Lagos", value: "lagos" },
+      { label: "Ogun", value: "ogun" },
+      { label: "Ondo", value: "ondo" },
+      { label: "Osun", value: "osun" },
+      { label: "Oyo", value: "oyo" },
+    ],
+  };

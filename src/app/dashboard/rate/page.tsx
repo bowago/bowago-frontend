@@ -1,0 +1,126 @@
+"use client";
+import { useRouter } from "next/navigation";
+import AddActionCard from "@/components/cards/AddCard";
+import ContractRateManagementView from "@/components/layout/ContractRateManagementView";
+import PromoRateManagementView from "@/components/layout/PromoRateManagementView";
+import StandardRateManagementView from "@/components/layout/StandardRateManagementView";
+import CreateRateModal, { RateType } from "@/components/modals/CreateRateModal";
+import { Button } from "@/components/ui/button";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs/tabs";
+import { LocationEdit, Package, ReceiptText, Route } from "lucide-react";
+import { useState } from "react";
+import { useGetRateOverviewQuery } from "@/store/slice/apiSlice";
+
+export default function ShipmentsPage() {
+  const { data, isLoading } = useGetRateOverviewQuery({});
+  const [selected, setSelected] = useState<RateType>("standard");
+
+  const [isOpenCreateModal, setIsOpenCreateModal] = useState(false);
+  const router = useRouter();
+
+  const stat = data?.data ?? {};
+  console.log(data?.data);
+
+  return (
+    <div className=" space-y-10">
+      <div className="flex flex-row justify-between flex-1">
+        <h1 className="dashboard-heading">Rate Management</h1>
+
+        <Button
+          onClick={() => {
+            setSelected("standard");
+            setIsOpenCreateModal(true);
+          }}
+        >
+          Create Rate
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-4 gap-4 mb-10">
+        <AddActionCard
+          icon={<LocationEdit className="w-6 h-6 text-orange-500" />}
+          iconBg="bg-orange-50"
+          value={
+            isLoading ? "..." : `${stat?.totalZone?.toLocaleString() ?? "0"}`
+          }
+          label="Total zone"
+          addText={"Add New Zone"}
+          onClick={() => router.push("/dashboard/rate/zones")}
+          delay={0}
+        />
+        <AddActionCard
+          icon={<Route className="w-6 h-6 text-purple-500" />}
+          iconBg="bg-purple-50"
+          value={
+            isLoading
+              ? "..."
+              : `${stat?.totalRegisteredCity?.toLocaleString() ?? "0"}`
+          }
+          label="Total Registered City"
+          addText={"Add New City"}
+          onClick={() => router.push("/dashboard/rate/cities")}
+          delay={80}
+        />
+        <AddActionCard
+          icon={<ReceiptText className="w-6 h-6 text-blue-400" />}
+          iconBg="bg-blue-50"
+          value={
+            isLoading
+              ? "..."
+              : `${stat?.totalContractRate?.toLocaleString() ?? "0"}`
+          }
+          label="Total Contract rate"
+          addText={"Add New Contract Rate"}
+          onClick={() => {
+            setSelected("contract");
+            setIsOpenCreateModal(true);
+          }}
+          delay={160}
+        />
+        <AddActionCard
+          icon={<Package className="w-6 h-6 text-pink-400" />}
+          iconBg="bg-pink-50"
+          value={
+            isLoading
+              ? "..."
+              : `${stat?.totalBoxDimension?.toLocaleString() ?? "0"}`
+          }
+          label="Total Box"
+          addText={"Add New Box"}
+          onClick={() => router.push("/dashboard/rate/boxes")}
+          delay={240}
+        />
+      </div>
+
+      <Tabs defaultValue={"standard"}>
+        <TabsList defaultChecked>
+          <TabsTrigger value="standard">Standard Rate</TabsTrigger>
+          <TabsTrigger value="contract">Contract Rate</TabsTrigger>
+          <TabsTrigger value="promo">Promo Rate</TabsTrigger>
+        </TabsList>
+        <div className="mt-5">
+          <TabsContent value="standard" className="w-full flex flex-col gap-6">
+            <StandardRateManagementView />
+          </TabsContent>
+          <TabsContent value="contract" className="w-full">
+            <ContractRateManagementView />
+          </TabsContent>
+          <TabsContent value="promo" className="w-full">
+            <PromoRateManagementView />
+          </TabsContent>
+        </div>
+      </Tabs>
+
+      <CreateRateModal
+        isOpen={isOpenCreateModal}
+        setIsOpen={setIsOpenCreateModal}
+        defaultRate={selected}
+      />
+    </div>
+  );
+}
