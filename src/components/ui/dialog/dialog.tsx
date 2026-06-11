@@ -50,7 +50,7 @@ const DialogContent = React.forwardRef<
           ? "w-full h-full p-5"
           : size === "lg"
             ? `w-10/12 absolute top-10 right-0`
-            : "max-w-xl h-fit hide-scroll",
+            : "max-w-md w-full mx-auto",
         className,
       )}
       {...props}
