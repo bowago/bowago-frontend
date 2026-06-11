@@ -5,6 +5,7 @@ import ContractRateManagementView from "@/components/layout/ContractRateManageme
 import PromoRateManagementView from "@/components/layout/PromoRateManagementView";
 import StandardRateManagementView from "@/components/layout/StandardRateManagementView";
 import CreateRateModal, { RateType } from "@/components/modals/CreateRateModal";
+import ImportPricingModal from "@/components/modals/ImportPricingModal";
 import { Button } from "@/components/ui/button";
 import {
   Tabs,
@@ -12,33 +13,45 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs/tabs";
-import { LocationEdit, Package, ReceiptText, Route } from "lucide-react";
+import { LocationEdit, Package, ReceiptText, Route, Upload } from "lucide-react";
 import { useState } from "react";
 import { useGetRateOverviewQuery } from "@/store/slice/apiSlice";
 
 export default function ShipmentsPage() {
-  const { data, isLoading } = useGetRateOverviewQuery({});
+  const { data, isLoading, refetch } = useGetRateOverviewQuery({});
   const [selected, setSelected] = useState<RateType>("standard");
 
   const [isOpenCreateModal, setIsOpenCreateModal] = useState(false);
   const router = useRouter();
 
   const stat = data?.data ?? {};
-  console.log(data?.data);
 
   return (
     <div className=" space-y-10">
-      <div className="flex flex-row justify-between flex-1">
+      <div className="flex flex-row justify-between flex-1 items-center gap-3 flex-wrap">
         <h1 className="dashboard-heading">Rate Management</h1>
 
-        <Button
-          onClick={() => {
-            setSelected("standard");
-            setIsOpenCreateModal(true);
-          }}
-        >
-          Create Rate
-        </Button>
+        <div className="flex items-center gap-3">
+          {/* Import Pricing Sheet — bulk Excel upload */}
+          <ImportPricingModal
+            onSuccess={() => refetch()}
+            trigger={
+              <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-50 transition-colors">
+                <Upload className="w-4 h-4" />
+                Import Sheet
+              </button>
+            }
+          />
+
+          <Button
+            onClick={() => {
+              setSelected("standard");
+              setIsOpenCreateModal(true);
+            }}
+          >
+            Create Rate
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-4 gap-4 mb-10">

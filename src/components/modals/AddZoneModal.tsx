@@ -137,9 +137,9 @@ export default function AddZoneModal({
                 options={
                   citiesData?.data?.cities &&
                   citiesData?.data?.cities.map(
-                    (region: { state: string; id: string }) => ({
-                      label: region.state,
-                      value: region.id,
+                    (city: { name: string; state: string; id: string }) => ({
+                      label: `${city.name}${city.state && city.state !== "Unknown" ? ` (${city.state})` : ""}`,
+                      value: city.id,
                     }),
                   )
                 }
@@ -160,9 +160,9 @@ export default function AddZoneModal({
                 options={
                   citiesData?.data?.cities &&
                   citiesData?.data?.cities.map(
-                    (region: { state: string; id: string }) => ({
-                      label: region.state,
-                      value: region.id,
+                    (city: { name: string; state: string; id: string }) => ({
+                      label: `${city.name}${city.state && city.state !== "Unknown" ? ` (${city.state})` : ""}`,
+                      value: city.id,
                     }),
                   )
                 }

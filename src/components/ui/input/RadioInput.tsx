@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { forwardRef } from "react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
@@ -86,40 +87,78 @@ export function RadioGroupCard({
   className,
   label,
 }: RadioGroupCardProps) {
+  // Controlled: use `value` if provided, otherwise fall back to internal state
+  const [internalValue, setInternalValue] = React.useState(
+    defaultValue ?? options[0]?.value ?? "",
+  );
+  const selected = value !== undefined ? value : internalValue;
+
+  const handleSelect = (optValue: string) => {
+    if (value === undefined) setInternalValue(optValue);
+    onValueChange?.(optValue);
+  };
+
   return (
     <div className="flex flex-col gap-1.5 w-full">
       {label && (
         <label className="text-sm font-medium text-black">{label}</label>
       )}
 
-      <RadioGroup
-        value={value}
-        defaultValue={defaultValue}
-        onValueChange={onValueChange}
-        className={cn("w-full space-x-3", className)}
-      >
-        {options.map((item) => (
-          <FieldLabel key={item.value} htmlFor={item.value}>
-            <Field
-              orientation="horizontal"
-              className="justify-between items-center border rounded-lg px-4 py-3 cursor-pointer hover:border-gray-300 transition"
+      <div className={cn("flex gap-2", className)}>
+        {options.map((item) => {
+          const isSelected = selected === item.value;
+          return (
+            <button
+              key={item.value}
+              type="button"
+              onClick={() => handleSelect(item.value)}
+              className={cn(
+                "flex-1 flex items-center justify-between px-4 py-3 rounded-lg border text-left transition-all",
+                isSelected
+                  ? "border-brand bg-red-50 ring-1 ring-brand"
+                  : "border-gray-200 bg-white hover:border-gray-300",
+              )}
             >
-              <FieldContent className="flex items-center gap-3">
-                {item.icon && <div className="text-gray-500">{item.icon}</div>}
-
+              <div className="flex items-center gap-3">
+                {item.icon && (
+                  <div
+                    className={isSelected ? "text-brand" : "text-gray-400"}
+                  >
+                    {item.icon}
+                  </div>
+                )}
                 <div>
-                  <FieldTitle>{item.label}</FieldTitle>
+                  <p
+                    className={cn(
+                      "text-sm font-semibold",
+                      isSelected ? "text-brand" : "text-gray-800",
+                    )}
+                  >
+                    {item.label}
+                  </p>
                   {item.description && (
-                    <FieldDescription>{item.description}</FieldDescription>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {item.description}
+                    </p>
                   )}
                 </div>
-              </FieldContent>
+              </div>
 
-              <RadioGroupItem value={item.value} id={item.value} />
-            </Field>
-          </FieldLabel>
-        ))}
-      </RadioGroup>
+              {/* Custom radio dot */}
+              <span
+                className={cn(
+                  "w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0",
+                  isSelected ? "border-brand" : "border-gray-300",
+                )}
+              >
+                {isSelected && (
+                  <span className="w-2 h-2 rounded-full bg-brand block" />
+                )}
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -69,7 +69,7 @@ export default function UsersPage() {
   const [newSubRole, setNewSubRole] = useState("");
   const [roleModalOpen, setRoleModalOpen] = useState(false);
 
-  const { data, isLoading, refetch } = useGetUsersQuery({
+  const { data, isLoading, isError, error, refetch } = useGetUsersQuery({
     search,
     role: roleFilter,
   });
@@ -136,6 +136,21 @@ export default function UsersPage() {
       {isLoading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 animate-spin text-brand" />
+        </div>
+      ) : isError ? (
+        <div className="flex flex-col items-center justify-center py-20 text-gray-400 gap-2">
+          <UserX className="w-12 h-12 mb-2 opacity-30" />
+          <p className="font-medium text-gray-600">
+            {(error as any)?.status === 403
+              ? "Access denied — admin permission required to view users"
+              : "Failed to load users. Please try again."}
+          </p>
+          <button
+            onClick={() => refetch()}
+            className="text-sm text-brand hover:underline mt-1"
+          >
+            Retry
+          </button>
         </div>
       ) : users.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-gray-400">

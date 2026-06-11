@@ -1337,6 +1337,29 @@ export const apiSlice = createApi({
       providesTags: ["StandardRate", "ContractRate", "PromoRate"],
     }),
 
+    // useImportPricingSheetMutation — POST /pricing/import (multipart)
+    ImportPricingSheet: builder.mutation<any, FormData>({
+      query: (formData) => ({
+        url: "/pricing/import",
+        method: "POST",
+        body: formData,
+        // Don't set Content-Type — browser sets multipart boundary automatically
+        formData: true,
+      }),
+      invalidatesTags: ["StandardRate", "Zone"],
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast("Pricing sheet imported successfully");
+        } catch (e: any) {
+          errorToast(
+            e.error?.data?.message ?? "Import failed. Check the file format.",
+          );
+        }
+      },
+    }),
+
+
     // useGetNotificationsQuery
     GetNotifications: builder.query<any, { page?: number } | void>({
       query: (params) => {
@@ -1520,6 +1543,7 @@ export const {
   useDeletePromoRateMutation,
   useUpdateShipmentStatusMutation,
   useGetPricingStatsQuery,
+  useImportPricingSheetMutation,
   useGetNotificationsQuery,
   useMarkNotificationReadMutation,
 } = apiSlice;

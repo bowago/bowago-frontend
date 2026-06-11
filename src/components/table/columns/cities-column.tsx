@@ -48,7 +48,7 @@ export const citiesColumns: ColumnDef<Cities>[] = [
       const router = useRouter();
 
       const onDeleteCity = () => {
-        handleDeleteCity({ id: row.getValue("id") });
+        handleDeleteCity({ id: row.original.id });
       };
 
       return (

@@ -70,7 +70,7 @@ export default function UserDetailPage() {
   const me = useSelector((s: RootState) => s.auth.user);
   const isSuperAdmin = me?.adminSubRole === "SUPER_ADMIN";
 
-  const { data, isLoading, refetch } = useGetUserByIdQuery({ id });
+  const { data, isLoading, isError, error, refetch } = useGetUserByIdQuery({ id });
   const [toggleStatus, { isLoading: toggling }] = useToggleUserActiveMutation();
   const [updateRole, { isLoading: updatingRole }] = useUpdateUserRoleMutation();
   const [deleteUser, { isLoading: deleting }] = useDeleteUserMutation();
@@ -111,11 +111,22 @@ export default function UserDetailPage() {
     );
   }
 
-  if (!user) {
+  if (isError || !user) {
+    const status = (error as any)?.status;
+    const isForbidden = status === 403;
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3 text-gray-400">
         <XCircle className="w-10 h-10 opacity-30" />
-        <p>User not found</p>
+        <p className="font-medium text-gray-600">
+          {isForbidden
+            ? "Access denied — admin permission required"
+            : "User not found or could not be loaded"}
+        </p>
+        <p className="text-xs text-gray-400 max-w-xs text-center">
+          {isForbidden
+            ? "You may not have the required role to view this user's profile."
+            : "The user may have been deleted or the link is invalid."}
+        </p>
         <button
           onClick={() => router.back()}
           className="text-sm text-brand hover:underline"
