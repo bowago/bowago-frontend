@@ -34,11 +34,17 @@ function TrackPageInner() {
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div
           className="absolute -top-40 -right-40 w-[700px] h-[700px] rounded-full"
-          style={{ background: "radial-gradient(circle, rgba(204,0,0,0.12) 0%, transparent 70%)" }}
+          style={{
+            background:
+              "radial-gradient(circle, rgba(204,0,0,0.12) 0%, transparent 70%)",
+          }}
         />
         <div
           className="absolute bottom-0 -left-20 w-[500px] h-[500px] rounded-full"
-          style={{ background: "radial-gradient(circle, rgba(204,0,0,0.06) 0%, transparent 70%)" }}
+          style={{
+            background:
+              "radial-gradient(circle, rgba(204,0,0,0.06) 0%, transparent 70%)",
+          }}
         />
         <div
           className="absolute inset-0 opacity-[0.03]"
@@ -55,7 +61,13 @@ function TrackPageInner() {
         <div className="max-w-6xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3 group">
             <ArrowLeft className="w-4 h-4 text-white/40 group-hover:text-white/70 transition-colors" />
-            <Image src="/bowago-logo.svg" alt="BowaGO" width={100} height={40} />
+            <Image
+              src="/bowago-logo.svg"
+              alt="BowaGO"
+              width={100}
+              height={40}
+              loading="eager"
+            />
           </Link>
           <div className="flex items-center gap-3">
             <Link
@@ -85,7 +97,8 @@ function TrackPageInner() {
             Track Your <span className="text-brand">Shipment</span>
           </h1>
           <p className="text-white/50 text-lg max-w-xl mx-auto">
-            Real-time updates, route map, and full delivery timeline — enter your tracking number below.
+            Real-time updates, route map, and full delivery timeline — enter
+            your tracking number below.
           </p>
         </div>
       </div>
@@ -122,9 +135,21 @@ function TrackPageInner() {
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-white/30">
           <span>© {new Date().getFullYear()} BowaGO Logistics Ltd.</span>
           <div className="flex items-center gap-5">
-            <Link href="/" className="hover:text-white transition-colors">Home</Link>
-            <Link href="/auth/login" className="hover:text-white transition-colors">Admin Login</Link>
-            <Link href="/auth/signup" className="hover:text-white transition-colors">Get Started</Link>
+            <Link href="/" className="hover:text-white transition-colors">
+              Home
+            </Link>
+            <Link
+              href="/auth/login"
+              className="hover:text-white transition-colors"
+            >
+              Admin Login
+            </Link>
+            <Link
+              href="/auth/signup"
+              className="hover:text-white transition-colors"
+            >
+              Get Started
+            </Link>
           </div>
         </div>
       </footer>

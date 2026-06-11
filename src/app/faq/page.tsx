@@ -36,6 +36,7 @@ export default function PublicFAQPage() {
               alt="BowaGO"
               width={100}
               height={40}
+              loading="eager"
             />
           </Link>
           <div className="flex items-center gap-3">

@@ -69,6 +69,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
               height={153}
               alt="BowaGO"
               priority
+              loading="eager"
             />
             <div className="space-y-3 text-white/80">
               {[
@@ -94,6 +95,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
               height={72}
               alt="BowaGO"
               priority
+              loading="eager"
             />
           </div>
 
