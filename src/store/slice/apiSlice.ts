@@ -32,6 +32,7 @@ import {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 // const API_CLIENT_KEY_AUTH = process.env.NEXT_PUBLIC_CLIENT_KEY_AUTH ?? "";
+// const API_CLIENT_KEY = process.env.NEXT_PUBLIC_CLIENT_KEY ?? "";
 
 export type AdminShipmentQueryParams = {
   status?: string;
@@ -1358,7 +1359,6 @@ export const apiSlice = createApi({
         }
       },
     }),
-
 
     // useGetNotificationsQuery
     GetNotifications: builder.query<any, { page?: number } | void>({
