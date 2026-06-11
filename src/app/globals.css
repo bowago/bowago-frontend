@@ -1,11 +1,6 @@
 @import "tailwindcss";
 @variant dark (false);
 
-/* tw-animate-css: animations are handled via custom keyframes below */
-/* shadcn CSS vars are defined in :root below */
-
-/* @custom-variant dark (&:is(.dark *)); */
-
 :root {
   --dark: #1e1e1e;
   --surface: #f8fafc;
