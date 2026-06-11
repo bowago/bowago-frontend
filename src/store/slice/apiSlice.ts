@@ -1235,9 +1235,13 @@ export const apiSlice = createApi({
       },
     }),
     // useGetUsersQuery
-    GetUsers: builder.query<any, any>({
-      query: () => {
-        return `/users`;
+    GetUsers: builder.query<any, { search?: string; role?: string } | void>({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        if (params?.search) searchParams.append("search", params.search);
+        if (params?.role) searchParams.append("role", params.role);
+        const qs = searchParams.toString();
+        return `/users${qs ? `?${qs}` : ""}`;
       },
     }),
 
