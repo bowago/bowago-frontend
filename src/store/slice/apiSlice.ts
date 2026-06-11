@@ -32,7 +32,6 @@ import {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 // const API_CLIENT_KEY_AUTH = process.env.NEXT_PUBLIC_CLIENT_KEY_AUTH ?? "";
-// const API_CLIENT_KEY = process.env.NEXT_PUBLIC_CLIENT_KEY ?? "";
 
 export type AdminShipmentQueryParams = {
   status?: string;
@@ -1338,6 +1337,44 @@ export const apiSlice = createApi({
       providesTags: ["StandardRate", "ContractRate", "PromoRate"],
     }),
 
+    // useEditCityMutation — PATCH /pricing/cities/:id (Super Admin only)
+    EditCity: builder.mutation<
+      any,
+      { id: string; name?: string; region?: string; state?: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/pricing/cities/${id}`,
+        method: "PATCH",
+        body,
+      }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast("City updated successfully");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "City update failed");
+        }
+      },
+    }),
+
+    // useEditZoneMutation — PATCH /pricing/zone-matrix/:id (Super Admin only)
+    EditZone: builder.mutation<any, { id: string; zone: number }>({
+      query: ({ id, zone }) => ({
+        url: `/pricing/zone-matrix/${id}`,
+        method: "PATCH",
+        body: { zone },
+      }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast("Zone updated successfully");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Zone update failed");
+        }
+      },
+      invalidatesTags: ["Zone"],
+    }),
+
     // useImportPricingSheetMutation — POST /pricing/import (multipart)
     ImportPricingSheet: builder.mutation<any, FormData>({
       query: (formData) => ({
@@ -1359,6 +1396,7 @@ export const apiSlice = createApi({
         }
       },
     }),
+
 
     // useGetNotificationsQuery
     GetNotifications: builder.query<any, { page?: number } | void>({
@@ -1544,6 +1582,8 @@ export const {
   useUpdateShipmentStatusMutation,
   useGetPricingStatsQuery,
   useImportPricingSheetMutation,
+  useEditCityMutation,
+  useEditZoneMutation,
   useGetNotificationsQuery,
   useMarkNotificationReadMutation,
 } = apiSlice;
