@@ -2,34 +2,17 @@
 
 import { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { cn } from "@/utils/cn";
-import Image from "next/image";
 import { Controller, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
-import {
-  AddCitiesFormData,
-  addCitiesSchema,
-  CargoFormData,
-  cargoSchema,
-  RouteFormData,
-  routeSchema,
-  ServiceFormData,
-  serviceSchema,
-} from "@/lib/validation";
+import { AddCitiesFormData, addCitiesSchema } from "@/lib/validation";
 import { FieldError, Input, SelectInput } from "../ui/input";
 import { Button } from "../ui/button";
-import { REGION_STATES } from "@/lib/regions";
+import {
+  regionOptions,
+  statesForRegion,
+  getRegionForState,
+} from "@/lib/nigeria-states";
 import { useAddCityMutation } from "@/store/slice/apiSlice";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface QuoteFormData {
-  state: string;
-  name: string;
-  region: string;
-}
-
-// ─── Icons ────────────────────────────────────────────────────────────────────
 
 const LocationIcon = () => (
   <svg
@@ -60,129 +43,57 @@ export default function AddCitiesModal({
   setIsOpen: (e: boolean) => void;
 }) {
   const [handleAddCity, { isLoading }] = useAddCityMutation();
-  // Accumulated data across steps
-  const [collectedData, setCollectedData] = useState<Partial<QuoteFormData>>(
-    {},
-  );
 
-  // ── Step 2 form ──
-  const addCityForm = useForm<AddCitiesFormData>({
+  const form = useForm<AddCitiesFormData>({
     resolver: yupResolver(addCitiesSchema),
-    defaultValues: {
-      name: collectedData.name ?? "",
-      region: collectedData.region ?? "",
-      state: collectedData.state ?? "",
-    },
+    defaultValues: { name: "", region: "", state: "" },
   });
 
-  const reset = () => {
-    setCollectedData({});
-    addCityForm.reset({
-      name: "",
-      region: "",
-      state: "",
-    });
-  };
+  const reset = () =>
+    form.reset({ name: "", region: "", state: "" });
 
   const handleOpenChange = (v: boolean) => {
     setIsOpen(v);
     if (!v) reset();
   };
 
-  const AddCityForm = () => {
-    const {
-      register,
-      handleSubmit,
-      control,
-      watch,
-      setValue,
-      formState: { errors },
-    } = addCityForm;
+  const {
+    register,
+    handleSubmit,
+    control,
+    watch,
+    setValue,
+    formState: { errors },
+  } = form;
 
-    const selectedRegion = watch("region");
+  const selectedRegion = watch("region");
+  const selectedState  = watch("state");
 
-    // Reset state when region changes
-    useEffect(() => {
+  // When region changes → clear state if it no longer belongs to that region
+  useEffect(() => {
+    if (selectedState && getRegionForState(selectedState) !== selectedRegion) {
       setValue("state", "");
-    }, [selectedRegion, setValue]);
+    }
+  }, [selectedRegion]);
 
-    const onSubmit = (data: AddCitiesFormData) => {
-      handleAddCity(data)
-        .unwrap()
-        .then(() => reset());
-    };
+  // When state changes → auto-fill region if it's empty or mismatched
+  const handleStateChange = (state: string) => {
+    setValue("state", state);
+    const region = getRegionForState(state);
+    if (region) setValue("region", region);
+  };
 
-    return (
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <div className="grid grid-cols-2 gap-3 mb-3 mt-6">
-          {/* Origin */}
-          <div className=" col-span-2">
-            <Input
-              label="Name"
-              type="text"
-              placeholder="Enter name"
-              leftIcon={<LocationIcon />}
-              error={errors.name?.message}
-              {...register("name")}
-            />
-          </div>
-
-          {/* Destination */}
-
-          <Controller
-            control={control}
-            name="region"
-            render={({ field }) => (
-              <SelectInput
-                label="Region"
-                placeholder="Select Region"
-                options={Object.keys(REGION_STATES).map((region) => ({
-                  label: region,
-                  value: region,
-                }))}
-                value={field.value}
-                onValueChange={field.onChange}
-                error={errors.region?.message}
-              />
-            )}
-          />
-          <Controller
-            control={control}
-            name="state"
-            render={({ field }) => (
-              <SelectInput
-                label="State"
-                placeholder={
-                  selectedRegion ? "Select state" : "Select region first"
-                }
-                options={selectedRegion ? REGION_STATES[selectedRegion] : []}
-                value={field.value}
-                onValueChange={field.onChange}
-                error={errors.state?.message}
-                disabled={!selectedRegion}
-              />
-            )}
-          />
-        </div>
-
-        <div className="flex justify-end gap-2 mt-5">
-          <Button
-            isLoading={isLoading}
-            type="submit"
-            className="px-5 py-2 text-xs font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-          >
-            Add City
-          </Button>
-        </div>
-      </form>
-    );
+  const onSubmit = (data: AddCitiesFormData) => {
+    handleAddCity(data)
+      .unwrap()
+      .then(() => reset());
   };
 
   return (
     <div className="flex items-center justify-center">
       <Dialog.Root open={isOpen} onOpenChange={handleOpenChange}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 animate-[fadeIn_150ms_ease]" />
+          <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" />
           <Dialog.Content
             className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-white rounded-2xl shadow-2xl w-full max-w-xl p-6 focus:outline-none"
             style={{ maxHeight: "90vh", overflowY: "auto" }}
@@ -190,18 +101,8 @@ export default function AddCitiesModal({
             <div className="flex items-center justify-between mb-1">
               <Dialog.Close asChild>
                 <button className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600">
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2.5}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M6 18L18 6M6 6l12 12"
-                    />
+                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </Dialog.Close>
@@ -211,15 +112,67 @@ export default function AddCitiesModal({
               <span className="w-6" />
             </div>
 
-            <AddCityForm />
+            <form onSubmit={handleSubmit(onSubmit)}>
+              <div className="grid grid-cols-2 gap-3 mb-3 mt-6">
+                <div className="col-span-2">
+                  <Input
+                    label="City Name"
+                    type="text"
+                    placeholder="e.g. Aba"
+                    leftIcon={<LocationIcon />}
+                    error={errors.name?.message}
+                    {...register("name")}
+                  />
+                </div>
+
+                {/* Region — selecting a region filters the state dropdown */}
+                <Controller
+                  control={control}
+                  name="region"
+                  render={({ field }) => (
+                    <SelectInput
+                      label="Region"
+                      placeholder="Select region"
+                      options={regionOptions}
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      error={errors.region?.message}
+                    />
+                  )}
+                />
+
+                {/* State — selecting a state auto-fills region */}
+                <Controller
+                  control={control}
+                  name="state"
+                  render={({ field }) => (
+                    <SelectInput
+                      label="State"
+                      placeholder={
+                        selectedRegion ? "Select state" : "Select state or region first"
+                      }
+                      options={statesForRegion(selectedRegion)}
+                      value={field.value}
+                      onValueChange={handleStateChange}
+                      error={errors.state?.message}
+                    />
+                  )}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 mt-5">
+                <Button
+                  isLoading={isLoading}
+                  type="submit"
+                  className="px-5 py-2 text-xs font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Add City
+                </Button>
+              </div>
+            </form>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-
-      <style>{`
-        @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-        @keyframes slideUp { from { opacity: 0; transform: translate(-50%, -46%) } to { opacity: 1; transform: translate(-50%, -50%) } }
-      `}</style>
     </div>
   );
 }
