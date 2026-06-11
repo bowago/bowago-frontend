@@ -288,12 +288,15 @@ export const apiSlice = createApi({
       },
     }),
     // useUpdateUserProfileMutation
-    updateUserProfile: builder.mutation<unknown, {
-      firstName?: string;
-      lastName?: string;
-      phone?: string;
-      avatar?: string;
-    }>({
+    updateUserProfile: builder.mutation<
+      unknown,
+      {
+        firstName?: string;
+        lastName?: string;
+        phone?: string;
+        avatar?: string;
+      }
+    >({
       query: (body) => ({
         url: `/users/me`,
         method: "PATCH",
@@ -796,7 +799,10 @@ export const apiSlice = createApi({
       invalidatesTags: ["Zone"],
     }),
     // useInitiateShipmentPaymentMutation
-    InitiateShipmentPayment: builder.mutation<any, { shipmentId: string; callbackUrl?: string }>({
+    InitiateShipmentPayment: builder.mutation<
+      any,
+      { shipmentId: string; callbackUrl?: string }
+    >({
       query: (formData) => ({
         url: `/payments/initialize`,
         method: "POST",
@@ -1090,8 +1096,8 @@ export const apiSlice = createApi({
       query: (params) => {
         const searchParams = new URLSearchParams();
         if (params?.status) searchParams.append("status", params.status);
-        if (params?.page)   searchParams.append("page",   String(params.page));
-        if (params?.limit)  searchParams.append("limit",  String(params.limit));
+        if (params?.page) searchParams.append("page", String(params.page));
+        if (params?.limit) searchParams.append("limit", String(params.limit));
         const qs = searchParams.toString();
         // Admin role hits /invoices/admin, customer hits /invoices/my
         const base = params?.admin ? "/invoices/admin" : "/invoices/my";
@@ -1242,11 +1248,14 @@ export const apiSlice = createApi({
     }),
 
     // useGetAdminInvoicesQuery
-    GetAdminInvoices: builder.query<any, { status?: string; page?: number } | void>({
+    GetAdminInvoices: builder.query<
+      any,
+      { status?: string; page?: number } | void
+    >({
       query: (params) => {
         const searchParams = new URLSearchParams();
         if (params?.status) searchParams.append("status", params.status);
-        if (params?.page)   searchParams.append("page",   String(params.page));
+        if (params?.page) searchParams.append("page", String(params.page));
         const qs = searchParams.toString();
         return `/invoices/financial-overview${qs ? "?" + qs : ""}`;
       },
@@ -1266,7 +1275,9 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Payment verification failed");
+          errorToast(
+            errorM.error?.data?.message || "Payment verification failed",
+          );
         }
       },
       invalidatesTags: ["Shipment"],
@@ -1293,7 +1304,10 @@ export const apiSlice = createApi({
     }),
 
     // useUpdateShipmentStatusMutation — admin updates shipment status
-    UpdateShipmentStatus: builder.mutation<unknown, { id: string; status: string; location?: string; description?: string }>({
+    UpdateShipmentStatus: builder.mutation<
+      unknown,
+      { id: string; status: string; location?: string; description?: string }
+    >({
       query: ({ id, ...body }) => ({
         url: `/shipments/${id}/status`,
         method: "PATCH",
@@ -1335,37 +1349,83 @@ export const apiSlice = createApi({
       }),
     }),
 
-
     // ─── 2FA ─────────────────────────────────────────────────────────────────
     Setup2FA: builder.mutation<any, { method: "SMS" | "EMAIL" }>({
       query: (body) => ({ url: "/auth/setup-2fa", method: "POST", body }),
       async onQueryStarted(_, { queryFulfilled }) {
-        try { await queryFulfilled; }
-        catch (e: any) { errorToast(e.error?.data?.message || "2FA setup failed"); }
+        try {
+          await queryFulfilled;
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "2FA setup failed");
+        }
       },
     }),
     Verify2FA: builder.mutation<any, { otp: string }>({
       query: (body) => ({ url: "/auth/verify-2fa", method: "POST", body }),
       async onQueryStarted(_, { queryFulfilled }) {
-        try { const { data } = await queryFulfilled; if (data) successToast("2FA verified successfully"); }
-        catch (e: any) { errorToast(e.error?.data?.message || "Verification failed"); }
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast("2FA verified successfully");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Verification failed");
+        }
       },
     }),
 
     // ─── User Management ──────────────────────────────────────────────────────
-    UpdateUserRole: builder.mutation<any, { userId: string; adminSubRole: string }>({
-      query: ({ userId, ...body }) => ({ url: `/users/${userId}/role`, method: "PATCH", body }),
+    UpdateUserRole: builder.mutation<
+      any,
+      { userId: string; adminSubRole: string }
+    >({
+      query: ({ userId, ...body }) => ({
+        url: `/users/${userId}/role`,
+        method: "PATCH",
+        body,
+      }),
       async onQueryStarted(_, { queryFulfilled }) {
-        try { const { data } = await queryFulfilled; if (data) successToast("Role updated successfully"); }
-        catch (e: any) { errorToast(e.error?.data?.message || "Role update failed"); }
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast("Role updated successfully");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Role update failed");
+        }
       },
       invalidatesTags: [],
     }),
-    ToggleUserActive: builder.mutation<any, { userId: string; isActive: boolean }>({
-      query: ({ userId, isActive }) => ({ url: `/users/${userId}/status`, method: "PATCH", body: { isActive } }),
+    ToggleUserActive: builder.mutation<
+      any,
+      { userId: string; isActive: boolean }
+    >({
+      query: ({ userId, isActive }) => ({
+        url: `/users/${userId}/status`,
+        method: "PATCH",
+        body: { isActive },
+      }),
       async onQueryStarted(_, { queryFulfilled }) {
-        try { const { data } = await queryFulfilled; if (data) successToast("User status updated"); }
-        catch (e: any) { errorToast(e.error?.data?.message || "Status update failed"); }
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast("User status updated");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Status update failed");
+        }
+      },
+    }),
+
+    // useGetUserByIdQuery
+    GetUserById: builder.query<any, { id: string }>({
+      query: ({ id }) => `/users/${id}`,
+    }),
+
+    // useDeleteUserMutation
+    DeleteUser: builder.mutation<any, { id: string }>({
+      query: ({ id }) => ({ url: `/users/${id}`, method: "DELETE" }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast("User deleted successfully");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Delete failed");
+        }
       },
     }),
 
@@ -1407,6 +1467,8 @@ export const {
   useGetUsersQuery,
   useUpdateUserRoleMutation,
   useToggleUserActiveMutation,
+  useGetUserByIdQuery,
+  useDeleteUserMutation,
   useSetup2FAMutation,
   useVerify2FAMutation,
 
