@@ -5,6 +5,7 @@ import { useGetCitiesQuery } from "@/store/slice/apiSlice";
 import { Filter } from "lucide-react";
 import { useState } from "react";
 import { citiesColumns } from "../table/columns/cities-column";
+import { regionOptions, statesForRegion } from "@/lib/nigeria-states";
 
 export default function CitiesRateManagementView() {
   const [filters, setFilters] = useState({
@@ -15,43 +16,35 @@ export default function CitiesRateManagementView() {
 
   const [appliedFilters, setAppliedFilters] = useState(filters);
 
-  const { data, isLoading } = useGetCitiesQuery(appliedFilters);
-
-  // Apply filtering only using appliedFilters
+  // Always refetch on focus / on cache invalidation so the table reflects
+  // create/edit/delete actions immediately without a manual page refresh.
+  const { data, isLoading, isFetching } = useGetCitiesQuery(appliedFilters, {
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
+  });
 
   const handleChange = (key: string, value: string) => {
     setFilters((prev) => ({
       ...prev,
       [key]: value,
+      // Clear state if region changes (state list depends on region)
+      ...(key === "region" ? { state: "" } : {}),
     }));
   };
 
-  // Apply filters when button is clicked
   const applyFilters = () => {
     setAppliedFilters(filters);
   };
 
   const clearFilters = () => {
-    const empty = {
-      search: "",
-      region: "",
-      state: "",
-    };
-
+    const empty = { search: "", region: "", state: "" };
     setFilters(empty);
     setAppliedFilters(empty);
   };
 
   const removeFilter = (key: string) => {
-    setAppliedFilters((prev) => ({
-      ...prev,
-      [key]: "",
-    }));
-
-    setFilters((prev) => ({
-      ...prev,
-      [key]: "",
-    }));
+    setAppliedFilters((prev) => ({ ...prev, [key]: "" }));
+    setFilters((prev) => ({ ...prev, [key]: "" }));
   };
 
   return (
@@ -64,18 +57,34 @@ export default function CitiesRateManagementView() {
           placeholder="Search by city name"
           className="border rounded-md p-2"
         />
-        <input
+
+        {/* Region — dropdown sourced from the shared Nigerian states lib */}
+        <select
           value={filters.region}
           onChange={(e) => handleChange("region", e.target.value)}
-          placeholder="Enter region"
-          className="border rounded-md p-2"
-        />
-        <input
+          className="border rounded-md p-2 bg-white text-sm"
+        >
+          <option value="">All regions</option>
+          {regionOptions.map((r) => (
+            <option key={r.value} value={r.value}>
+              {r.label}
+            </option>
+          ))}
+        </select>
+
+        {/* State — dropdown filtered by selected region */}
+        <select
           value={filters.state}
           onChange={(e) => handleChange("state", e.target.value)}
-          placeholder="Enter state"
-          className="border rounded-md p-2"
-        />
+          className="border rounded-md p-2 bg-white text-sm"
+        >
+          <option value="">All states</option>
+          {statesForRegion(filters.region).map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
+        </select>
 
         <button
           onClick={applyFilters}
@@ -116,7 +125,7 @@ export default function CitiesRateManagementView() {
         )}
       </div>
 
-      {isLoading && <div>...Loading all cities </div>}
+      {(isLoading || isFetching) && <div>...Loading all cities </div>}
       {/* Table */}
       {data?.data?.cities && (
         <AppTable columns={citiesColumns} data={data?.data?.cities} />

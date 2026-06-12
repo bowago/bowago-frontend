@@ -113,6 +113,7 @@ export const apiSlice = createApi({
   tagTypes: [
     "Dimension",
     "Zone",
+    "City",
     "StandardRate",
     "ContractRate",
     "PromoRate",
@@ -334,7 +335,7 @@ export const apiSlice = createApi({
           errorToast(errorM.error?.data?.message || "Unexpected errror");
         }
       },
-      invalidatesTags: ["Zone"],
+      invalidatesTags: ["Zone", "City"],
     }),
     // useAddCityMutation
     addCity: builder.mutation<
@@ -357,6 +358,7 @@ export const apiSlice = createApi({
           errorToast(errorM.error?.data?.message || "Unexpected errror");
         }
       },
+      invalidatesTags: ["City"],
     }),
     // useCreateQuoteMutation
     CreateQuote: builder.mutation<
@@ -736,7 +738,7 @@ export const apiSlice = createApi({
           errorToast(errorM.error?.data?.message || "Unexpected errror");
         }
       },
-      invalidatesTags: ["Zone"],
+      invalidatesTags: ["Zone", "City"],
     }),
     // useDeleteSurchargeMutation
     DeleteSurcharge: builder.mutation<unknown, { id: string }>({
@@ -776,7 +778,7 @@ export const apiSlice = createApi({
           errorToast(errorM.error?.data?.message || "Unexpected errror");
         }
       },
-      invalidatesTags: ["Zone"],
+      invalidatesTags: ["Zone", "City"],
     }),
     // useReInstateZoneMutation
     ReInstateZone: builder.mutation<unknown, { id: string }>({
@@ -796,7 +798,7 @@ export const apiSlice = createApi({
           errorToast(errorM.error?.data?.message || "Unexpected errror");
         }
       },
-      invalidatesTags: ["Zone"],
+      invalidatesTags: ["Zone", "City"],
     }),
     // useInitiateShipmentPaymentMutation
     InitiateShipmentPayment: builder.mutation<
@@ -902,24 +904,24 @@ export const apiSlice = createApi({
       invalidatesTags: ["Shipment"],
     }),
 
-    // useDeleteCityMutation
-    deleteCity: builder.mutation<unknown, { id: string }>({
-      query: (formData) => ({
-        url: `/pricing/cities/${formData?.id}`,
+    // useDeleteCityMutation — pass force:true to cascade-delete dependent routes
+    deleteCity: builder.mutation<unknown, { id: string; force?: boolean }>({
+      query: ({ id, force }) => ({
+        url: `/pricing/cities/${id}${force ? "?force=true" : ""}`,
         method: "DELETE",
-        body: formData,
       }),
-      async onQueryStarted(args, { queryFulfilled }) {
+      async onQueryStarted(_, { queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          if (data) {
-            successToast("City Deleted Successfully");
-          }
-        } catch (error) {
-          const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          if (data) successToast((data as any)?.message || "City Deleted Successfully");
+        } catch (error: any) {
+          // 409 = city has dependent zone/km routes — UI shows a confirmation
+          // dialog for this instead of a generic error toast.
+          if (error?.error?.status === 409) return;
+          errorToast(error?.error?.data?.message || "Unexpected error");
         }
       },
+      invalidatesTags: ["City", "Zone"],
     }),
 
     // useDeleteStandardRateMutation
@@ -988,6 +990,7 @@ export const apiSlice = createApi({
 
         return `/pricing/cities?${searchParams.toString()}`;
       },
+      providesTags: ["City"],
     }),
 
     // useGetSurchargesQuery
@@ -1355,6 +1358,7 @@ export const apiSlice = createApi({
           errorToast(e.error?.data?.message || "City update failed");
         }
       },
+      invalidatesTags: ["City"],
     }),
 
     // useEditZoneMutation — PATCH /pricing/zone-matrix/:id (Super Admin only)
@@ -1372,7 +1376,7 @@ export const apiSlice = createApi({
           errorToast(e.error?.data?.message || "Zone update failed");
         }
       },
-      invalidatesTags: ["Zone"],
+      invalidatesTags: ["Zone", "City"],
     }),
 
     // useImportPricingSheetMutation — POST /pricing/import (multipart)
