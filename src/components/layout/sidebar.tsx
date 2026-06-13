@@ -12,6 +12,7 @@ import {
   Map,
   FileText,
   Ticket,
+  AlertTriangle,
   HelpCircle,
   Settings,
   LogOut,
@@ -119,6 +120,12 @@ const menuList: MenuItem[] = [
     icon: <Receipt className={ICON_CLS} />,
   },
   {
+    label: "Failed Webhooks",
+    href: "/dashboard/payment/webhooks",
+    roles: ["ADMIN"],
+    icon: <AlertTriangle className={ICON_CLS} />,
+  },
+  {
     label: "Support",
     href: "/dashboard/tickets",
     roles: ["ADMIN"],
@@ -175,6 +182,20 @@ const menuList: MenuItem[] = [
     href: "/dashboard/users",
     roles: ["ADMIN"],
     icon: <Users className={ICON_CLS} />,
+    children: [
+      {
+        label: "All Users",
+        href: "/dashboard/users",
+        roles: ["ADMIN"],
+        icon: <Users className={ICON_CLS} />,
+      },
+      {
+        label: "Custom Capabilities",
+        href: "/dashboard/users/roles",
+        roles: ["ADMIN"],
+        icon: <Shield className={ICON_CLS} />,
+      },
+    ],
   },
 ];
 

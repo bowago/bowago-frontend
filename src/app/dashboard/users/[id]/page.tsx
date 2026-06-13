@@ -31,6 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog/dialog";
 
 const SUB_ROLES = [
+  { value: "CUSTOMER", label: "Customer (no admin access)" },
   { value: "LOGISTICS_MANAGER", label: "Logistics Manager" },
   { value: "ROLE_ADMIN", label: "Custom Admin" },
   { value: "ROLE_AGENT", label: "CS Agent" },
@@ -83,7 +84,7 @@ export default function UserDetailPage() {
   const shipments: any[] = data?.data?.shipments ?? [];
 
   const openRoleModal = () => {
-    setNewSubRole(user?.adminSubRole ?? "LOGISTICS_MANAGER");
+    setNewSubRole(user?.adminSubRole ?? "CUSTOMER");
     setRoleModalOpen(true);
   };
 
@@ -93,7 +94,11 @@ export default function UserDetailPage() {
   };
 
   const handleRoleUpdate = async () => {
-    await updateRole({ userId: id, adminSubRole: newSubRole });
+    if (newSubRole === "CUSTOMER") {
+      await updateRole({ userId: id, role: "CUSTOMER" });
+    } else {
+      await updateRole({ userId: id, adminSubRole: newSubRole });
+    }
     setRoleModalOpen(false);
     refetch();
   };
@@ -113,26 +118,85 @@ export default function UserDetailPage() {
 
   if (isError || !user) {
     const status = (error as any)?.status;
+    const backendMessage = (error as any)?.data?.message as string | undefined;
     const isForbidden = status === 403;
+    const isNotFound = status === 404;
+
+    let heading = "User not found or could not be loaded";
+    let detail =
+      "The user may have been deleted or the link is invalid.";
+
+    if (isForbidden) {
+      heading = "Access denied — admin permission required";
+      detail = "You may not have the required role to view this user's profile.";
+    } else if (isNotFound) {
+      heading = "User not found";
+      detail = backendMessage ?? "This user does not exist or was removed.";
+    } else if (isError) {
+      // Anything else (500, network error, etc.) — surface the real message
+      // instead of a generic "not found" so it's clear something else broke.
+      heading = "Something went wrong loading this user";
+      detail =
+        backendMessage ?? `Unexpected error${status ? ` (status ${status})` : ""}. Please try again.`;
+    }
+
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3 text-gray-400">
         <XCircle className="w-10 h-10 opacity-30" />
-        <p className="font-medium text-gray-600">
-          {isForbidden
-            ? "Access denied — admin permission required"
-            : "User not found or could not be loaded"}
-        </p>
-        <p className="text-xs text-gray-400 max-w-xs text-center">
-          {isForbidden
-            ? "You may not have the required role to view this user's profile."
-            : "The user may have been deleted or the link is invalid."}
-        </p>
-        <button
-          onClick={() => router.back()}
-          className="text-sm text-brand hover:underline"
-        >
-          Go back
-        </button>
+        <p className="font-medium text-gray-600">{heading}</p>
+        <p className="text-xs text-gray-400 max-w-sm text-center">{detail}</p>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => router.back()}
+            className="text-sm text-brand hover:underline"
+          >
+            Go back
+          </button>
+          {!isForbidden && !isNotFound && (
+            <button
+              onClick={() => refetch()}
+              className="text-sm text-brand hover:underline"
+            >
+              Retry
+            </button>
+          )}
+        </div>
+
+        {/* ── Debug panel (Super Admin only) ──
+            Shows the raw RTK Query state so we can see exactly what the API
+            returned. Remove once the root cause is confirmed. */}
+        {isSuperAdmin && (
+          <div className="w-full max-w-2xl mt-6 text-left">
+            <p className="text-xs font-semibold text-gray-500 mb-2">
+              🔧 Debug info (visible to Super Admin only)
+            </p>
+            <div className="grid grid-cols-1 gap-3 text-xs">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <p className="font-mono text-gray-400 mb-1">
+                  requested id (from useParams):
+                </p>
+                <pre className="text-gray-700 break-all">{String(id)}</pre>
+              </div>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <p className="font-mono text-gray-400 mb-1">
+                  isLoading={String(isLoading)} · isError={String(isError)} · status={String(status)}
+                </p>
+              </div>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <p className="font-mono text-gray-400 mb-1">data (RTK Query result):</p>
+                <pre className="text-gray-700 overflow-x-auto max-h-64">
+                  {JSON.stringify(data, null, 2) ?? "undefined"}
+                </pre>
+              </div>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <p className="font-mono text-gray-400 mb-1">error (RTK Query result):</p>
+                <pre className="text-gray-700 overflow-x-auto max-h-64">
+                  {JSON.stringify(error, null, 2) ?? "undefined"}
+                </pre>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -298,16 +362,16 @@ export default function UserDetailPage() {
               {user.isActive ? "Suspend account" : "Activate account"}
             </button>
 
-            {/* Set role (super admin only, non-super-admin targets) */}
+            {/* Set role (super admin only, non-super-admin targets, not self) */}
             {isSuperAdmin &&
-              user.role === "ADMIN" &&
-              user.adminSubRole !== "SUPER_ADMIN" && (
+              user.adminSubRole !== "SUPER_ADMIN" &&
+              user.id !== me?.id && (
                 <button
                   onClick={openRoleModal}
                   className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-sm font-medium text-brand hover:bg-brand/5 border border-brand/20 transition-colors"
                 >
                   <Shield className="w-4 h-4" />
-                  Change sub-role
+                  Change role
                 </button>
               )}
 

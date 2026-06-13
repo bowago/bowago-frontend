@@ -2,7 +2,7 @@
 
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
-import { Mail, Lock } from "lucide-react";
+import { Mail, Lock, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { AlertBanner, AuthCardHeader } from "../layout/authLayout";
 import { LoginFormData, loginSchema } from "@/lib/validation";
@@ -10,14 +10,25 @@ import { Input } from "../ui/input/Input";
 import { Button } from "../ui/button/button";
 import { SocialLogin } from "../ui/button/social-button";
 import { useRouter } from "next/navigation";
-import { useLoginMutation } from "@/store/slice/apiSlice";
+import {
+  useLoginMutation,
+  useVerifyLogin2FAMutation,
+} from "@/store/slice/apiSlice";
 import { useState } from "react";
 
 export function LoginForm() {
   const router = useRouter();
   const [serverError, setServerError] = useState("");
 
+  // ── 2FA challenge state ──
+  // If POST /auth/login returns requires2FA:true, we switch to this step
+  // instead of redirecting — a 6-digit code has been emailed to the user.
+  const [pending2FAEmail, setPending2FAEmail] = useState<string | null>(null);
+  const [otp, setOtp] = useState("");
+
   const [onLogin, { isLoading }] = useLoginMutation();
+  const [verifyLogin2FA, { isLoading: isVerifying2FA }] =
+    useVerifyLogin2FAMutation();
 
   const {
     register,
@@ -32,6 +43,13 @@ export function LoginForm() {
     try {
       // unwrap() throws on error, resolves with data on success
       const result = await onLogin(formData).unwrap();
+
+      if (result?.data?.requires2FA) {
+        // 2FA enabled — show OTP step instead of redirecting
+        setPending2FAEmail(result.data.email ?? formData.email);
+        return;
+      }
+
       // onQueryStarted in apiSlice already dispatches token + user to Redux
       // Just redirect — token is already in store
       if (result?.data?.accessToken) {
@@ -46,6 +64,78 @@ export function LoginForm() {
       setServerError(msg);
     }
   };
+
+  const onVerify2FA = async () => {
+    if (!pending2FAEmail || otp.length !== 6) return;
+    setServerError("");
+    try {
+      const result = await verifyLogin2FA({
+        email: pending2FAEmail,
+        otp,
+      }).unwrap();
+      if (result?.data?.accessToken) {
+        router.push("/dashboard");
+      }
+    } catch (err: any) {
+      const msg =
+        err?.data?.message ||
+        err?.error?.data?.message ||
+        "Invalid or expired code. Please try again.";
+      setServerError(msg);
+    }
+  };
+
+  // ── 2FA OTP step ──
+  if (pending2FAEmail) {
+    return (
+      <>
+        <AuthCardHeader
+          title="Two-Factor Verification"
+          subtitle={`Enter the 6-digit code sent to ${pending2FAEmail}`}
+        />
+
+        {serverError && <AlertBanner message={serverError} type="error" />}
+
+        <div className="flex flex-col gap-4 mt-6">
+          <Input
+            label="Verification Code"
+            type="text"
+            inputMode="numeric"
+            maxLength={6}
+            placeholder="123456"
+            leftIcon={<ShieldCheck size={15} />}
+            value={otp}
+            onChange={(e) =>
+              setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+            }
+          />
+
+          <Button
+            type="button"
+            onClick={onVerify2FA}
+            isLoading={isVerifying2FA}
+            disabled={otp.length !== 6}
+            fullWidth
+            className="mt-1"
+          >
+            Verify & Continue
+          </Button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setPending2FAEmail(null);
+              setOtp("");
+              setServerError("");
+            }}
+            className="text-sm text-gray-500 hover:underline mt-1"
+          >
+            ← Back to login
+          </button>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>

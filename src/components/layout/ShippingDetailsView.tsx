@@ -17,8 +17,8 @@ export type TrackingStop = {
     | string;
   location: string;
   description: string;
-  lat: number;
-  lng: number;
+  lat?: number | null;
+  lng?: number | null;
   proofUrl?: string;
   updatedBy?: string;
   createdAt: string;
@@ -189,7 +189,9 @@ interface MapProps {
 export const ShipmentTrackerMap = ({ trackingHistory, dark = false }: MapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<unknown>(null);
-  const hasRealCoords = trackingHistory.some((s) => s.lat !== 0 || s.lng !== 0);
+  const hasRealCoords = trackingHistory.some(
+    (s) => (s.lat ?? 0) !== 0 || (s.lng ?? 0) !== 0,
+  );
 
   useEffect(() => {
     if (!hasRealCoords || !mapRef.current || mapInstanceRef.current) return;
@@ -208,7 +210,7 @@ export const ShipmentTrackerMap = ({ trackingHistory, dark = false }: MapProps) 
 
       const points: [number, number][] = [];
       trackingHistory.forEach((stop, i) => {
-        if (stop.lat === 0 && stop.lng === 0) return;
+        if (!stop.lat || !stop.lng) return;
         const isLast = i === trackingHistory.length - 1;
         const color = STATUS_COLORS[stop.status] ?? "#888";
         const icon = L.divIcon({

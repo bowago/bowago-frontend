@@ -34,7 +34,8 @@ export const resetPasswordSchema = yup.object({
     .required("OTP is required"),
   password: yup
     .string()
-    .min(8, "Password must be at least 8 characters")
+    .min(12, "Password must be at least 12 characters")
+    .matches(/[a-z]/, "Password must contain at least one lowercase letter")
     .matches(/[A-Z]/, "Password must contain at least one uppercase letter")
     .matches(/[0-9]/, "Password must contain at least one number")
     .required("Password is required"),
@@ -54,7 +55,8 @@ export const changePasswordSchema = yup.object({
     .label("Current Password"),
   newPassword: yup
     .string()
-    .min(8, "Password must be at least 8 characters")
+    .min(12, "Password must be at least 12 characters")
+    .matches(/[a-z]/, "Password must contain at least one lowercase letter")
     .matches(/[A-Z]/, "Password must contain at least one uppercase letter")
     .matches(/[0-9]/, "Password must contain at least one number")
     .required()
@@ -77,7 +79,8 @@ export const signupSchema = yup.object({
     .required("Phone number is required"),
   password: yup
     .string()
-    .min(8, "Password must be at least 8 characters")
+    .min(12, "Password must be at least 12 characters")
+    .matches(/[a-z]/, "Must contain at least one lowercase letter")
     .matches(/[A-Z]/, "Must contain at least one uppercase letter")
     .matches(/[0-9]/, "Must contain at least one number")
     .required("Password is required"),

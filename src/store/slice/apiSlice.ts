@@ -123,6 +123,9 @@ export const apiSlice = createApi({
     "Ticket",
     "Claim",
     "FAQ",
+    "FailedWebhook",
+    "AdminRole",
+    "User",
   ],
   baseQuery: baseQueryWithReauth,
   endpoints: (builder) => ({
@@ -152,7 +155,11 @@ export const apiSlice = createApi({
       async onQueryStarted(args, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          // console.log(data);
+
+          // If 2FA is enabled, no tokens are issued yet — the UI should
+          // prompt for the emailed code and call useVerifyLogin2FAMutation.
+          if ((data as any)?.data?.requires2FA) return;
+
           const userToken = {
             accessToken: data?.data?.accessToken,
             refreshToken: data?.data?.refreshToken,
@@ -1246,6 +1253,7 @@ export const apiSlice = createApi({
         const qs = searchParams.toString();
         return `/users${qs ? `?${qs}` : ""}`;
       },
+      providesTags: ["User"],
     }),
 
     // useGetAdminDashboardQuery
@@ -1334,10 +1342,183 @@ export const apiSlice = createApi({
       invalidatesTags: ["Shipment"],
     }),
 
+    // ─── Custom Admin Capabilities (Super Admin) ──────────────────────────────
+    // useGetCapabilitiesQuery — full list of toggleable capability flags
+    GetCapabilities: builder.query<any, void>({
+      query: () => "/admin/roles/capabilities",
+    }),
+    // useGetAdminRolesQuery — list all staff with custom role assignments
+    GetAdminRoles: builder.query<any, { page?: number; limit?: number } | void>({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        if (params?.page) searchParams.append("page", String(params.page));
+        if (params?.limit) searchParams.append("limit", String(params.limit));
+        const qs = searchParams.toString();
+        return `/admin/roles${qs ? `?${qs}` : ""}`;
+      },
+      providesTags: ["AdminRole"],
+    }),
+    // useGetAdminRoleQuery — get one user's capability set
+    GetAdminRole: builder.query<any, { userId: string }>({
+      query: ({ userId }) => `/admin/roles/${userId}`,
+      providesTags: ["AdminRole"],
+    }),
+    // useAssignCustomRoleMutation — create/replace a user's capability set (sets adminSubRole to ROLE_ADMIN)
+    AssignCustomRole: builder.mutation<
+      any,
+      {
+        userId: string;
+        roleLabel?: string;
+        notes?: string;
+        canManageRates?: boolean;
+        canManageUsers?: boolean;
+        canManageShipments?: boolean;
+        canViewAnalytics?: boolean;
+        canManageTickets?: boolean;
+        canManageInvoices?: boolean;
+        canManageSurcharges?: boolean;
+        canManagePromos?: boolean;
+        canManageClaims?: boolean;
+        canBulkNotify?: boolean;
+        canViewAuditLogs?: boolean;
+        canManageOrganization?: boolean;
+      }
+    >({
+      query: ({ userId, ...body }) => ({
+        url: "/admin/roles",
+        method: "POST",
+        body: { userId, ...body },
+      }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast((data as any)?.message || "Custom role assigned successfully");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Failed to assign custom role");
+        }
+      },
+      invalidatesTags: ["AdminRole", "User"],
+    }),
+    // useUpdateCustomRoleMutation — update capability flags for an existing custom role
+    UpdateCustomRole: builder.mutation<
+      any,
+      { userId: string } & Record<string, boolean | string | undefined>
+    >({
+      query: ({ userId, ...body }) => ({
+        url: `/admin/roles/${userId}`,
+        method: "PATCH",
+        body,
+      }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast("Custom role updated successfully");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Failed to update custom role");
+        }
+      },
+      invalidatesTags: ["AdminRole"],
+    }),
+    // useRevokeCustomRoleMutation — remove capability set, revert to LOGISTICS_MANAGER
+    RevokeCustomRole: builder.mutation<any, { userId: string }>({
+      query: ({ userId }) => ({
+        url: `/admin/roles/${userId}`,
+        method: "DELETE",
+      }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast((data as any)?.message || "Custom role revoked");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Failed to revoke custom role");
+        }
+      },
+      invalidatesTags: ["AdminRole", "User"],
+    }),
+
+    // ─── Webhook Dead Letter Queue (Super Admin) ──────────────────────────────
+    // useGetFailedWebhooksQuery
+    GetFailedWebhooks: builder.query<
+      any,
+      { status?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        if (params?.status) searchParams.append("status", params.status);
+        if (params?.page) searchParams.append("page", String(params.page));
+        if (params?.limit) searchParams.append("limit", String(params.limit));
+        const qs = searchParams.toString();
+        return `/payments/webhooks/failed${qs ? `?${qs}` : ""}`;
+      },
+      providesTags: ["FailedWebhook"],
+    }),
+    // useRetryFailedWebhookMutation
+    RetryFailedWebhook: builder.mutation<any, { id: string }>({
+      query: ({ id }) => ({
+        url: `/payments/webhooks/failed/${id}/retry`,
+        method: "POST",
+      }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast((data as any)?.message || "Webhook re-processed successfully");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Retry failed");
+        }
+      },
+      invalidatesTags: ["FailedWebhook"],
+    }),
+    // useDismissFailedWebhookMutation
+    DismissFailedWebhook: builder.mutation<any, { id: string }>({
+      query: ({ id }) => ({
+        url: `/payments/webhooks/failed/${id}/dismiss`,
+        method: "POST",
+      }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast("Webhook entry dismissed");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Failed to dismiss");
+        }
+      },
+      invalidatesTags: ["FailedWebhook"],
+    }),
+
     // useGetPricingStatsQuery — already exists as GetRateOverview, but add canonical name
     GetPricingStats: builder.query<any, void>({
       query: () => "/pricing/stats",
       providesTags: ["StandardRate", "ContractRate", "PromoRate"],
+    }),
+
+    // useEditBoxDimensionMutation — PATCH /pricing/dimensions/:id (Super Admin only)
+    EditBoxDimension: builder.mutation<
+      any,
+      {
+        id: string;
+        categoryId?: string;
+        displayName?: string;
+        lengthCm?: number;
+        widthCm?: number;
+        heightCm?: number;
+        bestFor?: string;
+        weightKgLimit?: number;
+      }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/pricing/dimensions/${id}`,
+        method: "PATCH",
+        body,
+      }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast("Box dimension updated successfully");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Box dimension update failed");
+        }
+      },
+      invalidatesTags: ["Dimension"],
     }),
 
     // useEditCityMutation — PATCH /pricing/cities/:id (Super Admin only)
@@ -1423,7 +1604,8 @@ export const apiSlice = createApi({
       query: (body) => ({ url: "/auth/setup-2fa", method: "POST", body }),
       async onQueryStarted(_, { queryFulfilled }) {
         try {
-          await queryFulfilled;
+          const { data } = await queryFulfilled;
+          if (data) successToast((data as any)?.message || "Verification code sent");
         } catch (e: any) {
           errorToast(e.error?.data?.message || "2FA setup failed");
         }
@@ -1434,9 +1616,39 @@ export const apiSlice = createApi({
       async onQueryStarted(_, { queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          if (data) successToast("2FA verified successfully");
+          if (data) successToast("Two-factor authentication enabled");
         } catch (e: any) {
           errorToast(e.error?.data?.message || "Verification failed");
+        }
+      },
+    }),
+    // useDisable2FAMutation
+    Disable2FA: builder.mutation<any, { password: string }>({
+      query: (body) => ({ url: "/auth/disable-2fa", method: "POST", body }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast("Two-factor authentication disabled");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Failed to disable 2FA");
+        }
+      },
+    }),
+    // useVerifyLogin2FAMutation — completes login after Login returns requires2FA:true
+    VerifyLogin2FA: builder.mutation<AuthResponse, { email: string; otp: string }>({
+      query: (body) => ({ url: "/auth/login-2fa", method: "POST", body }),
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          const userToken = {
+            accessToken: (data as any)?.data?.accessToken,
+            refreshToken: (data as any)?.data?.refreshToken,
+          };
+          dispatch(authTokenChange(userToken));
+          dispatch(setUserData((data as any).data.user));
+        } catch (error) {
+          const errorM = error as CustomError;
+          errorToast(errorM.error?.data?.message || "Invalid or expired code");
         }
       },
     }),
@@ -1444,7 +1656,7 @@ export const apiSlice = createApi({
     // ─── User Management ──────────────────────────────────────────────────────
     UpdateUserRole: builder.mutation<
       any,
-      { userId: string; adminSubRole: string }
+      { userId: string; adminSubRole?: string; role?: "ADMIN" | "CUSTOMER" }
     >({
       query: ({ userId, ...body }) => ({
         url: `/users/${userId}/role`,
@@ -1459,7 +1671,7 @@ export const apiSlice = createApi({
           errorToast(e.error?.data?.message || "Role update failed");
         }
       },
-      invalidatesTags: [],
+      invalidatesTags: ["User", "AdminRole"],
     }),
     ToggleUserActive: builder.mutation<
       any,
@@ -1478,11 +1690,13 @@ export const apiSlice = createApi({
           errorToast(e.error?.data?.message || "Status update failed");
         }
       },
+      invalidatesTags: ["User"],
     }),
 
     // useGetUserByIdQuery
     GetUserById: builder.query<any, { id: string }>({
       query: ({ id }) => `/users/${id}`,
+      providesTags: ["User"],
     }),
 
     // useDeleteUserMutation
@@ -1496,6 +1710,7 @@ export const apiSlice = createApi({
           errorToast(e.error?.data?.message || "Delete failed");
         }
       },
+      invalidatesTags: ["User"],
     }),
 
     // useGetRateOverviewQuery
@@ -1540,6 +1755,8 @@ export const {
   useDeleteUserMutation,
   useSetup2FAMutation,
   useVerify2FAMutation,
+  useDisable2FAMutation,
+  useVerifyLogin2FAMutation,
 
   // invoice
   useGetAllInvoiceQuery,
@@ -1585,7 +1802,17 @@ export const {
   useDeletePromoRateMutation,
   useUpdateShipmentStatusMutation,
   useGetPricingStatsQuery,
+  useGetCapabilitiesQuery,
+  useGetAdminRolesQuery,
+  useGetAdminRoleQuery,
+  useAssignCustomRoleMutation,
+  useUpdateCustomRoleMutation,
+  useRevokeCustomRoleMutation,
+  useGetFailedWebhooksQuery,
+  useRetryFailedWebhookMutation,
+  useDismissFailedWebhookMutation,
   useImportPricingSheetMutation,
+  useEditBoxDimensionMutation,
   useEditCityMutation,
   useEditZoneMutation,
   useGetNotificationsQuery,

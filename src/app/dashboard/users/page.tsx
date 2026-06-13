@@ -21,6 +21,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog/dialog";
 import { Button } from "@/components/ui/button";
 
 const SUB_ROLES = [
+  { value: "CUSTOMER", label: "Customer (no admin access)" },
   { value: "LOGISTICS_MANAGER", label: "Logistics Manager" },
   { value: "ROLE_ADMIN", label: "Custom Admin (ROLE_ADMIN)" },
   { value: "ROLE_AGENT", label: "CS Agent" },
@@ -79,13 +80,17 @@ export default function UsersPage() {
 
   const openRoleModal = (u: User) => {
     setSelectedUser(u);
-    setNewSubRole(u.adminSubRole ?? "LOGISTICS_MANAGER");
+    setNewSubRole(u.adminSubRole ?? "CUSTOMER");
     setRoleModalOpen(true);
   };
 
   const handleRoleUpdate = async () => {
     if (!selectedUser) return;
-    await updateRole({ userId: selectedUser.id, adminSubRole: newSubRole });
+    if (newSubRole === "CUSTOMER") {
+      await updateRole({ userId: selectedUser.id, role: "CUSTOMER" });
+    } else {
+      await updateRole({ userId: selectedUser.id, adminSubRole: newSubRole });
+    }
     setRoleModalOpen(false);
     refetch();
   };
@@ -241,8 +246,8 @@ export default function UsersPage() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         {isSuperAdmin &&
-                          u.role === "ADMIN" &&
-                          u.adminSubRole !== "SUPER_ADMIN" && (
+                          u.adminSubRole !== "SUPER_ADMIN" &&
+                          u.id !== user?.id && (
                             <button
                               onClick={() => openRoleModal(u)}
                               className="text-xs text-brand border border-brand/30 px-2.5 py-1 rounded-lg hover:bg-brand/5 transition-colors"

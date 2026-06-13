@@ -40,7 +40,15 @@ export default function ShipmentDetails() {
   const user = useSelector((s: RootState) => s.auth.user);
   const isAdmin = user?.role === "ADMIN";
 
-  const { data, isLoading, isError } = useGetUserShipmentsByIdQuery({ id }, { skip: !id });
+  const { data, isLoading, isError } = useGetUserShipmentsByIdQuery(
+    { id },
+    {
+      skip: !id,
+      pollingInterval: 30000,
+      refetchOnFocus: true,
+      refetchOnReconnect: true,
+    },
+  );
   const [updateStatus, { isLoading: updating }] = useUpdateShipmentStatusMutation();
 
   const [docFilters, setDocFilters] = useState({ name: "", type: "", status: "" });

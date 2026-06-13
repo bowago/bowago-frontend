@@ -72,7 +72,14 @@ export function TrackingForm({ prefillTrackingId, dark = false }: TrackerFormPro
 
   const { data: rawData, isLoading, isError, isFetching } = useTrackShipmentQuery(
     { trackingNumber: submittedId },
-    { skip: !submittedId }
+    {
+      skip: !submittedId,
+      // Poll every 30s so the map/status feels live without WebSockets.
+      // Pauses automatically when the tab is hidden (RTK Query default).
+      pollingInterval: 30000,
+      refetchOnFocus: true,
+      refetchOnReconnect: true,
+    }
   );
 
   const shipment = (rawData as any)?.data?.shipment as Shipment | undefined;
