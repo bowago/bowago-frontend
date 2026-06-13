@@ -39,6 +39,10 @@ export interface AuthData {
   accessToken: string;
   refreshToken: string;
   user: UserModel;
+  // Present instead of tokens when the account has 2FA enabled —
+  // the client must call POST /auth/login-2fa with { email, otp }.
+  requires2FA?: boolean;
+  email?: string;
 }
 
 export interface UserToken {
