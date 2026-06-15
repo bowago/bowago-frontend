@@ -13,6 +13,8 @@ import {
   useGetCitiesQuery,
   useGetDimensionsQuery,
   useInitiateShipmentPaymentMutation,
+  useInitPendingPaymentMutation,
+  useDownloadInvoiceMutation,
 } from "@/store/slice/apiSlice";
 
 // ─── Validation Schema ────────────────────────────────────────────────────────
@@ -372,6 +374,8 @@ export default function CreateShipmentModal({
   initialValue: any;
 }) {
   const [handleInitiateShipmentPayment] = useInitiateShipmentPaymentMutation();
+  const [handleInitPendingPayment, { isLoading: isPreparingInvoice }] = useInitPendingPaymentMutation();
+  const [handleDownloadInvoice, { isLoading: isDownloadingInvoice }] = useDownloadInvoiceMutation();
   const [handleCreateShipment, { isLoading: isCreatingShipment }] =
     useAddShipmentMutation();
   const { data: citiesData, isLoading } = useGetCitiesQuery({});
@@ -515,8 +519,24 @@ export default function CreateShipmentModal({
   };
 
   const handleGenerateInvoice = async () => {
-    const data = getValues();
-    console.log("Invoice data:", data);
+    const shipmentId = getCreatedShipmentId();
+    if (!shipmentId) return;
+
+    try {
+      const result = await handleInitPendingPayment({ shipmentId }).unwrap();
+      const paymentId = result?.data?.payment?.id;
+      if (!paymentId) return;
+
+      const tracking =
+        createdShipmentData?.shipment?.trackingNumber ?? shipmentId;
+
+      await handleDownloadInvoice({
+        paymentId,
+        filename: `BowaGO-Invoice-${tracking}.pdf`,
+      });
+    } catch {
+      // errors are surfaced via toast in the mutation hooks
+    }
   };
 
   const handlePayment = async () => {
@@ -988,6 +1008,7 @@ export default function CreateShipmentModal({
                 variant="secondary"
                 type="button"
                 onClick={handleGenerateInvoice}
+                isLoading={isPreparingInvoice || isDownloadingInvoice}
               >
                 Generate Invoice Only
               </Button>

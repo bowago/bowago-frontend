@@ -313,9 +313,39 @@ export const apiSlice = createApi({
       async onQueryStarted(args, { queryFulfilled }) {
         try {
           await queryFulfilled;
+          successToast("Profile updated successfully");
         } catch (error) {
           const errorM = error as CustomError;
           errorToast(errorM.error?.data?.message || "Unexpected errror");
+        }
+      },
+    }),
+
+    // useUpsertDefaultAddressMutation — creates the default address if none
+    // exists, otherwise updates the existing default. Used by the Personal
+    // Info "Address Information" section.
+    UpsertDefaultAddress: builder.mutation<
+      any,
+      {
+        existingId?: string | null;
+        street: string;
+        city: string;
+        state: string;
+        country?: string;
+        postalCode?: string;
+      }
+    >({
+      query: ({ existingId, ...body }) => ({
+        url: existingId ? `/users/me/addresses/${existingId}` : `/users/me/addresses`,
+        method: existingId ? "PUT" : "POST",
+        body: { ...body, isDefault: true },
+      }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast("Address saved successfully");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Failed to save address");
         }
       },
     }),
@@ -830,6 +860,60 @@ export const apiSlice = createApi({
       },
       invalidatesTags: ["Shipment"],
     }),
+
+    // useInitPendingPaymentMutation — "Generate Invoice Only": creates/reuses
+    // a PENDING payment record (no Paystack call) so an invoice can be
+    // downloaded before the customer pays.
+    InitPendingPayment: builder.mutation<any, { shipmentId: string }>({
+      query: (body) => ({
+        url: `/payments/init-pending`,
+        method: "POST",
+        body,
+      }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast("Invoice ready");
+        } catch (error: any) {
+          errorToast(error.error?.data?.message || "Failed to generate invoice");
+        }
+      },
+      invalidatesTags: ["Shipment"],
+    }),
+
+    // useDownloadInvoiceMutation — fetches the invoice PDF as a blob and
+    // triggers a browser download. Requires a paymentId (from
+    // InitPendingPayment or an existing Payment record on the shipment).
+    DownloadInvoice: builder.mutation<void, { paymentId: string; filename?: string }>({
+      query: ({ paymentId }) => ({
+        url: `/invoices/${paymentId}/download`,
+        method: "GET",
+        responseHandler: async (response) => {
+          if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw err;
+          }
+          return response.blob();
+        },
+        cache: "no-cache",
+      }),
+      async onQueryStarted({ filename }, { queryFulfilled }) {
+        try {
+          const blob = (await queryFulfilled).data as unknown as Blob;
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = filename || "invoice.pdf";
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+        } catch (error: any) {
+          errorToast(error?.data?.message || error?.error?.data?.message || "Failed to download invoice");
+        }
+      },
+    }),
+
     // useCreateTicketMutation
     CreateTicket: builder.mutation<unknown, CreateTicketFormData>({
       query: (formData) => ({
@@ -1222,7 +1306,10 @@ export const apiSlice = createApi({
       providesTags: ["Shipment"],
     }),
     // useGetZoneQuery
-    GetZone: builder.query<any, { fromCity: string; toCity: string }>({
+    GetZone: builder.query<
+      any,
+      { fromCity?: string; toCity?: string; page?: number; limit?: number }
+    >({
       query: (params) => {
         const searchParams = new URLSearchParams();
 
@@ -1232,6 +1319,14 @@ export const apiSlice = createApi({
 
         if (params?.toCity) {
           searchParams.append("toCity", params.toCity);
+        }
+
+        if (params?.page) {
+          searchParams.append("page", String(params.page));
+        }
+
+        if (params?.limit) {
+          searchParams.append("limit", String(params.limit));
         }
 
         return `/pricing/zone-matrix?${searchParams.toString()}`;
@@ -1611,7 +1706,7 @@ export const apiSlice = createApi({
         }
       },
     }),
-    Verify2FA: builder.mutation<any, { otp: string }>({
+    Verify2FA: builder.mutation<any, { otp: string; method?: "EMAIL" | "SMS" }>({
       query: (body) => ({ url: "/auth/verify-2fa", method: "POST", body }),
       async onQueryStarted(_, { queryFulfilled }) {
         try {
@@ -1737,6 +1832,8 @@ export const {
   useAddShipmentMutation,
   useCancelShipmentMutation,
   useInitiateShipmentPaymentMutation,
+  useInitPendingPaymentMutation,
+  useDownloadInvoiceMutation,
   useGetUserShipmentsQuery,
   useGetUserShipmentsByIdQuery,
   useGetAdminShipmentsQuery,
@@ -1746,6 +1843,7 @@ export const {
   // settings
   useGetUserProfileQuery,
   useUpdateUserProfileMutation,
+  useUpsertDefaultAddressMutation,
 
   // users
   useGetUsersQuery,

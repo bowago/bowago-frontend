@@ -14,13 +14,17 @@ import { Button } from "@/components/ui/button";
 import {
   useGetUserProfileQuery,
   useUpdateUserProfileMutation,
+  useUpsertDefaultAddressMutation,
 } from "@/store/slice/apiSlice";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 export function PersonalInformationForm() {
   const { data: userData, isLoading } = useGetUserProfileQuery({});
-  const [handleUpdateUserProfile, { isLoading: isUpdating }] =
+  const [handleUpdateUserProfile, { isLoading: isUpdatingProfile }] =
     useUpdateUserProfileMutation({});
+  const [upsertAddress, { isLoading: isSavingAddress }] =
+    useUpsertDefaultAddressMutation();
+
   const {
     register,
     handleSubmit,
@@ -30,19 +34,55 @@ export function PersonalInformationForm() {
     resolver: yupResolver(personalInformationSchema),
   });
 
+  // Track the default address ID so we PUT (update) instead of POST (create)
+  // on subsequent saves.
+  const defaultAddressId = useRef<string | null>(null);
+
   useEffect(() => {
     if (userData) {
-      let resData = userData?.data?.user;
-      console.log(resData);
+      const resData = userData?.data?.user;
       setValue("email", resData?.email);
       setValue("firstName", resData?.firstName);
       setValue("lastName", resData?.lastName);
       setValue("phone", resData?.phone);
+
+      // Pre-fill address fields from the user's default address, if any
+      const addresses = resData?.addresses ?? [];
+      const defaultAddress =
+        addresses.find((a: any) => a.isDefault) ?? addresses[0] ?? null;
+
+      if (defaultAddress) {
+        defaultAddressId.current = defaultAddress.id;
+        setValue("streetAddress", defaultAddress.street);
+        setValue("city", defaultAddress.city);
+        setValue("state", defaultAddress.state);
+        setValue("country", defaultAddress.country);
+        setValue("zipCode", defaultAddress.postalCode ?? "");
+      }
     }
   }, [userData]);
 
-  const onSubmit = (data: PersonalInformationFormData) => {
-    handleUpdateUserProfile(data);
+  const onSubmit = async (data: PersonalInformationFormData) => {
+    // Update first/last name, phone (email is read-only — changing it
+    // requires re-verification, not supported here)
+    await handleUpdateUserProfile({
+      firstName: data.firstName,
+      lastName: data.lastName,
+      phone: data.phone,
+    });
+
+    // Save address only if at least street + city + state are filled —
+    // the Address model requires these fields.
+    if (data.streetAddress && data.city && data.state) {
+      await upsertAddress({
+        existingId: defaultAddressId.current,
+        street: data.streetAddress,
+        city: data.city,
+        state: data.state,
+        country: data.country || "Nigeria",
+        postalCode: data.zipCode || undefined,
+      });
+    }
   };
 
   return (
@@ -70,10 +110,15 @@ export function PersonalInformationForm() {
           label="Email Address"
           type="email"
           leftIcon={<Mail size={15} />}
+          disabled
           error={errors.email?.message as string}
           {...register("email")}
         />
       </div>
+      <p className="text-xs text-gray-400 -mt-4">
+        Email address can't be changed here. Contact support if you need to
+        update it.
+      </p>
 
       {/* Phone */}
 
@@ -90,7 +135,13 @@ export function PersonalInformationForm() {
       {/* Address Section */}
 
       <div className="flex flex-col gap-4">
-        <p className="font-medium text-lg">Address Information</p>
+        <div>
+          <p className="font-medium text-lg">Address Information</p>
+          <p className="text-xs text-gray-400">
+            This is saved as your default shipping address and used to
+            pre-fill the sender details when creating a shipment.
+          </p>
+        </div>
 
         <Input
           label="Street Address"
@@ -136,7 +187,7 @@ export function PersonalInformationForm() {
       {/* Save Button */}
 
       <div className="pt-2">
-        <Button type="submit" isLoading={isUpdating}>
+        <Button type="submit" isLoading={isUpdatingProfile || isSavingAddress}>
           Save
         </Button>
       </div>

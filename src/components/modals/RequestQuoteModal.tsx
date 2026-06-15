@@ -278,12 +278,14 @@ export default function CreateQuoteModal({
               onValueChange={(val) => {
                 field.onChange(val);
 
-                const selected = dimensions.find((d) => d.id === val);
-
-                if (selected) {
-                  setValue("weightKg", selected.weightKgLimit);
-                  setValue("tons", selected.weightKgLimit / 1000);
-                }
+                // Don't pre-fill weightKg/tons from the box's weight limit —
+                // weightKg takes priority on the backend and would override
+                // the boxDimensionId + "Number of Boxes" (cartons) total-weight
+                // calculation, silently discarding the quantity the user enters.
+                // Clear weightKg/tons so the backend computes total weight as
+                // (box weight limit × number of boxes).
+                setValue("weightKg", undefined as any);
+                setValue("tons", undefined as any);
               }}
               error={errors.boxDimensionId?.message}
             />
@@ -334,17 +336,21 @@ export default function CreateQuoteModal({
             error={errors.tons?.message}
           />
 
-          {/* CARTONS */}
+          {/* CARTONS / BOX QUANTITY */}
           <Input
-            label="Cartons"
+            label={values.boxDimensionId ? "Number of Boxes" : "Cartons"}
             type="number"
             leftIcon={<Package size={16} />}
             {...register("cartons", {
               valueAsNumber: true,
-              required: "Cartons required",
+              required: values.boxDimensionId
+                ? "Number of boxes is required"
+                : "Cartons required",
               min: {
                 value: 1,
-                message: "Minimum of 1 carton required",
+                message: values.boxDimensionId
+                  ? "Minimum of 1 box required"
+                  : "Minimum of 1 carton required",
               },
             })}
             error={errors.cartons?.message}

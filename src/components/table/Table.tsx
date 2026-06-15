@@ -27,9 +27,16 @@ import {
 export function AppTable<T>({
   data,
   columns,
+  pageSize,
+  hidePagination = false,
 }: {
   data: T[];
   columns: ColumnDef<T>[];
+  /** Initial page size for client-side pagination (default: 10) */
+  pageSize?: number;
+  /** Hide the built-in "Previous/Next/X of Y selected" footer entirely —
+   *  use when the parent implements its own server-side pagination. */
+  hidePagination?: boolean;
 }) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
@@ -50,6 +57,14 @@ export function AppTable<T>({
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
+    initialState: {
+      pagination: {
+        // Default to showing all rows on one "page" so the built-in
+        // Previous/Next don't fight with server-side pagination when
+        // hidePagination is true. Callers can still override via pageSize.
+        pageSize: pageSize ?? (hidePagination ? data.length || 10 : 10),
+      },
+    },
     state: {
       sorting,
       columnFilters,
@@ -111,30 +126,28 @@ export function AppTable<T>({
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-end space-x-2 py-4">
-        <div className="flex-1 text-sm text-muted-foreground">
-          {table.getFilteredSelectedRowModel().rows.length} of{" "}
-          {table.getFilteredRowModel().rows.length} row(s) selected.
+      {!hidePagination && (
+        <div className="flex items-center justify-end space-x-2 py-4">
+          <div className="flex-1 text-sm text-muted-foreground">
+            {table.getFilteredSelectedRowModel().rows.length} of{" "}
+            {table.getFilteredRowModel().rows.length} row(s) selected.
+          </div>
+          <div className="space-x-2">
+            <Button
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+            >
+              Previous
+            </Button>
+            <Button
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+            >
+              Next
+            </Button>
+          </div>
         </div>
-        <div className="space-x-2">
-          <Button
-            // variant="outline"
-            // size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-          >
-            Previous
-          </Button>
-          <Button
-            // variant="outline"
-            // size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-          >
-            Next
-          </Button>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

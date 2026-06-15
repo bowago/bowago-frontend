@@ -2,10 +2,12 @@
 
 import { AppTable } from "@/components/table/Table";
 import { useGetZoneQuery } from "@/store/slice/apiSlice";
-import { Filter } from "lucide-react";
+import { Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
 import { ZoneColumns } from "../table/columns/zone-column";
+
+const PAGE_SIZE = 20;
 
 export default function ZonesRateManagementView() {
   const [filters, setFilters] = useState({
@@ -14,9 +16,17 @@ export default function ZonesRateManagementView() {
   });
 
   const [appliedFilters, setAppliedFilters] = useState(filters);
+  const [page, setPage] = useState(1);
 
-  const { data, isLoading } = useGetZoneQuery(appliedFilters);
+  const { data, isLoading, isFetching } = useGetZoneQuery({
+    ...appliedFilters,
+    page,
+    limit: PAGE_SIZE,
+  });
 
+  const meta = data?.meta as
+    | { total: number; page: number; limit: number; totalPages: number; hasNext: boolean; hasPrev: boolean }
+    | undefined;
 
   // Apply filtering only using appliedFilters
 
@@ -30,6 +40,7 @@ export default function ZonesRateManagementView() {
   // Apply filters when button is clicked
   const applyFilters = () => {
     setAppliedFilters(filters);
+    setPage(1); // reset to first page on new filter
   };
 
   const clearFilters = () => {
@@ -40,6 +51,7 @@ export default function ZonesRateManagementView() {
 
     setFilters(empty);
     setAppliedFilters(empty);
+    setPage(1);
   };
 
   const removeFilter = (key: string) => {
@@ -52,6 +64,8 @@ export default function ZonesRateManagementView() {
       ...prev,
       [key]: "",
     }));
+
+    setPage(1);
   };
 
   return (
@@ -113,7 +127,39 @@ export default function ZonesRateManagementView() {
       {isLoading && <div>...Loading all zones </div>}
       {/* Table */}
       {data?.data?.matrix && (
-        <AppTable columns={ZoneColumns} data={data?.data?.matrix} />
+        <AppTable columns={ZoneColumns} data={data?.data?.matrix} pageSize={PAGE_SIZE} hidePagination />
+      )}
+
+      {/* Server-side pagination */}
+      {meta && meta.total > 0 && (
+        <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
+          <span>
+            Showing {(meta.page - 1) * meta.limit + 1}–
+            {Math.min(meta.page * meta.limit, meta.total)} of {meta.total} route
+            {meta.total === 1 ? "" : "s"}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={!meta.hasPrev || isFetching}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-md border border-gray-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Previous
+            </button>
+            <span className="px-2">
+              Page {meta.page} of {meta.totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={!meta.hasNext || isFetching}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-md border border-gray-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              Next
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

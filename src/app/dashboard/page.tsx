@@ -49,7 +49,10 @@ export default function Page() {
     skip: !isAdmin,
   });
   const { data: shipmentsData } = useGetAdminShipmentsQuery(
-    { status: "IN_TRANSIT" },
+    // "Active" = anything still progressing toward delivery — not just
+    // IN_TRANSIT. A freshly-booked PENDING shipment is just as "active"
+    // from an operations standpoint and shouldn't be hidden here.
+    { status: "PENDING,CONFIRMED,PICKED_UP,IN_TRANSIT,OUT_FOR_DELIVERY" },
     { skip: !isAdmin }
   );
 
@@ -176,7 +179,7 @@ export default function Page() {
             </div>
             {activeShipments.length === 0 ? (
               <div className="text-center py-12 text-gray-400 text-sm">
-                No active shipments in transit
+                No active shipments
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

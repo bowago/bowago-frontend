@@ -3,10 +3,16 @@ import ShipmentDetailView from "@/components/layout/ShippingDetailsView";
 import { documentColumns } from "@/components/table/columns/document-columns";
 import { AppTable } from "@/components/table/Table";
 import { Tabs, TabsList, TabsContent, TabsTrigger } from "@/components/ui/tabs/tabs";
-import { Filter, MoveLeft, Loader2 } from "lucide-react";
+import { Filter, MoveLeft, Loader2, CreditCard, Download } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { useState } from "react";
-import { useGetUserShipmentsByIdQuery, useUpdateShipmentStatusMutation } from "@/store/slice/apiSlice";
+import {
+  useGetUserShipmentsByIdQuery,
+  useUpdateShipmentStatusMutation,
+  useInitiateShipmentPaymentMutation,
+  useInitPendingPaymentMutation,
+  useDownloadInvoiceMutation,
+} from "@/store/slice/apiSlice";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 
@@ -50,6 +56,30 @@ export default function ShipmentDetails() {
     },
   );
   const [updateStatus, { isLoading: updating }] = useUpdateShipmentStatusMutation();
+  const [initiatePayment, { isLoading: payingNow }] = useInitiateShipmentPaymentMutation();
+  const [initPendingPayment, { isLoading: preparingInvoice }] = useInitPendingPaymentMutation();
+  const [downloadInvoice, { isLoading: downloadingInvoice }] = useDownloadInvoiceMutation();
+
+  const handlePayNow = async () => {
+    const callbackUrl = `${window.location.origin}/dashboard/payment/callback`;
+    const result = await initiatePayment({ shipmentId: id, callbackUrl }).unwrap();
+    const authorizationUrl = result?.authorizationUrl ?? result?.data?.authorizationUrl;
+    if (authorizationUrl) window.location.href = authorizationUrl;
+  };
+
+  const handleDownloadInvoice = async () => {
+    try {
+      const result = await initPendingPayment({ shipmentId: id }).unwrap();
+      const paymentId = result?.data?.payment?.id;
+      if (!paymentId) return;
+      await downloadInvoice({
+        paymentId,
+        filename: `BowaGO-Invoice-${shipment?.trackingNumber ?? id}.pdf`,
+      });
+    } catch {
+      // errors surfaced via toast
+    }
+  };
 
   const [docFilters, setDocFilters] = useState({ name: "", type: "", status: "" });
   const [appliedDocFilters, setAppliedDocFilters] = useState(docFilters);
@@ -92,13 +122,44 @@ export default function ShipmentDetails() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <button onClick={() => router.back()}>
-          <MoveLeft />
-        </button>
-        <h2 className="text-xl font-semibold">
-          Shipments / {shipment.trackingNumber}
-        </h2>
+      <div className="flex items-center gap-3 justify-between flex-wrap">
+        <div className="flex items-center gap-3">
+          <button onClick={() => router.back()}>
+            <MoveLeft />
+          </button>
+          <h2 className="text-xl font-semibold">
+            Shipments / {shipment.trackingNumber}
+          </h2>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {shipment.paymentStatus !== "PAID" && (
+            <button
+              onClick={handlePayNow}
+              disabled={payingNow}
+              className="flex items-center gap-1.5 bg-brand text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-60"
+            >
+              {payingNow ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <CreditCard className="w-4 h-4" />
+              )}
+              Pay Now
+            </button>
+          )}
+          <button
+            onClick={handleDownloadInvoice}
+            disabled={preparingInvoice || downloadingInvoice}
+            className="flex items-center gap-1.5 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors disabled:opacity-60"
+          >
+            {preparingInvoice || downloadingInvoice ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            Download Invoice
+          </button>
+        </div>
       </div>
 
       <Tabs defaultValue="shipment">

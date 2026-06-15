@@ -44,7 +44,7 @@ export default function TwoFASetupSection() {
     setError("");
     if (otp.length !== 6) { setError("Please enter the 6-digit code"); return; }
     try {
-      await verify2FA({ otp }).unwrap();
+      await verify2FA({ otp, method }).unwrap();
       setStep("done");
     } catch (e: any) {
       setError(e?.data?.message ?? "Invalid code. Please try again.");
@@ -84,7 +84,15 @@ export default function TwoFASetupSection() {
             <p className="text-sm font-medium text-gray-700">Choose your 2FA method:</p>
             {([
               { value: "EMAIL", label: "Email OTP", desc: `Send a 6-digit code to ${user?.email ?? "your email"}`, icon: Mail, disabled: false },
-              { value: "SMS",   label: "SMS OTP",   desc: "Coming soon", icon: Smartphone, disabled: true },
+              {
+                value: "SMS",
+                label: "SMS OTP",
+                desc: user?.phone
+                  ? `Send a 6-digit code to ${user.phone}`
+                  : "Add a phone number in Personal Info to enable this",
+                icon: Smartphone,
+                disabled: !user?.phone,
+              },
             ] as const).map(({ value, label, desc, icon: Icon, disabled }) => (
               <button
                 key={value}
