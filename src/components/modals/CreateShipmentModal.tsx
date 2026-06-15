@@ -83,6 +83,7 @@ type SurchargeItem = {
 type ShipmentSummary = {
   id?: string;
   shipmentId?: string;
+  trackingNumber?: string;
   serviceType?: string;
   senderName?: string;
   senderPhone?: string;
@@ -374,8 +375,10 @@ export default function CreateShipmentModal({
   initialValue: any;
 }) {
   const [handleInitiateShipmentPayment] = useInitiateShipmentPaymentMutation();
-  const [handleInitPendingPayment, { isLoading: isPreparingInvoice }] = useInitPendingPaymentMutation();
-  const [handleDownloadInvoice, { isLoading: isDownloadingInvoice }] = useDownloadInvoiceMutation();
+  const [handleInitPendingPayment, { isLoading: isPreparingInvoice }] =
+    useInitPendingPaymentMutation();
+  const [handleDownloadInvoice, { isLoading: isDownloadingInvoice }] =
+    useDownloadInvoiceMutation();
   const [handleCreateShipment, { isLoading: isCreatingShipment }] =
     useAddShipmentMutation();
   const { data: citiesData, isLoading } = useGetCitiesQuery({});
