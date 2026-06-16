@@ -282,13 +282,23 @@ export const contractRateSchema = yup.object({
 
   isActive: yup.boolean().default(true),
 
-  validFrom: yup.date().typeError("Valid from is required").required(),
+  // String (YYYY-MM-DD) from HTML date inputs — using yup.date() would
+  // infer the type as Date and cause a type mismatch with the string value
+  // returned by <input type="date">. String + regex keeps the type as string.
+  validFrom: yup
+    .string()
+    .matches(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date")
+    .required("Valid from is required"),
 
   validUntil: yup
-    .date()
-    .typeError("Valid until is required")
-    .min(yup.ref("validFrom"), "Must be after start date")
-    .required(),
+    .string()
+    .matches(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date")
+    .required("Valid until is required")
+    .test("after-start", "Must be after start date", function (val) {
+      const { validFrom } = this.parent;
+      if (!validFrom || !val) return true;
+      return val >= validFrom;
+    }),
 
   notes: yup.string().max(300).nullable().notRequired(),
 });
