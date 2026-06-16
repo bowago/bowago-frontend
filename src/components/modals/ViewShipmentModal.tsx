@@ -10,7 +10,10 @@ import { Button } from "../ui/button";
 import {
   useCancelShipmentMutation,
   useGetUserShipmentsByIdQuery,
+  useInitiateShipmentPaymentMutation,
 } from "@/store/slice/apiSlice";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store/store";
 import { SERVICE_DELIVERY_MAP, SERVICE_OPTIONS } from "./CreateShipmentModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -179,9 +182,32 @@ export default function ViewShipmentModal({
     useGetUserShipmentsByIdQuery({ id });
 
   const shipmentDetails = shipmentData?.data ?? {};
+  const shipment = shipmentDetails?.shipment;
   const [handleCancelShipment, { isLoading }] = useCancelShipmentMutation();
+  const [initPayment, { isLoading: paying }] =
+    useInitiateShipmentPaymentMutation();
+  const currentUser = useSelector((s: RootState) => s.auth.user);
 
-  console.log({ shipmentDetails });
+  // Show Pay button only if shipment is unpaid AND the current user owns it
+  const isOwner = currentUser?.id === shipment?.customerId;
+  const needsPayment = shipment?.paymentStatus !== "PAID";
+  const showPayButton = isOwner && needsPayment;
+
+  const handlePay = async () => {
+    try {
+      const callbackUrl = `${window.location.origin}/dashboard/payment/callback`;
+      const result = await initPayment({
+        shipmentId: id,
+        callbackUrl,
+      }).unwrap();
+      const url =
+        (result as any)?.authorizationUrl ??
+        (result as any)?.data?.authorizationUrl;
+      if (url) window.location.href = url;
+    } catch {
+      // error handled by apiSlice
+    }
+  };
 
   // ── Step 2 form ──
   const deleteShipmentForm = useForm<{ reason: string }>({
@@ -282,6 +308,19 @@ export default function ViewShipmentModal({
             )}
 
             <ReviewStep data={shipmentDetails} />
+
+            {/* Pay Now button — only for the shipment owner when payment is pending */}
+            {!isLoadingShipmentDetails && showPayButton && (
+              <div className="mt-6 pt-4 border-t border-gray-100">
+                <Button
+                  onClick={handlePay}
+                  isLoading={paying}
+                  className="w-full bg-brand hover:bg-red-700 text-white font-semibold py-3 rounded-xl"
+                >
+                  Pay Now — ₦{shipment?.quotedPrice?.toLocaleString() ?? "0"}
+                </Button>
+              </div>
+            )}
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>

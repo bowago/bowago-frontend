@@ -13,13 +13,19 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs/tabs";
-import { LocationEdit, Package, ReceiptText, Route, Upload } from "lucide-react";
+import { LocationEdit, Package, ReceiptText, Route, Upload, Download } from "lucide-react";
 import { useState } from "react";
-import { useGetRateOverviewQuery } from "@/store/slice/apiSlice";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store/store";
+import { useGetRateOverviewQuery, useExportPricingSheetMutation } from "@/store/slice/apiSlice";
 
 export default function ShipmentsPage() {
   const { data, isLoading, refetch } = useGetRateOverviewQuery({});
   const [selected, setSelected] = useState<RateType>("standard");
+  const [exportPricing, { isLoading: exporting }] = useExportPricingSheetMutation();
+
+  const me = useSelector((state: RootState) => state.auth.user);
+  const isSuperAdmin = (me as any)?.adminSubRole === "SUPER_ADMIN";
 
   const [isOpenCreateModal, setIsOpenCreateModal] = useState(false);
   const router = useRouter();
@@ -32,6 +38,18 @@ export default function ShipmentsPage() {
         <h1 className="dashboard-heading">Rate Management</h1>
 
         <div className="flex items-center gap-3">
+          {/* Export Pricing Sheet — Super Admin only */}
+          {isSuperAdmin && (
+            <button
+              onClick={() => exportPricing()}
+              disabled={exporting}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-200 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              <Download className="w-4 h-4" />
+              {exporting ? "Exporting…" : "Export Sheet"}
+            </button>
+          )}
+
           {/* Import Pricing Sheet — bulk Excel upload */}
           <ImportPricingModal
             onSuccess={() => refetch()}

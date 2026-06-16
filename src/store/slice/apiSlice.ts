@@ -46,7 +46,6 @@ export type UserShipmentQueryParams = {
   search?: string;
 };
 
-console.log("API_BASE_URL", API_BASE_URL);
 // console.log("API_CLIENT_KEY", API_CLIENT_KEY);
 // console.log("API_CLIENT_KEY_AUTH", API_CLIENT_KEY_AUTH);
 
@@ -126,6 +125,7 @@ export const apiSlice = createApi({
     "FailedWebhook",
     "AdminRole",
     "User",
+    "SavedCard",
   ],
   baseQuery: baseQueryWithReauth,
   endpoints: (builder) => ({
@@ -350,6 +350,45 @@ export const apiSlice = createApi({
       },
     }),
 
+    // ─── Saved Cards (Settings → Payment Method) ──────────────────────────────
+    // useGetSavedCardsQuery
+    GetSavedCards: builder.query<any, void>({
+      query: () => "/users/me/saved-cards",
+      providesTags: ["SavedCard"],
+    }),
+    // useSetDefaultCardMutation
+    SetDefaultCard: builder.mutation<any, { id: string }>({
+      query: ({ id }) => ({
+        url: `/users/me/saved-cards/${id}/default`,
+        method: "PATCH",
+      }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast("Default card updated");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Failed to update default card");
+        }
+      },
+      invalidatesTags: ["SavedCard"],
+    }),
+    // useDeleteSavedCardMutation
+    DeleteSavedCard: builder.mutation<any, { id: string }>({
+      query: ({ id }) => ({
+        url: `/users/me/saved-cards/${id}`,
+        method: "DELETE",
+      }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast("Card removed");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Failed to remove card");
+        }
+      },
+      invalidatesTags: ["SavedCard"],
+    }),
+
     // rate management
     // useAddZoneMutation
     AddZone: builder.mutation<
@@ -407,6 +446,7 @@ export const apiSlice = createApi({
         tons: number;
         cartons: number;
         boxDimensionId: string;
+        serviceType?: string;
       }
     >({
       query: (formData) => ({
@@ -649,14 +689,16 @@ export const apiSlice = createApi({
       unknown,
       {
         id: string;
-        label: string;
-        discountPercent: number;
-        fixedPricePerKgByZone: {
+        label?: string;
+        serviceType?: string;
+        discountPercent?: number | null;
+        fixedPricePerKgByZone?: {
           [zone: string]: number;
-        };
-        isActive: boolean;
-        validUntil: string;
-        notes: string;
+        } | null;
+        isActive?: boolean;
+        validFrom?: string;
+        validUntil?: string;
+        notes?: string;
       }
     >({
       query: (formData) => {
@@ -756,6 +798,7 @@ export const apiSlice = createApi({
           errorToast(errorM.error?.data?.message || "Unexpected errror");
         }
       },
+      invalidatesTags: ["ContractRate"],
     }),
     // useDeleteZoneMutation
     DeleteZone: builder.mutation<unknown, { id: string }>({
@@ -1141,6 +1184,7 @@ export const apiSlice = createApi({
 
         return `/contract-rates?${searchParams.toString()}`;
       },
+      providesTags: ["ContractRate"],
     }),
 
     // useGetPromoRateQuery
@@ -1148,30 +1192,41 @@ export const apiSlice = createApi({
       any,
       {
         isActive?: boolean;
+        serviceType?: string;
+        zone?: number | string;
+      } | void
+    >({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        if (params?.isActive) searchParams.append("isActive", params.isActive.toString());
+        if ((params as any)?.serviceType) searchParams.append("serviceType", (params as any).serviceType);
+        if ((params as any)?.zone) searchParams.append("zone", String((params as any).zone));
+        return `/promo-rates?${searchParams.toString()}`;
+      },
+      providesTags: ["PromoRate"],
+    }),
+
+    // useGetStandardRateQuery
+    GetStandardRate: builder.query<
+      any,
+      {
+        zone?: number | string;
+        serviceType?: string;
+        minKg?: number;
+        maxKg?: number;
+        isActive?: string;
       }
     >({
       query: (params) => {
         const searchParams = new URLSearchParams();
-
-        if (params?.isActive) {
-          searchParams.append("isActive", params.isActive.toString());
-        }
-        return `/promo-rates?${searchParams.toString()}`;
-      },
-      providesTags: ["PromoRate"], // Label this data as 'Post'
-    }),
-
-    // useGetStandardRateQuery
-    GetStandardRate: builder.query<any, { zone: number }>({
-      query: (params) => {
-        const searchParams = new URLSearchParams();
-
-        if (params?.zone) {
-          searchParams.append("zone", String(params.zone));
-        }
+        if (params?.zone) searchParams.append("zone", String(params.zone));
+        if (params?.serviceType) searchParams.append("serviceType", params.serviceType);
+        if (params?.minKg !== undefined) searchParams.append("minKg", String(params.minKg));
+        if (params?.maxKg !== undefined) searchParams.append("maxKg", String(params.maxKg));
+        if (params?.isActive) searchParams.append("isActive", params.isActive);
         return `/pricing/price-bands?${searchParams.toString()}`;
       },
-      providesTags: ["StandardRate"], // Label this data as 'Post'
+      providesTags: ["StandardRate"],
     }),
 
     // useGetDimensionsQuery
@@ -1308,7 +1363,7 @@ export const apiSlice = createApi({
     // useGetZoneQuery
     GetZone: builder.query<
       any,
-      { fromCity?: string; toCity?: string; page?: number; limit?: number }
+      { fromCity?: string; toCity?: string; page?: number; limit?: number; isActive?: string }
     >({
       query: (params) => {
         const searchParams = new URLSearchParams();
@@ -1327,6 +1382,10 @@ export const apiSlice = createApi({
 
         if (params?.limit) {
           searchParams.append("limit", String(params.limit));
+        }
+
+        if (params?.isActive) {
+          searchParams.append("isActive", params.isActive);
         }
 
         return `/pricing/zone-matrix?${searchParams.toString()}`;
@@ -1677,6 +1736,40 @@ export const apiSlice = createApi({
       },
     }),
 
+    // useExportPricingSheetMutation — Super Admin: download an .xlsx of
+    // current pricing/zone/distance/box data in the same layout the
+    // importer expects.
+    ExportPricingSheet: builder.mutation<void, void>({
+      query: () => ({
+        url: "/pricing/export",
+        method: "GET",
+        responseHandler: async (response) => {
+          if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw err;
+          }
+          return response.blob();
+        },
+        cache: "no-cache",
+      }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          const blob = (await queryFulfilled).data as unknown as Blob;
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `BowaGO-Pricing-Export-${new Date().toISOString().slice(0, 10)}.xlsx`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+          successToast("Pricing data exported");
+        } catch (error: any) {
+          errorToast(error?.data?.message || error?.error?.data?.message || "Export failed");
+        }
+      },
+    }),
+
 
     // useGetNotificationsQuery
     GetNotifications: builder.query<any, { page?: number } | void>({
@@ -1808,6 +1901,46 @@ export const apiSlice = createApi({
       invalidatesTags: ["User"],
     }),
 
+
+    // useDeleteAccountMutation — lets a customer delete their own account
+    DeleteAccount: builder.mutation<any, { password: string }>({
+      query: (body) => ({
+        url: "/users/me",
+        method: "DELETE",
+        body,
+      }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Account deleted successfully");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Failed to delete account");
+        }
+      },
+    }),
+
+    // useGoogleAuthMutation — exchange a Google ID token for BowaGO tokens
+    GoogleAuth: builder.mutation<AuthResponse, { idToken: string }>({
+      query: (body) => ({
+        url: "/auth/google",
+        method: "POST",
+        body,
+      }),
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          const userToken = {
+            accessToken: (data as any)?.data?.accessToken,
+            refreshToken: (data as any)?.data?.refreshToken,
+          };
+          dispatch(authTokenChange(userToken));
+          dispatch(setUserData((data as any).data.user));
+        } catch (error) {
+          const errorM = error as CustomError;
+          errorToast(errorM.error?.data?.message || "Google sign-in failed");
+        }
+      },
+    }),
     // useGetRateOverviewQuery
     GetRateOverview: builder.query<any, any>({
       query: () => {
@@ -1844,6 +1977,9 @@ export const {
   useGetUserProfileQuery,
   useUpdateUserProfileMutation,
   useUpsertDefaultAddressMutation,
+  useGetSavedCardsQuery,
+  useSetDefaultCardMutation,
+  useDeleteSavedCardMutation,
 
   // users
   useGetUsersQuery,
@@ -1851,6 +1987,8 @@ export const {
   useToggleUserActiveMutation,
   useGetUserByIdQuery,
   useDeleteUserMutation,
+  useDeleteAccountMutation,
+  useGoogleAuthMutation,
   useSetup2FAMutation,
   useVerify2FAMutation,
   useDisable2FAMutation,
@@ -1910,6 +2048,7 @@ export const {
   useRetryFailedWebhookMutation,
   useDismissFailedWebhookMutation,
   useImportPricingSheetMutation,
+  useExportPricingSheetMutation,
   useEditBoxDimensionMutation,
   useEditCityMutation,
   useEditZoneMutation,

@@ -2,129 +2,152 @@
 
 import { AppTable } from "@/components/table/Table";
 import { useGetContractRateQuery } from "@/store/slice/apiSlice";
-import { Filter } from "lucide-react";
+import { Filter, X } from "lucide-react";
 import { useState } from "react";
-
+import AddContractRateModal from "../modals/AddContractRateModal";
 import { ContractRateColumns } from "../table/columns/contract-rate-column";
+
+const SERVICE_TYPES = ["EXPRESS", "STANDARD", "ECONOMY"];
 
 export default function ContractRateManagementView() {
   const [filters, setFilters] = useState({
-    isActive: false,
     search: "",
+    serviceType: "",
+    isActive: "",
+    validFrom: "",
+    validUntil: "",
+  });
+  const [applied, setApplied] = useState(filters);
+
+  const { data, isLoading } = useGetContractRateQuery({
+    search: applied.search || undefined,
+    isActive: applied.isActive ? applied.isActive === "true" : undefined,
+  } as any);
+
+  const rates: any[] = data?.data?.rates ?? [];
+
+  // Client-side filter for serviceType and date range
+  const filtered = rates.filter((r) => {
+    if (applied.serviceType && r.serviceType !== applied.serviceType) return false;
+    if (applied.validFrom && r.validFrom && new Date(r.validFrom) < new Date(applied.validFrom)) return false;
+    if (applied.validUntil && r.validUntil && new Date(r.validUntil) > new Date(applied.validUntil)) return false;
+    return true;
   });
 
-  const [appliedFilters, setAppliedFilters] = useState(filters);
+  const set = (key: string, val: string) =>
+    setFilters((p) => ({ ...p, [key]: val }));
 
-  const { data, isLoading } = useGetContractRateQuery(appliedFilters);
-
-  const handleActiveChange = (checked: boolean) => {
-    setFilters((prev) => ({
-      ...prev,
-      isActive: checked,
-    }));
-  };
-  // Apply filtering only using appliedFilters
-
-  const handleChange = (key: string, value: string) => {
-    setFilters((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
-  };
-
-  // Apply filters when button is clicked
-  const applyFilters = () => {
-    setAppliedFilters(filters);
-  };
-
+  const applyFilters = () => setApplied(filters);
   const clearFilters = () => {
-    const empty = {
-      isActive: false,
-      search: "",
-    };
-
+    const empty = { search: "", serviceType: "", isActive: "", validFrom: "", validUntil: "" };
     setFilters(empty);
-    setAppliedFilters(empty);
+    setApplied(empty);
   };
 
-  const removeFilter = (key: string) => {
-    setAppliedFilters((prev) => ({
-      ...prev,
-      [key]: "",
-    }));
+  const hasFilter = Object.values(applied).some(Boolean);
 
-    setFilters((prev) => ({
-      ...prev,
-      [key]: "",
-    }));
+  const labelMap: Record<string, (v: string) => string> = {
+    search: (v) => `Search: "${v}"`,
+    serviceType: (v) => `Service: ${v}`,
+    isActive: (v) => (v === "true" ? "Active" : "Inactive"),
+    validFrom: (v) => `Valid From: ${v}`,
+    validUntil: (v) => `Valid Until: ${v}`,
   };
 
   return (
     <div>
-      {/* Filters */}
-      <div className="flex flex-wrap gap-4 items-end">
+      {/* Filter bar */}
+      <div className="flex flex-wrap gap-3 items-end">
         <input
           value={filters.search}
-          onChange={(e) => handleChange("search", e.target.value)}
-          placeholder="Search by label or user email or user name"
-          className="border rounded-md p-2 w-100"
+          onChange={(e) => set("search", e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && applyFilters()}
+          placeholder="Search by label or email..."
+          className="border rounded-lg px-3 py-2 text-sm min-w-[200px]"
         />
-        <label className="flex items-center gap-2">
+
+        <select
+          value={filters.serviceType}
+          onChange={(e) => set("serviceType", e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="">All Services</option>
+          {SERVICE_TYPES.map((s) => (
+            <option key={s} value={s}>{s.charAt(0) + s.slice(1).toLowerCase()}</option>
+          ))}
+        </select>
+
+        <select
+          value={filters.isActive}
+          onChange={(e) => set("isActive", e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="">All Statuses</option>
+          <option value="true">Active</option>
+          <option value="false">Inactive</option>
+        </select>
+
+        <div className="flex items-center gap-1">
+          <label className="text-xs text-gray-500">Valid from</label>
           <input
-            type="checkbox"
-            checked={!!filters.isActive}
-            onChange={(e) => handleActiveChange(e.target.checked)}
+            type="date"
+            value={filters.validFrom}
+            onChange={(e) => set("validFrom", e.target.value)}
+            className="border rounded-lg px-3 py-2 text-sm"
           />
-          <span className="text-sm">Active Only</span>
-        </label>
+        </div>
+
+        <div className="flex items-center gap-1">
+          <label className="text-xs text-gray-500">Until</label>
+          <input
+            type="date"
+            value={filters.validUntil}
+            onChange={(e) => set("validUntil", e.target.value)}
+            className="border rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
 
         <button
           onClick={applyFilters}
-          className="bg-red-600 text-white px-5 py-2 rounded-md flex gap-2 items-center"
+          className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2"
         >
-          Filter <Filter size={16} />
+          <Filter size={14} /> Filter
         </button>
-      </div>
-
-      {/* Applied Filters */}
-      <div className="flex flex-wrap gap-2 items-center mb-6 mt-4">
-        <span className="text-sm text-gray-500">Applied Filters:</span>
-
-        {Object.entries(appliedFilters).map(([key, value]) =>
-          value ? (
-            <span
-              key={key}
-              className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-md text-sm"
-            >
-              {key}:{" "}
-              {typeof value === "boolean" && (
-                <>{value ? "Active" : "InActive"}</>
-              )}
-              {typeof value === "string" && value}
-              <button
-                onClick={() => removeFilter(key)}
-                className="text-red-500 hover:text-red-700"
-              >
-                ✕
-              </button>
-            </span>
-          ) : null,
-        )}
-
-        {Object.values(appliedFilters).some(Boolean) && (
-          <button
-            onClick={clearFilters}
-            className="text-red-600 text-sm font-medium ml-2"
-          >
+        {hasFilter && (
+          <button onClick={clearFilters} className="text-red-600 text-sm font-medium">
             Clear All
           </button>
         )}
       </div>
 
-      {isLoading && <div>...Loading all contract rate </div>}
-      {/* Table */}
-      {data?.data?.rates && (
-        <AppTable columns={ContractRateColumns} data={data?.data?.rates} />
+      {/* Applied chips */}
+      {hasFilter && (
+        <div className="flex flex-wrap gap-2 mt-3 mb-4">
+          {Object.entries(applied).map(([key, val]) =>
+            val ? (
+              <span
+                key={key}
+                className="flex items-center gap-1 bg-gray-100 px-3 py-1 rounded-full text-xs"
+              >
+                {labelMap[key]?.(val) ?? `${key}: ${val}`}
+                <button
+                  onClick={() => { set(key, ""); setApplied((p) => ({ ...p, [key]: "" })); }}
+                  className="text-red-500 ml-1"
+                >
+                  <X size={11} />
+                </button>
+              </span>
+            ) : null,
+          )}
+        </div>
+      )}
+
+      {isLoading && <p className="text-sm text-gray-400 py-6">Loading contract rates...</p>}
+      {!isLoading && filtered.length === 0 && (
+        <p className="text-sm text-gray-400 py-6 text-center">No contract rates found.</p>
+      )}
+      {!isLoading && filtered.length > 0 && (
+        <AppTable columns={ContractRateColumns} data={filtered} />
       )}
     </div>
   );

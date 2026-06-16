@@ -186,7 +186,7 @@ export default function ShipmentDetails() {
                   <div className="text-right">
                     <p className="font-mono text-sm">{shipment.trackingNumber}</p>
                     <p className="text-gray-300 text-sm mt-1">
-                      {shipment.serviceType} · {shipment.weight} {shipment.weightUnit}
+                      {shipment.serviceType}{shipment.weight && shipment.weightUnit ? ` · ${shipment.weight} ${shipment.weightUnit}` : shipment.weight ? ` · ${shipment.weight} kg` : ""}
                     </p>
                     <p className="text-gray-300 text-sm mt-1">
                       ₦{Number(shipment.finalPrice ?? shipment.quotedPrice).toLocaleString()}
@@ -261,7 +261,7 @@ export default function ShipmentDetails() {
               <div className="bg-white border rounded-lg p-4">
                 <h4 className="text-xs font-semibold text-gray-400 uppercase mb-3">Package Details</h4>
                 <div className="grid grid-cols-3 gap-4 text-sm">
-                  <div><p className="text-gray-400">Weight</p><p className="font-medium">{shipment.weight} {shipment.weightUnit}</p></div>
+                  <div><p className="text-gray-400">Weight</p><p className="font-medium">{shipment.weight && shipment.weightUnit ? `${shipment.weight} ${shipment.weightUnit}` : shipment.weight ? `${shipment.weight} kg` : shipment.cartons ? `${shipment.cartons} cartons` : "—"}</p></div>
                   <div><p className="text-gray-400">Service</p><p className="font-medium">{shipment.serviceType}</p></div>
                   <div><p className="text-gray-400">Fragile</p><p className="font-medium">{shipment.isFragile ? "Yes" : "No"}</p></div>
                   <div><p className="text-gray-400">Insurance</p><p className="font-medium">{shipment.requiresInsurance ? `Yes — ₦${Number(shipment.insuranceValue ?? 0).toLocaleString()}` : "No"}</p></div>

@@ -231,7 +231,17 @@ export function TrackingForm({ prefillTrackingId, dark = false }: TrackerFormPro
             {/* Meta row */}
             <div className={`grid grid-cols-3 gap-3 pt-4 border-t ${dark ? "border-white/10" : "border-white/20"}`}>
               {[
-                { icon: <Package className="w-4 h-4" />, label: "Weight", value: `${shipment.weight} ${shipment.weightUnit}` },
+                { 
+                  icon: <Package className="w-4 h-4" />, 
+                  label: "Weight", 
+                  value: shipment.weight && shipment.weightUnit 
+                    ? `${shipment.weight} ${shipment.weightUnit}` 
+                    : shipment.weight 
+                      ? `${shipment.weight} kg`
+                      : shipment.cartons 
+                        ? `${shipment.cartons} carton${Number(shipment.cartons) !== 1 ? "s" : ""}`
+                        : "—"
+                },
                 { icon: <MapPin className="w-4 h-4" />,  label: "Service", value: shipment.serviceType },
                 {
                   icon: <Clock className="w-4 h-4" />,

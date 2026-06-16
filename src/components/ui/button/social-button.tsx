@@ -2,37 +2,70 @@
 
 import { Divider } from "@/components/layout/authLayout";
 import { Button } from "./button";
-
-
+import { useGoogleAuthMutation } from "@/store/slice/apiSlice";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 interface SocialLoginProps {
-  onGoogleLogin?: () => void;
-  onAppleLogin?: () => void;
   label?: string;
 }
 
-export function SocialLogin({
-  onGoogleLogin,
-  onAppleLogin,
-  label = "Login with",
-}: SocialLoginProps) {
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: any) => void;
+          prompt: () => void;
+          renderButton: (el: HTMLElement, config: any) => void;
+        };
+      };
+    };
+  }
+}
+
+export function SocialLogin({ label = "Login with" }: SocialLoginProps) {
+  const router = useRouter();
+  const [googleAuth] = useGoogleAuthMutation();
+  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+
+  useEffect(() => {
+    if (!clientId || !window.google) return;
+    window.google.accounts.id.initialize({
+      client_id: clientId,
+      callback: async (response: { credential: string }) => {
+        try {
+          const result = await googleAuth({ idToken: response.credential }).unwrap();
+          if ((result as any)?.data?.accessToken) {
+            router.push("/dashboard");
+          }
+        } catch {}
+      },
+    });
+  }, [clientId]);
+
+  const handleGoogleClick = () => {
+    if (!clientId) {
+      alert("Google sign-in is not yet configured. Please sign up with email.");
+      return;
+    }
+    if (window.google) {
+      window.google.accounts.id.prompt();
+    }
+  };
+
   return (
     <>
       <Divider label={`or ${label}`} />
       <div className="flex gap-3">
-        <Button
-          variant="social"
-          fullWidth
-          onClick={onGoogleLogin}
-          className="text-sm"
-        >
+        <Button variant="social" fullWidth onClick={handleGoogleClick} className="text-sm">
           <GoogleIcon />
           Google
         </Button>
         <Button
           variant="social"
           fullWidth
-          onClick={onAppleLogin}
+          onClick={() => alert("Apple sign-in coming soon.")}
           className="text-sm"
         >
           <AppleIcon />

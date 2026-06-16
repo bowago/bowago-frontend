@@ -21,6 +21,7 @@ export default function RootLayout({
     <html lang="en">
       <head>
         {/* Preconnect for performance */}
+        <script src="https://accounts.google.com/gsi/client" async></script>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"

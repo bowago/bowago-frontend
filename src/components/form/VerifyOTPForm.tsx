@@ -79,6 +79,7 @@ export function VerifyOTPForm({ email }: VerifyOTPFormProps) {
           </button>
         </p>
 
+        <p className="text-xs text-gray-400 text-center -mt-2 mb-1">Can't find it? Check your spam/junk folder.</p>
         <Button type="submit" fullWidth isLoading={isLoadingVerifyEmail}>
           Verify Signup
         </Button>

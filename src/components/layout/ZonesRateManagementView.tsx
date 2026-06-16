@@ -13,6 +13,7 @@ export default function ZonesRateManagementView() {
   const [filters, setFilters] = useState({
     fromCity: "",
     toCity: "",
+    isActive: "",
   });
 
   const [appliedFilters, setAppliedFilters] = useState(filters);
@@ -47,6 +48,7 @@ export default function ZonesRateManagementView() {
     const empty = {
       fromCity: "",
       toCity: "",
+      isActive: "",
     };
 
     setFilters(empty);
@@ -85,6 +87,16 @@ export default function ZonesRateManagementView() {
           className="border rounded-md p-2"
         />
 
+        <select
+          value={filters.isActive}
+          onChange={(e) => handleChange("isActive", e.target.value)}
+          className="border rounded-md p-2 text-sm"
+        >
+          <option value="">All Statuses</option>
+          <option value="true">Active</option>
+          <option value="false">Inactive</option>
+        </select>
+
         <button
           onClick={applyFilters}
           className="bg-red-600 text-white px-5 py-2 rounded-md flex gap-2 items-center"
@@ -103,7 +115,9 @@ export default function ZonesRateManagementView() {
               key={key}
               className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-md text-sm"
             >
-              {key}: {value}
+              {key === "isActive"
+                ? `Status: ${value === "true" ? "Active" : "Inactive"}`
+                : `${key}: ${value}`}
               <button
                 onClick={() => removeFilter(key)}
                 className="text-red-500 hover:text-red-700"

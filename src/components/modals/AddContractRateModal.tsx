@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Controller, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -14,17 +14,24 @@ import {
   useGetUsersQuery,
 } from "@/store/slice/apiSlice";
 
+import { ContractRate } from "../table/columns/contract-rate-column";
+
 export default function AddContractRateModal({
   isOpen,
   setIsOpen,
+  editingRate,
 }: {
   isOpen: boolean;
   setIsOpen: (v: boolean) => void;
+  /** When provided, the modal edits this rate instead of creating a new one */
+  editingRate?: ContractRate | null;
 }) {
   const { data: usersData, isLoading: isLoadingUsers } = useGetUsersQuery({});
   const [handleAddContractRate, { isLoading }] = useAddContractRateMutation();
   const [handleEditContractRate, { isLoading: isLoadingContract }] =
     useEditContractRateMutation();
+
+  const isEditMode = !!editingRate;
 
   const contractForm = useForm<ContractRateFormData>({
     resolver: yupResolver(contractRateSchema) as any,
@@ -42,6 +49,36 @@ export default function AddContractRateModal({
   });
 
   const reset = () => contractForm.reset();
+
+  // Pre-fill the form whenever we open in edit mode for a given rate
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (editingRate) {
+      const toDateInput = (d: string) =>
+        d ? new Date(d).toISOString().slice(0, 10) : "";
+
+      contractForm.reset({
+        userId: editingRate.user?.id ?? "",
+        label: editingRate.label,
+        serviceType: editingRate.serviceType,
+        pricingType: editingRate.fixedPricePerKgByZone ? "fixed" : "discount",
+        discountPercent: editingRate.discountPercent ?? 0,
+        fixedPricePerKgByZone: editingRate.fixedPricePerKgByZone ?? {
+          "1": 0,
+          "2": 0,
+          "3": 0,
+          "4": 0,
+        },
+        isActive: editingRate.isActive,
+        validFrom: toDateInput(editingRate.validFrom),
+        validUntil: toDateInput(editingRate.validUntil),
+        notes: (editingRate as any).notes ?? "",
+      });
+    } else {
+      reset();
+    }
+  }, [isOpen, editingRate]);
 
   const handleOpenChange = (v: boolean) => {
     setIsOpen(v);
@@ -63,7 +100,6 @@ export default function AddContractRateModal({
 
     const onSubmit = (data: ContractRateFormData) => {
       const payload: any = {
-        userId: data.userId,
         label: data.label,
         serviceType: data.serviceType,
         isActive: data.isActive,
@@ -72,15 +108,28 @@ export default function AddContractRateModal({
         notes: data.notes,
       };
 
+      // Always send both pricing fields so switching pricing type on edit
+      // correctly clears the unused one (e.g. discount -> fixed should
+      // null out discountPercent).
       if (data.pricingType === "discount") {
         payload.discountPercent = data.discountPercent;
-      }
-
-      if (data.pricingType === "fixed") {
+        payload.fixedPricePerKgByZone = null;
+      } else {
         payload.fixedPricePerKgByZone = data.fixedPricePerKgByZone;
+        payload.discountPercent = null;
       }
 
-      handleAddContractRate(payload)
+      if (isEditMode && editingRate) {
+        handleEditContractRate({ id: editingRate.id, ...payload })
+          .unwrap()
+          .then(() => {
+            reset();
+            setIsOpen(false);
+          });
+        return;
+      }
+
+      handleAddContractRate({ userId: data.userId, ...payload })
         .unwrap()
         .then(() => {
           reset();
@@ -98,7 +147,7 @@ export default function AddContractRateModal({
             render={({ field }) => (
               <SelectInput
                 label="Select user"
-                disabled={isLoadingUsers}
+                disabled={isLoadingUsers || isEditMode}
                 placeholder={isLoadingUsers ? "...loading" : "Select user"}
                 options={
                   usersData?.data?.users?.map(
@@ -263,7 +312,7 @@ export default function AddContractRateModal({
 
         <div className="flex justify-end mt-5">
           <Button isLoading={isLoading || isLoadingContract} type="submit">
-            Create Contract Rate
+            {isEditMode ? "Save Changes" : "Create Contract Rate"}
           </Button>
         </div>
       </form>
@@ -278,7 +327,7 @@ export default function AddContractRateModal({
         <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6">
           <div className="flex justify-between items-center">
             <Dialog.Title className="text-lg font-semibold">
-              Create Contract Rate
+              {isEditMode ? "Edit Contract Rate" : "Create Contract Rate"}
             </Dialog.Title>
 
             <Dialog.Close asChild>

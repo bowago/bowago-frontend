@@ -1,12 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import {
+  useGetSavedCardsQuery,
+  useSetDefaultCardMutation,
+  useDeleteSavedCardMutation,
+} from "@/store/slice/apiSlice";
 
-type Card = {
-  id: number;
-  type: "visa" | "mastercard";
-  last4: string;
-  expiry: string;
+type SavedCard = {
+  id: string;
+  authorizationCode: string;
+  last4: string | null;
+  cardType: string | null;
+  bank: string | null;
+  expMonth: string | null;
+  expYear: string | null;
   isDefault: boolean;
 };
 
@@ -75,38 +83,64 @@ const PlusIcon = () => (
   </svg>
 );
 
-const initialCards: Card[] = [
-  { id: 1, type: "visa", last4: "2348", expiry: "12/24", isDefault: true },
-  {
-    id: 2,
-    type: "mastercard",
-    last4: "2348",
-    expiry: "12/24",
-    isDefault: false,
-  },
-  {
-    id: 3,
-    type: "mastercard",
-    last4: "2348",
-    expiry: "12/24",
-    isDefault: false,
-  },
-];
+const VerveLogo = () => (
+  <svg
+    viewBox="0 0 48 32"
+    className="w-10 h-7"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <rect width="48" height="32" rx="4" fill="#15783D" />
+    <text
+      x="6"
+      y="20"
+      fontFamily="Arial"
+      fontWeight="bold"
+      fontSize="13"
+      fill="white"
+      letterSpacing="0.5"
+    >
+      VERVE
+    </text>
+  </svg>
+);
+
+const GenericCardLogo = () => (
+  <svg
+    viewBox="0 0 48 32"
+    className="w-10 h-7"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <rect width="48" height="32" rx="4" fill="#6B7280" />
+    <rect x="4" y="8" width="40" height="4" fill="#9CA3AF" />
+  </svg>
+);
+
+function CardLogo({ cardType }: { cardType?: string | null }) {
+  const t = (cardType ?? "").toLowerCase();
+  if (t.includes("visa")) return <VisaLogo />;
+  if (t.includes("master")) return <MastercardLogo />;
+  if (t.includes("verve")) return <VerveLogo />;
+  return <GenericCardLogo />;
+}
 
 export default function PaymentMethodForm() {
-  const [cards, setCards] = useState<Card[]>(initialCards);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const { data, isLoading, isError } = useGetSavedCardsQuery();
+  const [setDefaultCard, { isLoading: settingDefault }] =
+    useSetDefaultCardMutation();
+  const [deleteSavedCard, { isLoading: deleting }] =
+    useDeleteSavedCardMutation();
 
-  const setDefault = (id: number) => {
-    setCards((prev) => prev.map((c) => ({ ...c, isDefault: c.id === id })));
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
+  const cards: SavedCard[] = data?.data?.cards ?? [];
+
+  const handleSetDefault = (id: string) => {
+    setDefaultCard({ id });
   };
 
-  const deleteCard = (id: number) => {
-    setDeletingId(id);
-    setTimeout(() => {
-      setCards((prev) => prev.filter((c) => c.id !== id));
-      setDeletingId(null);
-    }, 300);
+  const handleDelete = (id: string) => {
+    setPendingDeleteId(id);
+    deleteSavedCard({ id }).finally(() => setPendingDeleteId(null));
   };
 
   return (
@@ -114,66 +148,86 @@ export default function PaymentMethodForm() {
       <div className="w-full max-w-7xl grid grid-cols-1 md:grid-cols-2 gap-20 ">
         {/* Left: Card List */}
         <div className="space-y-3">
-          {cards.map((card) => (
-            <div
-              key={card.id}
-              className={`
+          {isLoading && (
+            <div className="text-center py-10 text-gray-400 text-sm">
+              Loading saved cards...
+            </div>
+          )}
+
+          {isError && (
+            <div className="text-center py-10 text-red-400 text-sm">
+              Failed to load saved cards.
+            </div>
+          )}
+
+          {!isLoading &&
+            !isError &&
+            cards.map((card) => (
+              <div
+                key={card.id}
+                className={`
                 bg-white rounded-2xl border px-4 py-3 shadow-sm
                 transition-all duration-300
-                ${deletingId === card.id ? "opacity-0 scale-95" : "opacity-100 scale-100"}
+                ${pendingDeleteId === card.id ? "opacity-0 scale-95" : "opacity-100 scale-100"}
                 ${card.isDefault ? "border-gray-200" : "border-gray-200 hover:border-gray-300"}
               `}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {card.type === "visa" ? <VisaLogo /> : <MastercardLogo />}
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800 capitalize">
-                      {card.type === "visa" ? "Visa" : "Mastercard"}
-                    </p>
-                    <p className="text-xs text-gray-400 tracking-wider">
-                      .... .... {card.last4}
-                    </p>
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <CardLogo cardType={card.cardType} />
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800 capitalize">
+                        {card.cardType ?? "Card"}
+                        {card.bank ? ` · ${card.bank}` : ""}
+                      </p>
+                      <p className="text-xs text-gray-400 tracking-wider">
+                        .... .... {card.last4 ?? "----"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {card.isDefault ? (
+                      <span className="text-xs font-medium text-red-500 border border-red-200 bg-red-50 px-2.5 py-1 rounded-full">
+                        Default
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => handleSetDefault(card.id)}
+                        disabled={settingDefault}
+                        className="text-xs font-medium text-red-500 border border-red-200 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-full transition-colors duration-150 disabled:opacity-50"
+                      >
+                        Set as Default
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleDelete(card.id)}
+                      disabled={deleting}
+                      className="text-gray-400 hover:text-red-500 transition-colors duration-150 p-1 rounded-lg hover:bg-red-50 disabled:opacity-50"
+                      aria-label="Delete card"
+                    >
+                      <TrashIcon />
+                    </button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  {card.isDefault ? (
-                    <span className="text-xs font-medium text-red-500 border border-red-200 bg-red-50 px-2.5 py-1 rounded-full">
-                      Default
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => setDefault(card.id)}
-                      className="text-xs font-medium text-red-500 border border-red-200 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-full transition-colors duration-150"
-                    >
-                      Set as Default
-                    </button>
-                  )}
-                  <button
-                    onClick={() => deleteCard(card.id)}
-                    className="text-gray-400 hover:text-red-500 transition-colors duration-150 p-1 rounded-lg hover:bg-red-50"
-                    aria-label="Delete card"
-                  >
-                    <TrashIcon />
-                  </button>
-                </div>
+                {(card.expMonth || card.expYear) && (
+                  <p className="text-xs text-gray-400 mt-2 ml-[52px]">
+                    Expires: {card.expMonth ?? "--"}/{card.expYear ?? "--"}
+                  </p>
+                )}
               </div>
+            ))}
 
-              <p className="text-xs text-gray-400 mt-2 ml-[52px]">
-                Expires: {card.expiry}
-              </p>
-            </div>
-          ))}
-
-          {cards.length === 0 && (
+          {!isLoading && !isError && cards.length === 0 && (
             <div className="text-center py-10 text-gray-400 text-sm">
-              No payment methods added yet.
+              No payment methods added yet. Cards used for a successful
+              payment will appear here automatically.
             </div>
           )}
         </div>
 
-        {/* Right: Header + CTA */}
+        {/* Right: Header + Info */}
         <div className="flex flex-col gap-4 pt-1">
           <div>
             <h2 className="text-xl font-bold text-gray-900 tracking-tight">
@@ -184,10 +238,11 @@ export default function PaymentMethodForm() {
             </p>
           </div>
 
-          <button className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white font-semibold text-sm rounded-xl px-5 py-3.5 shadow-md shadow-red-200 transition-all duration-150 w-full">
-            <PlusIcon />
-            Add New Payment Method
-          </button>
+          <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm text-gray-500">
+            Cards are saved automatically the next time you pay for a
+            shipment with Paystack — there's no manual "add card" step.
+            Once saved, you can set a default or remove a card here.
+          </div>
         </div>
       </div>
     </div>

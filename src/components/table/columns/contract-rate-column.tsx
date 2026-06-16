@@ -1,3 +1,4 @@
+import AddContractRateModal from "@/components/modals/AddContractRateModal";
 import AddStandardRateModal from "@/components/modals/AddStandardRateModal";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog/dialog";
@@ -14,7 +15,9 @@ export type ContractRate = {
   isActive: boolean;
   validFrom: string;
   validUntil: string;
+  notes?: string | null;
   user: {
+    id: string;
     firstName: string;
     lastName: string;
     email: string;
@@ -136,6 +139,7 @@ export const ContractRateColumns: ColumnDef<ContractRate>[] = [
     header: "Action",
     cell: ({ row }) => {
       const [isDeleteModal, setIsDeleteModal] = useState(false);
+      const [isEditModal, setIsEditModal] = useState(false);
       const [handleDeleteRate, { isLoading }] = useDeleteContractRateMutation();
 
       const onDelete = () => {
@@ -144,7 +148,10 @@ export const ContractRateColumns: ColumnDef<ContractRate>[] = [
 
       return (
         <div className="flex gap-2">
-          <button className="text-gray-400 border px-3 py-1 rounded-md text-xs">
+          <button
+            onClick={() => setIsEditModal(true)}
+            className="text-gray-600 border px-3 py-1 rounded-md text-xs hover:bg-gray-50"
+          >
             Edit
           </button>
 
@@ -154,6 +161,12 @@ export const ContractRateColumns: ColumnDef<ContractRate>[] = [
           >
             Delete
           </button>
+
+          <AddContractRateModal
+            isOpen={isEditModal}
+            setIsOpen={setIsEditModal}
+            editingRate={row.original}
+          />
 
           <Dialog open={isDeleteModal} onOpenChange={setIsDeleteModal}>
             <DialogContent>

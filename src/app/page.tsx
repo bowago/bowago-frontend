@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   useGetCitiesQuery,
+  useGetDimensionsQuery,
   useCreateQuoteMutation,
 } from "@/store/slice/apiSlice";
 import {
@@ -25,6 +26,12 @@ import {
 } from "lucide-react";
 
 type City = { id: string; name: string; state: string };
+type DimensionOption = {
+  id: string;
+  displayName: string;
+  weightKgLimit: number;
+  bestFor: string;
+};
 
 export default function LandingPage() {
   const router = useRouter();
@@ -33,6 +40,8 @@ export default function LandingPage() {
   const [fromCity, setFromCity] = useState("");
   const [toCity, setToCity] = useState("");
   const [weight, setWeight] = useState("");
+  const [boxDimensionId, setBoxDimensionId] = useState("");
+  const [boxQuantity, setBoxQuantity] = useState("1");
   const [serviceType, setServiceType] = useState("STANDARD");
   const [quoteResult, setQuoteResult] = useState<any>(null);
 
@@ -42,6 +51,8 @@ export default function LandingPage() {
 
   const { data: citiesData } = useGetCitiesQuery({});
   const cities: City[] = citiesData?.data?.cities ?? [];
+  const { data: dimensionData } = useGetDimensionsQuery({});
+  const dimensions: DimensionOption[] = dimensionData?.data?.dimensions ?? [];
   const [createQuote, { isLoading: quoting }] = useCreateQuoteMutation();
 
   const handleTrack = (e: React.FormEvent) => {
@@ -52,15 +63,23 @@ export default function LandingPage() {
 
   const handleQuote = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fromCity || !toCity || !weight) return;
+    if (!fromCity || !toCity) return;
+    if (!boxDimensionId && !weight) return;
+
     try {
       const result = await createQuote({
         fromCity,
         toCity,
-        weightKg: parseFloat(weight),
+        // Don't send weightKg when a box is selected — weightKg takes
+        // priority on the backend and would override the
+        // boxDimensionId + cartons (box quantity) calculation.
+        weightKg: boxDimensionId ? 0 : parseFloat(weight),
         tons: 0,
-        cartons: 1,
-        boxDimensionId: "",
+        cartons: boxDimensionId
+          ? Math.max(1, parseInt(boxQuantity || "1", 10))
+          : 1,
+        boxDimensionId,
+        serviceType,
       }).unwrap();
       setQuoteResult((result as any)?.data?.quote ?? (result as any)?.data);
     } catch {}
@@ -210,7 +229,7 @@ export default function LandingPage() {
             className={`flex flex-wrap gap-4 mb-16 transition-all duration-700 delay-300 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
           >
             <Link
-              href="/auth/signup"
+              href="/auth/login"
               className="inline-flex items-center gap-2 bg-brand hover:bg-red-700 text-white px-6 py-3.5 rounded-xl font-bold text-sm transition-all hover:scale-105"
             >
               Book a Shipment <ArrowRight className="w-4 h-4" />
@@ -314,19 +333,56 @@ export default function LandingPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs text-white/50 mb-1.5">
-                      Weight (kg)
+                      Box Type (optional)
                     </label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0.1"
-                      value={weight}
-                      onChange={(e) => setWeight(e.target.value)}
-                      placeholder="e.g. 5"
-                      required
-                      className="w-full bg-white/10 border border-white/20 text-white placeholder-white/30 rounded-xl px-3 py-2.5 text-sm focus:border-brand/60 transition-all"
-                    />
+                    <select
+                      value={boxDimensionId}
+                      onChange={(e) => setBoxDimensionId(e.target.value)}
+                      className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-3 py-2.5 text-sm focus:border-brand/60 transition-all [&>option]:bg-gray-900 [&>option]:text-white"
+                    >
+                      <option value="">No box — enter weight</option>
+                      {dimensions.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.displayName} (max {d.weightKgLimit}kg · {d.bestFor})
+                        </option>
+                      ))}
+                    </select>
                   </div>
+                  {boxDimensionId ? (
+                    <div>
+                      <label className="block text-xs text-white/50 mb-1.5">
+                        Number of Boxes
+                      </label>
+                      <input
+                        type="number"
+                        step="1"
+                        min="1"
+                        value={boxQuantity}
+                        onChange={(e) => setBoxQuantity(e.target.value)}
+                        placeholder="e.g. 1"
+                        required
+                        className="w-full bg-white/10 border border-white/20 text-white placeholder-white/30 rounded-xl px-3 py-2.5 text-sm focus:border-brand/60 transition-all"
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-xs text-white/50 mb-1.5">
+                        Weight (kg)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        value={weight}
+                        onChange={(e) => setWeight(e.target.value)}
+                        placeholder="e.g. 5"
+                        required
+                        className="w-full bg-white/10 border border-white/20 text-white placeholder-white/30 rounded-xl px-3 py-2.5 text-sm focus:border-brand/60 transition-all"
+                      />
+                    </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs text-white/50 mb-1.5">
                       Service
@@ -385,7 +441,7 @@ export default function LandingPage() {
                     </div>
                   ))}
                   <Link
-                    href="/auth/signup"
+                    href="/auth/login"
                     className="mt-4 w-full inline-flex items-center justify-center gap-2 bg-brand hover:bg-red-700 text-white py-2.5 rounded-xl text-sm font-bold transition-all"
                   >
                     Book This Shipment <ChevronRight className="w-4 h-4" />

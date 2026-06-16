@@ -6,6 +6,7 @@ import {
   ColumnFiltersState,
   SortingState,
   VisibilityState,
+  PaginationState,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
@@ -32,7 +33,7 @@ export function AppTable<T>({
 }: {
   data: T[];
   columns: ColumnDef<T>[];
-  /** Initial page size for client-side pagination (default: 10) */
+  /** Page size for client-side pagination (default: 10) */
   pageSize?: number;
   /** Hide the built-in "Previous/Next/X of Y selected" footer entirely —
    *  use when the parent implements its own server-side pagination. */
@@ -46,6 +47,28 @@ export function AppTable<T>({
     React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
 
+  // Controlled pagination state — avoids any quirks where TanStack's
+  // uncontrolled internal pagination state doesn't reflect Next/Previous
+  // clicks in the rendered rows.
+  const effectivePageSize =
+    pageSize ?? (hidePagination ? data.length || 10 : 10);
+
+  const [pagination, setPagination] = React.useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: effectivePageSize,
+  });
+
+  // Keep pageSize in sync if the prop changes (e.g. hidePagination toggles,
+  // or a parent passes a computed pageSize once data loads), without
+  // resetting the current page unnecessarily.
+  React.useEffect(() => {
+    setPagination((prev) =>
+      prev.pageSize === effectivePageSize
+        ? prev
+        : { pageIndex: 0, pageSize: effectivePageSize },
+    );
+  }, [effectivePageSize]);
+
   const table = useReactTable({
     data,
     columns,
@@ -57,19 +80,13 @@ export function AppTable<T>({
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
-    initialState: {
-      pagination: {
-        // Default to showing all rows on one "page" so the built-in
-        // Previous/Next don't fight with server-side pagination when
-        // hidePagination is true. Callers can still override via pageSize.
-        pageSize: pageSize ?? (hidePagination ? data.length || 10 : 10),
-      },
-    },
+    onPaginationChange: setPagination,
     state: {
       sorting,
       columnFilters,
       columnVisibility,
       rowSelection,
+      pagination,
     },
   });
 
@@ -127,12 +144,24 @@ export function AppTable<T>({
         </Table>
       </div>
       {!hidePagination && (
-        <div className="flex items-center justify-end space-x-2 py-4">
+        <div className="flex items-center justify-between space-x-2 py-4">
           <div className="flex-1 text-sm text-muted-foreground">
-            {table.getFilteredSelectedRowModel().rows.length} of{" "}
-            {table.getFilteredRowModel().rows.length} row(s) selected.
+            Showing{" "}
+            {table.getFilteredRowModel().rows.length === 0
+              ? 0
+              : pagination.pageIndex * pagination.pageSize + 1}
+            –
+            {Math.min(
+              (pagination.pageIndex + 1) * pagination.pageSize,
+              table.getFilteredRowModel().rows.length,
+            )}{" "}
+            of {table.getFilteredRowModel().rows.length}
           </div>
-          <div className="space-x-2">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">
+              Page {pagination.pageIndex + 1} of{" "}
+              {Math.max(1, table.getPageCount())}
+            </span>
             <Button
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}

@@ -16,6 +16,7 @@ import {
 import {
   useGetAdminDashboardQuery,
   useGetAdminShipmentsQuery,
+  useGetUserShipmentsQuery,
 } from "@/store/slice/apiSlice";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
@@ -56,8 +57,27 @@ export default function Page() {
     { skip: !isAdmin }
   );
 
+  // Customers query their own shipments for the stats cards
+  const { data: myShipmentData } = useGetUserShipmentsQuery({}, { skip: isAdmin });
+  const myShipments: any[] = (() => {
+    const d = (myShipmentData as any)?.data;
+    if (Array.isArray(d)) return d;
+    if (d?.shipments) return d.shipments;
+    return [];
+  })();
+
+  const myTotal = myShipments.length;
+  const myPending = myShipments.filter((s: any) => s.status === "PENDING" || s.paymentStatus === "PENDING").length;
+  const myDelivered = myShipments.filter((s: any) => s.status === "DELIVERED").length;
+
   const stats = dashData?.data;
   const activeShipments: ShipmentItem[] = (() => {
+    if (!isAdmin) {
+      // Customer: show their own non-delivered shipments
+      return myShipments
+        .filter((s: any) => !["DELIVERED", "CANCELLED", "RETURNED"].includes(s.status))
+        .slice(0, 3);
+    }
     if (!shipmentsData) return [];
     const d = (shipmentsData as any)?.data;
     if (Array.isArray(d)) return d.slice(0, 3);
@@ -103,7 +123,7 @@ export default function Page() {
             <StatCard
               icon={<PackagePlus className="w-6 h-6 text-orange-500" />}
               iconBg="bg-orange-50"
-              value={dashLoading ? "..." : String(stats?.shipments?.total ?? 0)}
+              value={isAdmin ? (dashLoading ? "..." : String(stats?.shipments?.total ?? 0)) : String(myTotal)}
               label="Total Shipments"
               trend={0}
               trendPositive={true}
@@ -112,7 +132,7 @@ export default function Page() {
             <StatCard
               icon={<Package className="w-6 h-6 text-purple-500" />}
               iconBg="bg-purple-50"
-              value={dashLoading ? "..." : String(stats?.shipments?.pending ?? 0)}
+              value={isAdmin ? (dashLoading ? "..." : String(stats?.shipments?.pending ?? 0)) : String(myPending)}
               label="Pending Shipments"
               trend={0}
               trendPositive={true}
@@ -121,7 +141,7 @@ export default function Page() {
             <StatCard
               icon={<Clock className="w-6 h-6 text-blue-400" />}
               iconBg="bg-blue-50"
-              value={dashLoading ? "..." : String(stats?.shipments?.delivered ?? 0)}
+              value={isAdmin ? (dashLoading ? "..." : String(stats?.shipments?.delivered ?? 0)) : String(myDelivered)}
               label="Delivered"
               trend={0}
               trendPositive={true}

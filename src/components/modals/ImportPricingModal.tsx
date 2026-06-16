@@ -215,32 +215,42 @@ export default function ImportPricingModal({
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
-            <button
-              onClick={handleClose}
-              className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors"
-            >
-              {result ? "Close" : "Cancel"}
-            </button>
-            {!result && (
-              <button
-                onClick={handleSubmit}
-                disabled={!selectedFile || isLoading}
-                className="flex items-center gap-2 px-5 py-2 bg-brand text-white text-sm font-semibold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Importing…
-                  </>
-                ) : (
-                  <>
-                    <Upload className="w-4 h-4" />
-                    Import Sheet
-                  </>
-                )}
-              </button>
+          <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
+            {isLoading ? (
+              <p className="text-xs text-gray-400">
+                Importing cities, zones, distances, price bands and box
+                sizes — this can take up to a minute for large sheets.
+              </p>
+            ) : (
+              <span />
             )}
+            <div className="flex gap-3 shrink-0">
+              <button
+                onClick={handleClose}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                {result ? "Close" : "Cancel"}
+              </button>
+              {!result && (
+                <button
+                  onClick={handleSubmit}
+                  disabled={!selectedFile || isLoading}
+                  className="flex items-center gap-2 px-5 py-2 bg-brand text-white text-sm font-semibold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Importing…
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      Import Sheet
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         </Dialog.Content>
       </Dialog.Portal>

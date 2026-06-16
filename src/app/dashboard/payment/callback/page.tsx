@@ -16,6 +16,23 @@ function PaymentCallbackInner() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
+    // The backend redirect may include ?status=success/failed when it has
+    // already verified the payment. If so, we trust it and skip re-verification
+    // to avoid a double-verify on the same reference.
+    const statusFromBackend = searchParams.get("status");
+
+    if (statusFromBackend === "success") {
+      setState("success");
+      setMessage("Your payment was successful! Your shipment is now being processed.");
+      return;
+    }
+    if (statusFromBackend === "failed") {
+      setState("failed");
+      setMessage("Payment could not be confirmed. Please try again or contact support.");
+      return;
+    }
+
+    // No status from backend — verify ourselves (e.g. initiated directly via Pay button)
     if (!reference) {
       setState("failed");
       setMessage("No payment reference found.");
@@ -26,9 +43,7 @@ function PaymentCallbackInner() {
       .then((data: any) => {
         if (data?.data?.payment?.status === "PAID" || data?.success) {
           setState("success");
-          setMessage(
-            "Your payment was successful! Your shipment is now being processed.",
-          );
+          setMessage("Your payment was successful! Your shipment is now being processed.");
         } else {
           setState("failed");
           setMessage("Payment could not be confirmed. Please contact support.");

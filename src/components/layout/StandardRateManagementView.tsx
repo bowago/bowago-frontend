@@ -2,122 +2,126 @@
 
 import { AppTable } from "@/components/table/Table";
 import { useGetStandardRateQuery } from "@/store/slice/apiSlice";
-import { Filter } from "lucide-react";
+import { Filter, X } from "lucide-react";
 import { useState } from "react";
-import { BoxDimensionsColumns } from "../table/columns/box-dimension-column";
-import { SelectInput } from "../ui/input";
 import { RateColumns } from "../table/columns/standard-rate-column";
+
+const SERVICE_TYPES = ["EXPRESS", "STANDARD", "ECONOMY"];
+const ZONES = ["1", "2", "3", "4"];
 
 export default function StandardRateManagementView() {
   const [filters, setFilters] = useState({
-    zone: 0,
+    zone: "",
+    serviceType: "",
+    isActive: "",
   });
-
-  const [appliedFilters, setAppliedFilters] = useState(filters);
+  const [applied, setApplied] = useState(filters);
 
   const { data, isLoading } = useGetStandardRateQuery({
-    zone: appliedFilters.zone,
-  });
+    zone: applied.zone ? Number(applied.zone) : undefined,
+    serviceType: applied.serviceType || undefined,
+    isActive: applied.isActive || undefined,
+  } as any);
 
-  // Apply filtering only using appliedFilters
+  const bands = data?.data?.bands ?? [];
 
-  const handleChange = (key: string, value: string) => {
-    setFilters((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
-  };
-
-  // Apply filters when button is clicked
-  const applyFilters = () => {
-    setAppliedFilters(filters);
-  };
-
+  const applyFilters = () => setApplied(filters);
   const clearFilters = () => {
-    const empty = {
-      zone: 0,
-    };
-
+    const empty = { zone: "", serviceType: "", isActive: "" };
     setFilters(empty);
-    setAppliedFilters(empty);
+    setApplied(empty);
+  };
+  const set = (key: string, val: string) =>
+    setFilters((p) => ({ ...p, [key]: val }));
+
+  const labelMap: Record<string, (v: string) => string> = {
+    zone: (v) => `Zone ${v}`,
+    serviceType: (v) => `Service: ${v}`,
+    isActive: (v) => (v === "true" ? "Active" : "Inactive"),
   };
 
-  const removeFilter = (key: string) => {
-    setAppliedFilters((prev) => ({
-      ...prev,
-      [key]: "",
-    }));
-
-    setFilters((prev) => ({
-      ...prev,
-      [key]: "",
-    }));
-  };
-
-  // console.log(data);
+  const hasFilter = Object.values(applied).some(Boolean);
 
   return (
     <div>
-      {/* Filters */}
-      <div className="flex flex-row flex-wrap gap-4 items-end">
-        <div className="w-1/4">
-          <SelectInput
-            label="Zone"
-            placeholder="Select a zone"
-            options={[
-              { label: "Zone 1", value: "1" },
-              { label: "Zone 2", value: "2" },
-              { label: "Zone 3", value: "3" },
-              { label: "Zone 4", value: "4" },
-            ]}
-            value={filters.zone.toString()}
-            onValueChange={(e) => handleChange("search", e)}
-          />
-        </div>
+      {/* Filter bar */}
+      <div className="flex flex-wrap gap-3 items-end">
+        <select
+          value={filters.zone}
+          onChange={(e) => set("zone", e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="">All Zones</option>
+          {ZONES.map((z) => (
+            <option key={z} value={z}>Zone {z}</option>
+          ))}
+        </select>
+
+        <select
+          value={filters.serviceType}
+          onChange={(e) => set("serviceType", e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="">All Services</option>
+          {SERVICE_TYPES.map((s) => (
+            <option key={s} value={s}>{s.charAt(0) + s.slice(1).toLowerCase()}</option>
+          ))}
+        </select>
+
+        <select
+          value={filters.isActive}
+          onChange={(e) => set("isActive", e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="">All Statuses</option>
+          <option value="true">Active</option>
+          <option value="false">Inactive</option>
+        </select>
 
         <button
           onClick={applyFilters}
-          className="bg-red-600 text-white px-5 py-2 rounded-md flex gap-2 items-center"
+          className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2"
         >
-          Filter <Filter size={16} />
+          <Filter size={14} /> Filter
         </button>
-      </div>
-
-      {/* Applied Filters */}
-      <div className="flex flex-wrap gap-2 items-center mb-6 mt-4">
-        <span className="text-sm text-gray-500">Applied Filters:</span>
-
-        {Object.entries(appliedFilters).map(([key, value]) =>
-          value ? (
-            <span
-              key={key}
-              className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-md text-sm"
-            >
-              {key}: {value}
-              <button
-                onClick={() => removeFilter(key)}
-                className="text-red-500 hover:text-red-700"
-              >
-                ✕
-              </button>
-            </span>
-          ) : null,
-        )}
-
-        {Object.values(appliedFilters).some(Boolean) && (
-          <button
-            onClick={clearFilters}
-            className="text-red-600 text-sm font-medium ml-2"
-          >
+        {hasFilter && (
+          <button onClick={clearFilters} className="text-red-600 text-sm font-medium">
             Clear All
           </button>
         )}
       </div>
 
-      {isLoading && <div>...Loading all standard rate </div>}
-      {/* Table */}
-      {data?.data?.bands && (
-        <AppTable columns={RateColumns} data={data?.data?.bands} />
+      {/* Applied chips */}
+      {hasFilter && (
+        <div className="flex flex-wrap gap-2 mt-3 mb-4">
+          {Object.entries(applied).map(([key, val]) =>
+            val ? (
+              <span
+                key={key}
+                className="flex items-center gap-1 bg-gray-100 px-3 py-1 rounded-full text-xs"
+              >
+                {labelMap[key]?.(val) ?? `${key}: ${val}`}
+                <button
+                  onClick={() => {
+                    set(key, "");
+                    setApplied((p) => ({ ...p, [key]: "" }));
+                  }}
+                  className="text-red-500 hover:text-red-700 ml-1"
+                >
+                  <X size={11} />
+                </button>
+              </span>
+            ) : null,
+          )}
+        </div>
+      )}
+
+      {isLoading && <p className="text-sm text-gray-400 py-6">Loading rates...</p>}
+      {!isLoading && bands.length === 0 && (
+        <p className="text-sm text-gray-400 py-6 text-center">No price bands found for the selected filters.</p>
+      )}
+      {!isLoading && bands.length > 0 && (
+        <AppTable columns={RateColumns} data={bands} />
       )}
     </div>
   );

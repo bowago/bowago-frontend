@@ -3,10 +3,8 @@
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { User, Mail, Building2, Phone, Lock } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
-  ResetPasswordFormData,
-  resetPasswordSchema,
   SignupFormData,
   signupSchema,
 } from "@/lib/validation";
@@ -24,7 +22,6 @@ interface SignupFormProps {
 
 export function SignupForm({ onSuccess, onLogin }: SignupFormProps) {
   const router = useRouter();
-
   const [onSignup, { isLoading }] = useSignupMutation({});
   const [serverError, setServerError] = useState("");
 
@@ -36,6 +33,7 @@ export function SignupForm({ onSuccess, onLogin }: SignupFormProps) {
   } = useForm({
     resolver: yupResolver(signupSchema),
   });
+
   const onSubmit = async (data: SignupFormData) => {
     setServerError("");
     const parts = data.fullName.trim().split(/\s+/);
@@ -70,53 +68,55 @@ export function SignupForm({ onSuccess, onLogin }: SignupFormProps) {
         subtitle="Create an account to continue usage."
       />
 
-      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
-        {/* Row 1: Full Name + Email */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input
-            label="Full Name"
-            type="text"
-            placeholder=""
-            leftIcon={<User size={15} />}
-            error={errors.fullName?.message}
-            {...register("fullName")}
-          />
-          <Input
-            label="Email Address"
-            type="email"
-            placeholder="Enter mail address"
-            leftIcon={<Mail size={15} />}
-            error={errors.email?.message}
-            {...register("email")}
-          />
-        </div>
+      {serverError && <AlertBanner message={serverError} type="error" />}
 
-        {/* Row 2: Business Name + Phone */}
+      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+        {/* Full Name — full width */}
+        <Input
+          label="Full Name"
+          type="text"
+          placeholder="John Doe"
+          leftIcon={<User size={15} />}
+          error={errors.fullName?.message}
+          {...register("fullName")}
+        />
+
+        {/* Email — full width */}
+        <Input
+          label="Email Address"
+          type="email"
+          placeholder="you@example.com"
+          leftIcon={<Mail size={15} />}
+          error={errors.email?.message}
+          {...register("email")}
+        />
+
+        {/* Phone + Business side by side */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input
-            label="Business Name (Optional)"
-            type="text"
-            placeholder=""
-            leftIcon={<Building2 size={15} />}
-            error={errors.businessName?.message}
-            {...register("businessName")}
-          />
           <Input
             label="Phone Number"
             type="tel"
-            placeholder=""
+            placeholder="08012345678"
             leftIcon={<Phone size={15} />}
             error={errors.phoneNumber?.message}
             {...register("phoneNumber")}
           />
+          <Input
+            label="Business Name (Optional)"
+            type="text"
+            placeholder="Acme Ltd"
+            leftIcon={<Building2 size={15} />}
+            error={errors.businessName?.message}
+            {...register("businessName")}
+          />
         </div>
 
-        {/* Row 3: Password + Confirm Password */}
+        {/* Password + Confirm side by side */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
             label="Password"
             type="password"
-            placeholder="Enter password"
+            placeholder="••••••••••••"
             leftIcon={<Lock size={15} />}
             error={errors.password?.message}
             {...register("password")}
@@ -124,7 +124,7 @@ export function SignupForm({ onSuccess, onLogin }: SignupFormProps) {
           <Input
             label="Confirm Password"
             type="password"
-            placeholder="Enter confirm password"
+            placeholder="••••••••••••"
             leftIcon={<Lock size={15} />}
             error={errors.confirmPassword?.message}
             {...register("confirmPassword")}
