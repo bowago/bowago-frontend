@@ -88,18 +88,18 @@ export const baseQueryWithReauth: BaseQueryFn<
     );
 
     if (refreshResult.data) {
-      // Store the new tokens
-      store.dispatch(
-        authTokenChange({
-          // @ts-expect-error
-          accessToken: refreshResult.data.accessToken,
-          refreshToken:
-            // @ts-expect-error
-            refreshResult.data.refreshToken ?? authState.refreshToken,
-        }),
-      );
-      // Retry the original request
-      result = await baseQuery(args, store, extraOptions);
+      // Response is { success, data: { accessToken, refreshToken } }
+      const refreshData = (refreshResult.data as any)?.data ?? refreshResult.data;
+      const newAccessToken = refreshData?.accessToken;
+      const newRefreshToken = refreshData?.refreshToken ?? authState.refreshToken;
+
+      if (newAccessToken) {
+        store.dispatch(authTokenChange({ accessToken: newAccessToken, refreshToken: newRefreshToken }));
+        // Retry the original request with the new token
+        result = await baseQuery(args, store, extraOptions);
+      } else {
+        store.dispatch(logoutUser());
+      }
     } else {
       store.dispatch(logoutUser());
     }
