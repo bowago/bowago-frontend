@@ -1941,6 +1941,42 @@ export const apiSlice = createApi({
         }
       },
     }),
+
+    // useMarkAsPaidMutation — Admin: manually record offline payment
+    MarkAsPaid: builder.mutation<any, { shipmentId: string; method?: string; reference?: string; notes?: string }>({
+      query: ({ shipmentId, ...body }) => ({
+        url: `/payments/${shipmentId}/mark-paid`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Shipment"],
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Shipment marked as paid");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Failed to mark as paid");
+        }
+      },
+    }),
+
+    // useWaivePaymentMutation — Super Admin: waive/comp a shipment
+    WaivePayment: builder.mutation<any, { shipmentId: string; reason?: string }>({
+      query: ({ shipmentId, ...body }) => ({
+        url: `/payments/${shipmentId}/waive`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Shipment"],
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Payment waived successfully");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Failed to waive payment");
+        }
+      },
+    }),
     // useGetRateOverviewQuery
     GetRateOverview: builder.query<any, any>({
       query: () => {
@@ -1988,6 +2024,8 @@ export const {
   useGetUserByIdQuery,
   useDeleteUserMutation,
   useDeleteAccountMutation,
+  useMarkAsPaidMutation,
+  useWaivePaymentMutation,
   useGoogleAuthMutation,
   useSetup2FAMutation,
   useVerify2FAMutation,
