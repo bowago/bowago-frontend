@@ -11,9 +11,9 @@ export const metadata: Metadata = {
   description:
     "Express, standard, and economy shipping across Nigeria with real-time tracking",
   icons: {
-    icon: "/favicon.png",
-    shortcut: "/favicon.png",
-    apple: "/favicon.png",
+    icon: [{ url: "/favicon.png", type: "image/png" }],
+    shortcut: [{ url: "/favicon.png", type: "image/png" }],
+    apple: [{ url: "/favicon.png", type: "image/png" }],
   },
 };
 
@@ -26,6 +26,9 @@ export default function RootLayout({
     <html lang="en">
       <head>
         {/* Preconnect for performance */}
+        <link rel="icon" type="image/png" href="/favicon.png" />
+        <link rel="shortcut icon" type="image/png" href="/favicon.png" />
+        <link rel="apple-touch-icon" href="/favicon.png" />
         <script src="https://accounts.google.com/gsi/client" async></script>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link

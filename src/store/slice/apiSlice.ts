@@ -1254,6 +1254,13 @@ export const apiSlice = createApi({
       },
       providesTags: ["Shipment"],
     }),
+
+    // useGetMyInvoiceSummaryQuery — customer-scoped invoice stats
+    GetMyInvoiceSummary: builder.query<unknown, void>({
+      query: () => "/invoices/my-summary",
+      providesTags: ["Invoice"],
+    }),
+
     // useGetInvoiceFinancialOverviewQuery
     GetInvoiceFinancialOverview: builder.query<unknown, void>({
       query: () => {
@@ -2035,6 +2042,7 @@ export const {
   // invoice
   useGetAllInvoiceQuery,
   useGetInvoiceFinancialOverviewQuery,
+  useGetMyInvoiceSummaryQuery,
   useGetAllTicketQuery,
   useGetClaimsQuery,
   useGetFAQQuery,
