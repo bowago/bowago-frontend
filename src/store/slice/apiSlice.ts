@@ -126,6 +126,7 @@ export const apiSlice = createApi({
     "AdminRole",
     "User",
     "SavedCard",
+    "Invoice",
   ],
   baseQuery: baseQueryWithReauth,
   endpoints: (builder) => ({
