@@ -10,6 +10,11 @@ export const metadata: Metadata = {
   title: "BowaGO — Fast Nigerian Logistics",
   description:
     "Express, standard, and economy shipping across Nigeria with real-time tracking",
+  icons: {
+    icon: "/favicon.png",
+    shortcut: "/favicon.png",
+    apple: "/favicon.png",
+  },
 };
 
 export default function RootLayout({
