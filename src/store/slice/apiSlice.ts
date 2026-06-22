@@ -2010,7 +2010,7 @@ export const apiSlice = createApi({
     }),
 
     // useUpdateFAQMutation — Super Admin: update a FAQ item
-    UpdateFAQ: builder.mutation<any, { id: string; question?: string; answer?: string; category?: string; isFeatured?: boolean; isActive?: boolean }>({
+    UpdateFAQ: builder.mutation<any, { id: string; question?: string; answer?: string; category?: string; sortOrder?: number; isFeatured?: boolean; isActive?: boolean }>({
       query: ({ id, ...body }) => ({
         url: `/faq/${id}`,
         method: "PATCH",
