@@ -1,4 +1,5 @@
 "use client";
+import { classifyAuthError } from "@/lib/authErrors";
 
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -56,21 +57,7 @@ export function LoginForm() {
         router.push("/dashboard");
       }
     } catch (err: any) {
-      const rawMsg = err?.data?.message || err?.error?.data?.message || "";
-      // Give contextual hints based on known error codes/messages
-      let msg = rawMsg;
-      if (!msg || msg.toLowerCase().includes("something went wrong")) {
-        msg = "Login failed. Please check your credentials and try again.";
-      } else if (rawMsg.toLowerCase().includes("invalid email or password") || rawMsg.toLowerCase().includes("not found") || rawMsg.toLowerCase().includes("no user")) {
-        msg = "No account found with this email. Please check for a typo, or sign up for a new account below.";
-      } else if (rawMsg.toLowerCase().includes("password")) {
-        msg = "Incorrect password. If you signed up with Google, try 'Login with Google' below instead.";
-      } else if (rawMsg.toLowerCase().includes("suspended") || rawMsg.toLowerCase().includes("inactive")) {
-        msg = "Your account has been suspended. Please contact support.";
-      } else if (rawMsg.toLowerCase().includes("verified") || rawMsg.toLowerCase().includes("confirm")) {
-        msg = "Please verify your email first. Check your inbox (and spam folder) for the verification email.";
-      }
-      setServerError(msg || "Login failed. Please try again.");
+      setServerError(classifyAuthError(err));
     }
   };
 
@@ -86,21 +73,7 @@ export function LoginForm() {
         router.push("/dashboard");
       }
     } catch (err: any) {
-      const rawMsg = err?.data?.message || err?.error?.data?.message || "";
-      // Give contextual hints based on known error codes/messages
-      let msg = rawMsg;
-      if (!msg || msg.toLowerCase().includes("something went wrong")) {
-        msg = "Login failed. Please check your credentials and try again.";
-      } else if (rawMsg.toLowerCase().includes("invalid email or password") || rawMsg.toLowerCase().includes("not found") || rawMsg.toLowerCase().includes("no user")) {
-        msg = "No account found with this email. Please check for a typo, or sign up for a new account below.";
-      } else if (rawMsg.toLowerCase().includes("password")) {
-        msg = "Incorrect password. If you signed up with Google, try 'Login with Google' below instead.";
-      } else if (rawMsg.toLowerCase().includes("suspended") || rawMsg.toLowerCase().includes("inactive")) {
-        msg = "Your account has been suspended. Please contact support.";
-      } else if (rawMsg.toLowerCase().includes("verified") || rawMsg.toLowerCase().includes("confirm")) {
-        msg = "Please verify your email first. Check your inbox (and spam folder) for the verification email.";
-      }
-      setServerError(msg || "Login failed. Please try again.");
+      setServerError(classifyAuthError(err));
     }
   };
 

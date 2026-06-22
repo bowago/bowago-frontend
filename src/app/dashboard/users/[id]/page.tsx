@@ -30,6 +30,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog/dialog";
 
+// Base roles available to all admins
 const SUB_ROLES = [
   { value: "CUSTOMER", label: "Customer (no admin access)" },
   { value: "LOGISTICS_MANAGER", label: "Logistics Manager" },
@@ -40,6 +41,9 @@ const SUB_ROLES = [
   { value: "ROLE_FINANCE", label: "Finance" },
   { value: "ROLE_USER", label: "Company User" },
 ];
+
+// Only Super Admins can assign or see the SUPER_ADMIN role
+const SUPER_ADMIN_ROLE = { value: "SUPER_ADMIN", label: "Super Admin (full access)" };
 
 const subRoleBadge: Record<string, string> = {
   SUPER_ADMIN: "bg-purple-100 text-purple-700",
@@ -526,6 +530,11 @@ export default function UserDetailPage() {
                   onChange={(e) => setNewSubRole(e.target.value)}
                   className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-2.5 pr-10 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand/40"
                 >
+                  {isSuperAdmin && (
+                    <option key="SUPER_ADMIN" value="SUPER_ADMIN">
+                      {SUPER_ADMIN_ROLE.label}
+                    </option>
+                  )}
                   {SUB_ROLES.map((r) => (
                     <option key={r.value} value={r.value}>
                       {r.label}

@@ -1,4 +1,5 @@
 "use client";
+import { classifyAuthError } from "@/lib/authErrors";
 
 import { useController, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -56,7 +57,7 @@ export function VerifyOTPForm({ email }: VerifyOTPFormProps) {
 
       <AuthCardHeader
         title="Enter OTP"
-        subtitle="Enter the 4-digit OTP sent to your registered email"
+        subtitle="Enter the 6-digit OTP sent to your registered email"
       />
 
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">

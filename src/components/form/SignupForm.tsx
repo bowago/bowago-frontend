@@ -1,4 +1,5 @@
 "use client";
+import { classifyAuthError } from "@/lib/authErrors";
 
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -53,11 +54,7 @@ export function SignupForm({ onSuccess, onLogin }: SignupFormProps) {
       }).unwrap();
       router.push(`/auth/verify-otp/${data.email}`);
     } catch (err: any) {
-      setServerError(
-        err?.data?.message ||
-          err?.error?.data?.message ||
-          "Signup failed. Please try again.",
-      );
+      setServerError(classifyAuthError(err));
     }
   };
 

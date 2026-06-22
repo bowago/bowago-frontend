@@ -31,6 +31,9 @@ const SUB_ROLES = [
   { value: "ROLE_USER", label: "Company User" },
 ];
 
+// Super Admin role — only shown in dropdown when logged-in user is a Super Admin
+const SUPER_ADMIN_ROLE = { value: "SUPER_ADMIN", label: "Super Admin (full access)" };
+
 const roleBadge: Record<string, string> = {
   ADMIN: "bg-red-100 text-red-700",
   CUSTOMER: "bg-blue-100 text-blue-700",
@@ -330,6 +333,11 @@ export default function UsersPage() {
                   onChange={(e) => setNewSubRole(e.target.value)}
                   className="w-full appearance-none border border-gray-200 rounded-xl px-4 py-2.5 pr-10 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand/40 transition-colors"
                 >
+                  {isSuperAdmin && (
+                    <option key="SUPER_ADMIN" value="SUPER_ADMIN">
+                      {SUPER_ADMIN_ROLE.label}
+                    </option>
+                  )}
                   {SUB_ROLES.map((r) => (
                     <option key={r.value} value={r.value}>
                       {r.label}

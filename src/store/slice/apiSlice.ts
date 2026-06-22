@@ -1985,6 +1985,62 @@ export const apiSlice = createApi({
         }
       },
     }),
+
+    // useGetFeaturedFAQsQuery — public, homepage FAQ preview (max 4)
+    GetFeaturedFAQs: builder.query<any, void>({
+      query: () => "/faq/featured",
+      providesTags: ["FAQ"],
+    }),
+
+    // useToggleFeaturedFAQMutation — Super Admin: toggle isFeatured on a FAQ
+    ToggleFeaturedFAQ: builder.mutation<any, { id: string }>({
+      query: ({ id }) => ({
+        url: `/faq/${id}/toggle-featured`,
+        method: "PATCH",
+      }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          successToast((data as any)?.message || "FAQ feature status updated");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Failed to update FAQ");
+        }
+      },
+      invalidatesTags: ["FAQ"],
+    }),
+
+    // useUpdateFAQMutation — Super Admin: update a FAQ item
+    UpdateFAQ: builder.mutation<any, { id: string; question?: string; answer?: string; category?: string; isFeatured?: boolean; isActive?: boolean }>({
+      query: ({ id, ...body }) => ({
+        url: `/faq/${id}`,
+        method: "PATCH",
+        body,
+      }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("FAQ updated");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "FAQ update failed");
+        }
+      },
+      invalidatesTags: ["FAQ"],
+    }),
+
+    // useDeleteFAQMutation — Super Admin: delete a FAQ item
+    DeleteFAQ: builder.mutation<any, { id: string }>({
+      query: ({ id }) => ({ url: `/faq/${id}`, method: "DELETE" }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("FAQ deleted");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Delete failed");
+        }
+      },
+      invalidatesTags: ["FAQ"],
+    }),
+
     // useGetRateOverviewQuery
     GetRateOverview: builder.query<any, any>({
       query: () => {
@@ -2047,6 +2103,10 @@ export const {
   useGetAllTicketQuery,
   useGetClaimsQuery,
   useGetFAQQuery,
+  useGetFeaturedFAQsQuery,
+  useToggleFeaturedFAQMutation,
+  useUpdateFAQMutation,
+  useDeleteFAQMutation,
 
   // rate management
   useAddCityMutation,

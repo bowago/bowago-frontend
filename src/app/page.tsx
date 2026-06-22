@@ -1,4 +1,5 @@
 "use client";
+import FeaturedFAQs from "@/components/layout/FeaturedFAQs";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -70,9 +71,6 @@ export default function LandingPage() {
       const result = await createQuote({
         fromCity,
         toCity,
-        // Don't send weightKg when a box is selected — weightKg takes
-        // priority on the backend and would override the
-        // boxDimensionId + cartons (box quantity) calculation.
         weightKg: boxDimensionId ? 0 : parseFloat(weight),
         tons: 0,
         cartons: boxDimensionId
@@ -343,7 +341,8 @@ export default function LandingPage() {
                       <option value="">No box — enter weight</option>
                       {dimensions.map((d) => (
                         <option key={d.id} value={d.id}>
-                          {d.displayName} (max {d.weightKgLimit}kg · {d.bestFor})
+                          {d.displayName} (max {d.weightKgLimit}kg · {d.bestFor}
+                          )
                         </option>
                       ))}
                     </select>
@@ -559,38 +558,7 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-            {[
-              {
-                q: "How do I track my shipment?",
-                a: "Enter your tracking number on the Track page or homepage. No login required — tracking is public.",
-              },
-              {
-                q: "How is shipping cost calculated?",
-                a: "Cost is based on origin, destination, zone, and billable weight (higher of actual or volumetric weight).",
-              },
-              {
-                q: "What is Express vs Standard?",
-                a: "Express is same-day or next-day. Standard is 2–4 days. Economy is 5–7 days. All include live tracking.",
-              },
-              {
-                q: "Can I insure my shipment?",
-                a: "Yes — add insurance at checkout. Premium is 2.5% of declared goods value, minimum ₦100.",
-              },
-            ].map((item) => (
-              <div
-                key={item.q}
-                className="bg-white/5 border border-white/10 rounded-2xl p-5 hover:border-white/20 transition-all"
-              >
-                <p className="font-semibold text-white text-sm mb-2">
-                  {item.q}
-                </p>
-                <p className="text-white/50 text-sm leading-relaxed">
-                  {item.a}
-                </p>
-              </div>
-            ))}
-          </div>
+          <FeaturedFAQs />
 
           <div className="text-center md:hidden">
             <Link
