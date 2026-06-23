@@ -15,6 +15,7 @@ import {
   useInitiateShipmentPaymentMutation,
   useInitPendingPaymentMutation,
   useDownloadInvoiceMutation,
+  useGeneratePersistedQuoteMutation,
 } from "@/store/slice/apiSlice";
 
 // ─── Validation Schema ────────────────────────────────────────────────────────
@@ -324,6 +325,17 @@ function ReviewStep({ data }: { data: ShipmentReviewData }) {
             </span>
           </div>
         ))}
+        {/* Insurance premium line item */}
+        {(quote as any)?.insurancePremiumKobo > 0 && (
+          <div className="flex justify-between items-center py-[5px] border-b border-gray-100">
+            <span className="text-xs text-gray-500">
+              Insurance (2.5% of declared value)
+            </span>
+            <span className="text-xs font-medium text-gray-800">
+              ₦{Math.round((quote as any).insurancePremiumKobo / 100).toLocaleString()}
+            </span>
+          </div>
+        )}
 
         <div className="flex justify-between items-center py-[5px]">
           <span className="text-xs font-semibold text-gray-900">Total</span>
@@ -381,6 +393,8 @@ export default function CreateShipmentModal({
     useDownloadInvoiceMutation();
   const [handleCreateShipment, { isLoading: isCreatingShipment }] =
     useAddShipmentMutation();
+  const [generatePersistedQuote] = useGeneratePersistedQuoteMutation();
+  const [persistedQuoteId, setPersistedQuoteId] = useState<string | null>(null);
   const { data: citiesData, isLoading } = useGetCitiesQuery({});
 
   const [step, setStep] = useState<Step>(1);
@@ -475,6 +489,7 @@ export default function CreateShipmentModal({
     insuranceValue: data.hasInsurance ? (data.insuranceValue ?? 0) : 0,
     pickupDate: formatPickupDate(data.pickupDate),
     notes: data.note ?? "",
+    ...(persistedQuoteId ? { quoteId: persistedQuoteId } : {}),
   });
 
   const getReviewData = (response: unknown): ShipmentReviewData => {
@@ -513,6 +528,35 @@ export default function CreateShipmentModal({
       await createShipment();
       return;
     }
+
+    // When moving from Step 1 → Step 2, generate a persistent quote so the
+    // price is locked for 15 minutes. If it fails (no pricing data yet) we
+    // proceed anyway — the shipment controller will calculate the price.
+    if (step === 1) {
+      const vals = getValues();
+      try {
+        const result = await generatePersistedQuote({
+          originCity: vals.originCity,
+          destinationCity: vals.destinationCity,
+          weightKg: vals.weight ?? 0,
+          tons: vals.tons ?? 0,
+          cartons: vals.cartons ?? 0,
+          lengthCm: vals.length ?? 0,
+          widthCm: vals.width ?? 0,
+          heightCm: vals.height ?? 0,
+          boxDimensionId: vals.boxSize ?? undefined,
+          serviceType: vals.serviceType,
+          insuranceSelected: vals.hasInsurance,
+          declaredValue: vals.insuranceValue ?? 0,
+        }).unwrap();
+        const qId = result?.data?.quote?.id ?? result?.data?.id;
+        if (qId) setPersistedQuoteId(qId);
+      } catch {
+        // Non-blocking — proceed without price lock
+        setPersistedQuoteId(null);
+      }
+    }
+
     setStep((s) => (s < 3 ? ((s + 1) as Step) : s));
   };
 
@@ -691,10 +735,29 @@ export default function CreateShipmentModal({
                     <Input
                       label="Pickup Date"
                       type="date"
+                      min={new Date().toISOString().split("T")[0]}
                       leftIcon={<Calendar size={14} />}
                       {...register("pickupDate")}
                       error={errors.pickupDate?.message}
                     />
+                    {/* Cutoff warning — same-day bookings after 2 PM shift to next day */}
+                    {(() => {
+                      const now = new Date();
+                      const isToday = (() => {
+                        const pd = getValues("pickupDate");
+                        if (!pd) return false;
+                        const d = new Date(pd);
+                        return d.toDateString() === now.toDateString();
+                      })();
+                      if (isToday && now.getHours() >= 14) {
+                        return (
+                          <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-1.5">
+                            ⚠ Bookings after 2:00 PM cannot be collected same day. The earliest pickup will be the <strong>next business day</strong>.
+                          </p>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 </div>
 

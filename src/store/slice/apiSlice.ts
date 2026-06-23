@@ -586,6 +586,7 @@ export const apiSlice = createApi({
         insuranceValue: number;
         pickupDate: string;
         notes: string;
+        quoteId?: string;
       }
     >({
       query: (formData) => ({
@@ -605,6 +606,31 @@ export const apiSlice = createApi({
         }
       },
       invalidatesTags: ["Shipment"],
+    }),
+
+
+    // useGeneratePersistedQuoteMutation — POST /quotes (15-min TTL, returns quoteId)
+    // Use this for the booking flow so price is locked at quote time.
+    GeneratePersistedQuote: builder.mutation<any, {
+      originCity: string;
+      destinationCity: string;
+      weightKg?: number;
+      tons?: number;
+      cartons?: number;
+      lengthCm?: number;
+      widthCm?: number;
+      heightCm?: number;
+      boxDimensionId?: string;
+      serviceType?: string;
+      insuranceSelected?: boolean;
+      declaredValue?: number;
+      promoCode?: string;
+    }>({
+      query: (body) => ({ url: "/quotes", method: "POST", body }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try { await queryFulfilled; }
+        catch (e: any) { /* silent — caller handles */ }
+      },
     }),
 
     // useAddContractRateMutation
@@ -2130,6 +2156,7 @@ export const {
   useEditPromoRateMutation,
   useGetAuditTrailQuery,
   useCreateQuoteMutation,
+  useGeneratePersistedQuoteMutation,
   useDeleteZoneMutation,
   usePauseZoneMutation,
   useReInstateZoneMutation,
