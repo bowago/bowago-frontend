@@ -17,6 +17,7 @@ import {
   useDownloadInvoiceMutation,
   useGeneratePersistedQuoteMutation,
   useGetDeliverySLAQuery,
+  useGetZoneByRouteQuery,
 } from "@/store/slice/apiSlice";
 
 // ─── Validation Schema ────────────────────────────────────────────────────────
@@ -426,11 +427,12 @@ export default function CreateShipmentModal({
     getValues,
     reset,
     setValue,
-    formState: { errors },
+    formState: { errors, isValid },
   } = useForm<CreateShipmentFormData>({
     resolver: yupResolver(
       createShipmentSchema,
     ) as Resolver<CreateShipmentFormData>,
+    mode: "onChange",
     defaultValues: {
       serviceType: "EXPRESS",
       isFragile: false,
@@ -478,6 +480,12 @@ export default function CreateShipmentModal({
     ],
     3: [],
   };
+
+  // Disable Continue/Create Shipment if any field for the current step has an error
+  const currentStepFields = STEP_FIELDS[step];
+  const stepHasErrors = currentStepFields.some(
+    (field) => !!errors[field as keyof typeof errors]
+  );
 
   const formatPickupDate = (value?: Date | string | null) => {
     if (!value) return "";
@@ -649,6 +657,25 @@ export default function CreateShipmentModal({
   const selectedBoxId = useWatch({ control, name: "boxSize" });
   const hasInsurance = useWatch({ control, name: "hasInsurance" });
 
+  // Live zone lookup — fires whenever both cities are selected (including same city = Zone 1)
+  const watchedOrigin = useWatch({ control, name: "originCity" });
+  const watchedDest   = useWatch({ control, name: "destinationCity" });
+  const canLookupZone = !!(watchedOrigin && watchedDest);
+  const { data: zoneRouteData } = useGetZoneByRouteQuery(
+    { fromCity: watchedOrigin ?? "", toCity: watchedDest ?? "" },
+    { skip: !canLookupZone }
+  );
+  const liveZone: number | null =
+    zoneRouteData?.data?.matrix?.[0]?.zone ?? null;
+
+  // Hardcoded SLA fallback — used when DB seed hasn't run yet or SLA table is empty.
+  // Mirrors the values in seed.js exactly.
+  const SLA_FALLBACK: Record<string, Record<string, string>> = {
+    EXPRESS:  { "1": "Same day – next day", "2": "1–2 business days", "3": "2–3 business days", "4": "3–5 business days" },
+    STANDARD: { "1": "1–2 business days",   "2": "2–4 business days", "3": "3–5 business days", "4": "5–7 business days" },
+    ECONOMY:  { "1": "2–4 business days",   "2": "4–7 business days", "3": "5–10 business days","4": "7–14 business days" },
+  };
+
   const cities = useMemo(
     () => (citiesData?.data?.cities ?? []) as CityOption[],
     [citiesData?.data?.cities],
@@ -673,22 +700,28 @@ export default function CreateShipmentModal({
   const maxTons = maxWeight / 1000;
 
   // Get delivery label for a service type based on SLA table.
-  // zone is optional — derived from the persisted quote result when available.
+  // zone is optional — derived from the zone matrix API when both cities are selected.
   const getSLALabel = (serviceType: string, zone?: number | null): string => {
-    if (zone != null && slas.length > 0) {
-      const match = slas.find(
-        (s: any) =>
-          s.zone === zone && s.serviceType === serviceType.toUpperCase(),
-      );
-      if (match)
-        return match.label ?? `${match.minDays}–${match.maxDays} business days`;
+    const svcKey = serviceType.toUpperCase();
+    if (zone != null) {
+      // 1. Try live SLA data from DB
+      if (slas.length > 0) {
+        const match = slas.find(
+          (s: any) => s.zone === zone && s.serviceType === svcKey,
+        );
+        if (match) return match.label ?? `${match.minDays}–${match.maxDays} business days`;
+      }
+      // 2. Fallback to hardcoded table (covers case where seed hasn't run)
+      const fallback = SLA_FALLBACK[svcKey]?.[String(zone)];
+      if (fallback) return fallback;
     }
-    const fallbacks: Record<string, string> = {
-      EXPRESS: "1–4 business days (by zone)",
+    // 3. Generic placeholder when zone not yet known
+    const generic: Record<string, string> = {
+      EXPRESS:  "1–4 business days (by zone)",
       STANDARD: "2–7 business days (by zone)",
-      ECONOMY: "4–14 business days (by zone)",
+      ECONOMY:  "4–14 business days (by zone)",
     };
-    return fallbacks[serviceType.toUpperCase()] ?? "Varies by zone";
+    return generic[svcKey] ?? "Varies by zone";
   };
 
   return (
@@ -738,7 +771,23 @@ export default function CreateShipmentModal({
                         value={field.value}
                         onValueChange={field.onChange}
                         className="flex flex-row gap-2"
-                        options={SERVICE_OPTIONS}
+                        options={[
+                          {
+                            label: "Express",
+                            description: getSLALabel("EXPRESS", liveZone),
+                            value: "EXPRESS",
+                          },
+                          {
+                            label: "Standard",
+                            description: getSLALabel("STANDARD", liveZone),
+                            value: "STANDARD",
+                          },
+                          {
+                            label: "Economy",
+                            description: getSLALabel("ECONOMY", liveZone),
+                            value: "ECONOMY",
+                          },
+                        ]}
                       />
                     )}
                   />
@@ -1169,6 +1218,7 @@ export default function CreateShipmentModal({
                   type="button"
                   onClick={handleNext}
                   isLoading={step === 2 && isCreatingShipment}
+                  disabled={stepHasErrors}
                 >
                   {step === 2 ? "Create Shipment" : "Continue"}
                 </Button>

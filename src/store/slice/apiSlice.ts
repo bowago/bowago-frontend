@@ -1399,7 +1399,14 @@ export const apiSlice = createApi({
       },
       providesTags: ["Shipment"],
     }),
-    // useGetZoneQuery
+    // useGetZoneByRouteQuery — looks up zone for a specific city pair (used in CreateShipmentModal)
+    GetZoneByRoute: builder.query<any, { fromCity: string; toCity: string }>({
+      query: ({ fromCity, toCity }) =>
+        `/pricing/zone-matrix?fromCity=${encodeURIComponent(fromCity)}&toCity=${encodeURIComponent(toCity)}&limit=1`,
+      providesTags: ['Zone'],
+    }),
+
+        // useGetZoneQuery
     GetZone: builder.query<
       any,
       { fromCity?: string; toCity?: string; page?: number; limit?: number; isActive?: string }
@@ -2320,6 +2327,7 @@ export const {
   useDeleteBoxMutation,
   useAddZoneMutation,
   useGetZoneQuery,
+  useGetZoneByRouteQuery,
   useAddStandardRateMutation,
   useGetStandardRateQuery,
   useGetContractRateQuery,
