@@ -30,6 +30,7 @@ import {
   Box,
   BookOpen,
   X,
+  BarChart2,
 } from "lucide-react";
 
 const ICON_CLS = "w-4 h-4 flex-shrink-0";
@@ -143,7 +144,19 @@ const menuList: MenuItem[] = [
         roles: ["ADMIN"],
         icon: <AlertCircle className={ICON_CLS} />,
       },
+      {
+        label: "Agent KPI",
+        href: "/dashboard/support/kpi",
+        roles: ["ADMIN"],
+        icon: <BarChart2 className={ICON_CLS} />,
+      },
     ],
+  },
+  {
+    label: "Team",
+    href: "/dashboard/team",
+    roles: ["ADMIN"],
+    icon: <Users className={ICON_CLS} />,
   },
   {
     label: "My Support",

@@ -85,6 +85,8 @@ export default function CreateQuoteModal({
   const [handleCreateQuote, { isLoading: isLoadingQuote, data }] =
     useCreateQuoteMutation();
   const [step, setStep] = useState(1);
+  // Sprint 7: terms consent — required before quote generation
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const form = useForm<QuoteFormData>({
     mode: "onChange",
@@ -121,13 +123,11 @@ export default function CreateQuoteModal({
   };
 
   const onSubmit = (data: QuoteFormData) => {
-    handleCreateQuote(data)
+    handleCreateQuote({ ...data, termsAccepted: true })
       .unwrap()
       .then(() => {
         setStep(3);
       });
-    // console.log("FINAL PAYLOAD:", data);
-    // setStep(3);
   };
 
   // ─────────────────────────────
@@ -358,18 +358,36 @@ export default function CreateQuoteModal({
         </div>
 
         {/* ACTION */}
-        <div className="flex justify-between">
-          <Button type="button" variant="secondary" onClick={() => setStep(1)}>
-            Back
-          </Button>
+        <div className="flex flex-col gap-3">
+          {/* Sprint 7: Terms of Service consent */}
+          <label className="flex items-start gap-2 cursor-pointer text-sm text-gray-600">
+            <input
+              type="checkbox"
+              checked={termsAccepted}
+              onChange={(e) => setTermsAccepted(e.target.checked)}
+              className="mt-0.5 rounded border-gray-300 accent-blue-600"
+            />
+            <span>
+              By clicking Calculate, you agree to our{" "}
+              <a href="/policies/terms" target="_blank" className="text-blue-600 underline">
+                Terms of Service
+              </a>
+            </span>
+          </label>
+          <div className="flex justify-between">
+            <Button type="button" variant="secondary" onClick={() => setStep(1)}>
+              Back
+            </Button>
 
-          <Button
-            type="button"
-            isLoading={isLoadingQuote}
-            onClick={handleNextStep2}
-          >
-            Calculate
-          </Button>
+            <Button
+              type="button"
+              isLoading={isLoadingQuote}
+              disabled={!termsAccepted}
+              onClick={handleNextStep2}
+            >
+              Calculate
+            </Button>
+          </div>
         </div>
       </div>
     );

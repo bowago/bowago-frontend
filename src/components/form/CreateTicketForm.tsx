@@ -42,7 +42,7 @@ export const AddTicketForm = ({ onSuccess }: AddTicketFormProps) => {
     defaultValues: {
       subject: "",
       category: "OTHER",
-      shipmentId: "",
+      trackingNumber: "",
       body: "",
       priority: "NORMAL",
     },
@@ -98,10 +98,10 @@ export const AddTicketForm = ({ onSuccess }: AddTicketFormProps) => {
 
         <div className="col-span-2">
           <Input
-            label="Shipment ID"
-            placeholder="3fa85f64-5717-4562-b3fc-2c963f66afa6"
-            error={errors.shipmentId?.message}
-            {...register("shipmentId")}
+            label="Tracking Number"
+            placeholder="BG-20260619-XXXXX"
+            error={errors.trackingNumber?.message}
+            {...register("trackingNumber")}
           />
         </div>
 

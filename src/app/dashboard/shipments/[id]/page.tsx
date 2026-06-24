@@ -62,7 +62,7 @@ export default function ShipmentDetails() {
 
   const handlePayNow = async () => {
     const callbackUrl = `${window.location.origin}/dashboard/payment/callback`;
-    const result = await initiatePayment({ shipmentId: id, callbackUrl }).unwrap();
+    const result = await initiatePayment({ shipmentId: id, callbackUrl, refundPolicyAccepted: true }).unwrap();
     const authorizationUrl = result?.authorizationUrl ?? result?.data?.authorizationUrl;
     if (authorizationUrl) window.location.href = authorizationUrl;
   };

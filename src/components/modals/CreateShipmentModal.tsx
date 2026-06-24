@@ -16,6 +16,7 @@ import {
   useInitPendingPaymentMutation,
   useDownloadInvoiceMutation,
   useGeneratePersistedQuoteMutation,
+  useGetDeliverySLAQuery,
 } from "@/store/slice/apiSlice";
 
 // ─── Validation Schema ────────────────────────────────────────────────────────
@@ -140,9 +141,21 @@ type PaymentResponse = {
 };
 
 export const SERVICE_OPTIONS = [
-  { label: "Express", description: "1–3 business days", value: "EXPRESS" },
-  { label: "Standard", description: "5–7 business days", value: "STANDARD" },
-  { label: "Economy", description: "10–14 business days", value: "ECONOMY" },
+  {
+    label: "Express",
+    description: "1–4 business days (by zone)",
+    value: "EXPRESS",
+  },
+  {
+    label: "Standard",
+    description: "2–7 business days (by zone)",
+    value: "STANDARD",
+  },
+  {
+    label: "Economy",
+    description: "4–14 business days (by zone)",
+    value: "ECONOMY",
+  },
 ];
 
 export const SERVICE_DELIVERY_MAP: Record<string, string> = {
@@ -332,7 +345,10 @@ function ReviewStep({ data }: { data: ShipmentReviewData }) {
               Insurance (2.5% of declared value)
             </span>
             <span className="text-xs font-medium text-gray-800">
-              ₦{Math.round((quote as any).insurancePremiumKobo / 100).toLocaleString()}
+              ₦
+              {Math.round(
+                (quote as any).insurancePremiumKobo / 100,
+              ).toLocaleString()}
             </span>
           </div>
         )}
@@ -394,6 +410,8 @@ export default function CreateShipmentModal({
   const [handleCreateShipment, { isLoading: isCreatingShipment }] =
     useAddShipmentMutation();
   const [generatePersistedQuote] = useGeneratePersistedQuoteMutation();
+  const { data: slaData } = useGetDeliverySLAQuery();
+  const slas: any[] = slaData?.data?.slas ?? [];
   const [persistedQuoteId, setPersistedQuoteId] = useState<string | null>(null);
   const { data: citiesData, isLoading } = useGetCitiesQuery({});
 
@@ -529,6 +547,25 @@ export default function CreateShipmentModal({
       return;
     }
 
+    // Auto-populate sender/receiver city from route (Step 1 → Step 2)
+    // The PRD clarifies: "sender city = pickup city, receiver city = destination city"
+    // so we auto-fill to avoid redundant entry and confusion (Michael's observation).
+    if (step === 1) {
+      const vals = getValues();
+      if (vals.originCity && !getValues("senderCity")) {
+        setValue("senderCity", vals.originCity);
+        const senderCityObj = cities?.find((c) => c.name === vals.originCity);
+        if (senderCityObj) setValue("senderState", senderCityObj.state);
+      }
+      if (vals.destinationCity && !getValues("receiverCity")) {
+        setValue("receiverCity", vals.destinationCity);
+        const receiverCityObj = cities?.find(
+          (c) => c.name === vals.destinationCity,
+        );
+        if (receiverCityObj) setValue("receiverState", receiverCityObj.state);
+      }
+    }
+
     // When moving from Step 1 → Step 2, generate a persistent quote so the
     // price is locked for 15 minutes. If it fails (no pricing data yet) we
     // proceed anyway — the shipment controller will calculate the price.
@@ -548,6 +585,7 @@ export default function CreateShipmentModal({
           serviceType: vals.serviceType,
           insuranceSelected: vals.hasInsurance,
           declaredValue: vals.insuranceValue ?? 0,
+          termsAccepted: true,
         }).unwrap();
         const qId = result?.data?.quote?.id ?? result?.data?.id;
         if (qId) setPersistedQuoteId(qId);
@@ -593,6 +631,7 @@ export default function CreateShipmentModal({
     const data = (await handleInitiateShipmentPayment({
       shipmentId,
       callbackUrl,
+      refundPolicyAccepted: true,
     }).unwrap()) as PaymentResponse;
     const authorizationUrl =
       data.authorizationUrl ?? data.data?.authorizationUrl;
@@ -632,6 +671,25 @@ export default function CreateShipmentModal({
   const maxHeight = selectedBox?.heightCm || 0;
   const maxWidth = selectedBox?.widthCm || 0;
   const maxTons = maxWeight / 1000;
+
+  // Get delivery label for a service type based on SLA table.
+  // zone is optional — derived from the persisted quote result when available.
+  const getSLALabel = (serviceType: string, zone?: number | null): string => {
+    if (zone != null && slas.length > 0) {
+      const match = slas.find(
+        (s: any) =>
+          s.zone === zone && s.serviceType === serviceType.toUpperCase(),
+      );
+      if (match)
+        return match.label ?? `${match.minDays}–${match.maxDays} business days`;
+    }
+    const fallbacks: Record<string, string> = {
+      EXPRESS: "1–4 business days (by zone)",
+      STANDARD: "2–7 business days (by zone)",
+      ECONOMY: "4–14 business days (by zone)",
+    };
+    return fallbacks[serviceType.toUpperCase()] ?? "Varies by zone";
+  };
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={handleOpenChange}>
@@ -752,7 +810,9 @@ export default function CreateShipmentModal({
                       if (isToday && now.getHours() >= 14) {
                         return (
                           <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-1.5">
-                            ⚠ Bookings after 2:00 PM cannot be collected same day. The earliest pickup will be the <strong>next business day</strong>.
+                            ⚠ Bookings after 2:00 PM cannot be collected same
+                            day. The earliest pickup will be the{" "}
+                            <strong>next business day</strong>.
                           </p>
                         );
                       }
@@ -931,12 +991,10 @@ export default function CreateShipmentModal({
                       name="senderCity"
                       render={({ field }) => (
                         <SelectInput
-                          label="Sender City"
-                          disabled={isLoading}
+                          label="Sender City (from route)"
+                          disabled={true}
                           options={cityOptions}
-                          placeholder={
-                            isLoading ? "...loading cities" : "e.g Ikeja"
-                          }
+                          placeholder="Auto-filled from Origin"
                           value={field.value as string}
                           onValueChange={(val) => {
                             field.onChange(val);
@@ -994,12 +1052,10 @@ export default function CreateShipmentModal({
                       name="receiverCity"
                       render={({ field }) => (
                         <SelectInput
-                          label="Recipient City"
-                          disabled={isLoading}
+                          label="Recipient City (from route)"
+                          disabled={true}
                           options={cityOptions}
-                          placeholder={
-                            isLoading ? "...loading cities" : "e.g Ikeja"
-                          }
+                          placeholder="Auto-filled from Destination"
                           value={field.value as string}
                           onValueChange={(val) => {
                             field.onChange(val);
@@ -1062,40 +1118,56 @@ export default function CreateShipmentModal({
           </form>
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t border-gray-100 flex items-center gap-3 shrink-0">
-            {step > 1 && (
-              <Button variant="secondary" type="button" onClick={handleBack}>
-                ← Back
-              </Button>
-            )}
-            <div className="flex-1" />
+          <div className="px-6 py-4 border-t border-gray-100 flex flex-col gap-3 shrink-0">
+            {/* Sprint 7: Refund Policy acknowledgement on Step 3 */}
             {step === 3 && (
-              <Button
-                variant="secondary"
-                type="button"
-                onClick={handleGenerateInvoice}
-                isLoading={isPreparingInvoice || isDownloadingInvoice}
-              >
-                Generate Invoice Only
-              </Button>
+              <p className="text-xs text-gray-400 text-center">
+                By clicking <strong>Pay Now</strong> you acknowledge our{" "}
+                <a
+                  href="/policies/refund"
+                  target="_blank"
+                  className="underline text-gray-600"
+                >
+                  Refund Policy
+                </a>
+                . This is recorded for compliance.
+              </p>
             )}
-            {step < 3 ? (
-              <Button
-                type="button"
-                onClick={handleNext}
-                isLoading={step === 2 && isCreatingShipment}
-              >
-                {step === 2 ? "Create Shipment" : "Continue"}
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                onClick={handlePayment}
-                className="bg-red-600 hover:bg-red-700 text-white"
-              >
-                Pay Now
-              </Button>
-            )}
+            <div className="flex items-center gap-3">
+              {step > 1 && (
+                <Button variant="secondary" type="button" onClick={handleBack}>
+                  ← Back
+                </Button>
+              )}
+              <div className="flex-1" />
+              {step === 3 && (
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={handleGenerateInvoice}
+                  isLoading={isPreparingInvoice || isDownloadingInvoice}
+                >
+                  Generate Invoice Only
+                </Button>
+              )}
+              {step < 3 ? (
+                <Button
+                  type="button"
+                  onClick={handleNext}
+                  isLoading={step === 2 && isCreatingShipment}
+                >
+                  {step === 2 ? "Create Shipment" : "Continue"}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  onClick={handlePayment}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  Pay Now
+                </Button>
+              )}
+            </div>
           </div>
         </Dialog.Content>
       </Dialog.Portal>

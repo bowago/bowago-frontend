@@ -199,6 +199,7 @@ export default function ViewShipmentModal({
       const result = await initPayment({
         shipmentId: id,
         callbackUrl,
+        refundPolicyAccepted: true,
       }).unwrap();
       const url =
         (result as any)?.authorizationUrl ??

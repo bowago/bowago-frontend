@@ -4,6 +4,7 @@ import AddActionCard from "@/components/cards/AddCard";
 import ContractRateManagementView from "@/components/layout/ContractRateManagementView";
 import PromoRateManagementView from "@/components/layout/PromoRateManagementView";
 import StandardRateManagementView from "@/components/layout/StandardRateManagementView";
+import DeliverySLAManagementView from "@/components/layout/DeliverySLAManagementView";
 import CreateRateModal, { RateType } from "@/components/modals/CreateRateModal";
 import ImportPricingModal from "@/components/modals/ImportPricingModal";
 import { Button } from "@/components/ui/button";
@@ -133,6 +134,7 @@ export default function ShipmentsPage() {
           <TabsTrigger value="standard">Standard Rate</TabsTrigger>
           <TabsTrigger value="contract">Contract Rate</TabsTrigger>
           <TabsTrigger value="promo">Promo Rate</TabsTrigger>
+          <TabsTrigger value="delivery-sla">Delivery SLA</TabsTrigger>
         </TabsList>
         <div className="mt-5">
           <TabsContent value="standard" className="w-full flex flex-col gap-6">
@@ -143,6 +145,9 @@ export default function ShipmentsPage() {
           </TabsContent>
           <TabsContent value="promo" className="w-full">
             <PromoRateManagementView />
+          </TabsContent>
+          <TabsContent value="delivery-sla" className="w-full">
+            <DeliverySLAManagementView />
           </TabsContent>
         </div>
       </Tabs>

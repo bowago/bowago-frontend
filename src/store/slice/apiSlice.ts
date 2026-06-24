@@ -127,6 +127,9 @@ export const apiSlice = createApi({
     "User",
     "SavedCard",
     "Invoice",
+    "Notification",
+    "DeliverySLA",
+    "OrgInvite",
   ],
   baseQuery: baseQueryWithReauth,
   endpoints: (builder) => ({
@@ -625,6 +628,7 @@ export const apiSlice = createApi({
       insuranceSelected?: boolean;
       declaredValue?: number;
       promoCode?: string;
+      termsAccepted: true; // Sprint 7: required — logged server-side in consent_logs
     }>({
       query: (body) => ({ url: "/quotes", method: "POST", body }),
       async onQueryStarted(_, { queryFulfilled }) {
@@ -910,7 +914,7 @@ export const apiSlice = createApi({
     // useInitiateShipmentPaymentMutation
     InitiateShipmentPayment: builder.mutation<
       any,
-      { shipmentId: string; callbackUrl?: string }
+      { shipmentId: string; callbackUrl?: string; refundPolicyAccepted: true }
     >({
       query: (formData) => ({
         url: `/payments/initialize`,
@@ -1805,13 +1809,30 @@ export const apiSlice = createApi({
     }),
 
 
-    // useGetNotificationsQuery
+    // useGetNotificationsQuery — polls every 30s for real-time bell updates
     GetNotifications: builder.query<any, { page?: number } | void>({
       query: (params) => {
         const qs = params?.page ? `?page=${params.page}` : "";
         return `/notifications${qs}`;
       },
+      providesTags: ["Notification"],
     }),
+
+    // useGetUnreadNotificationCountQuery — lightweight poll for bell badge
+    GetUnreadNotificationCount: builder.query<any, void>({
+      query: () => "/notifications/unread-count",
+      providesTags: ["Notification"],
+    }),
+
+    // useMarkAllNotificationsReadMutation
+    MarkAllNotificationsRead: builder.mutation<any, void>({
+      query: () => ({ url: "/notifications/mark-all-read", method: "PATCH" }),
+      invalidatesTags: ["Notification"],
+      async onQueryStarted(_, { queryFulfilled }) {
+        try { await queryFulfilled; } catch {}
+      },
+    }),
+
 
     // useMarkNotificationReadMutation
     MarkNotificationRead: builder.mutation<unknown, { id: string }>({
@@ -1819,6 +1840,25 @@ export const apiSlice = createApi({
         url: `/notifications/${id}/read`,
         method: "PATCH",
       }),
+    }),
+
+    // useDeleteNotificationMutation — delete a single notification
+    DeleteNotification: builder.mutation<any, { id: string }>({
+      query: ({ id }) => ({
+        url: `/notifications/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Notification"],
+    }),
+
+    // useBulkDeleteNotificationsMutation — delete by ids array or all (omit ids)
+    BulkDeleteNotifications: builder.mutation<any, { ids?: string[] }>({
+      query: (body) => ({
+        url: "/notifications/bulk",
+        method: "DELETE",
+        body,
+      }),
+      invalidatesTags: ["Notification"],
     }),
 
     // ─── 2FA ─────────────────────────────────────────────────────────────────
@@ -2067,12 +2107,148 @@ export const apiSlice = createApi({
       invalidatesTags: ["FAQ"],
     }),
 
+
+    // useGetDeliverySLAQuery — fetches zone×serviceType delivery days for booking modal
+    GetDeliverySLA: builder.query<any, void>({
+      query: () => "/pricing/delivery-sla",
+      providesTags: ["DeliverySLA"],
+    }),
+
+    // useUpdateDeliverySLAMutation — Super Admin: edit days for a zone×service
+    UpdateDeliverySLA: builder.mutation<any, { id: string; minDays: number; maxDays: number }>({
+      query: ({ id, ...body }) => ({
+        url: `/pricing/delivery-sla/${id}`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: ["DeliverySLA"],
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Delivery SLA updated");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Update failed");
+        }
+      },
+    }),
+
     // useGetRateOverviewQuery
     GetRateOverview: builder.query<any, any>({
       query: () => {
         return `/pricing/stats`;
       },
       providesTags: ["StandardRate", "ContractRate", "PromoRate"],
+    }),
+
+    // ─── Sprint 6: Agent KPI Dashboard ───────────────────────────────────
+    // useGetAgentKpiQuery
+    GetAgentKpi: builder.query<any, { from?: string; to?: string; agentId?: string } | void>({
+      query: (params) => {
+        const qs = params
+          ? new URLSearchParams(
+              Object.fromEntries(
+                Object.entries(params).filter(([, v]) => v !== undefined && v !== "")
+              ) as Record<string, string>
+            ).toString()
+          : "";
+        return `/support/kpi${qs ? `?${qs}` : ""}`;
+      },
+      providesTags: ["Ticket"],
+    }),
+
+    // useSubmitCsatMutation — customer rates a resolved ticket
+    SubmitCsat: builder.mutation<any, { id: string; score: number }>({
+      query: ({ id, score }) => ({
+        url: `/support/tickets/${id}/csat`,
+        method: "POST",
+        body: { score },
+      }),
+      invalidatesTags: ["Ticket"],
+    }),
+
+    // ─── Sprint 8: Organization Team Invite ──────────────────────────────
+    // useInviteMemberMutation
+    InviteMember: builder.mutation<any, { email: string; role: string }>({
+      query: (body) => ({
+        url: "/organization/invite-member",
+        method: "POST",
+        body,
+      }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+        } catch (e: any) { /* caller handles */ }
+      },
+      invalidatesTags: ["OrgInvite"],
+    }),
+
+    // useAcceptInviteMutation — public: creates account from invite token
+    AcceptInvite: builder.mutation<any, {
+      token: string;
+      firstName: string;
+      lastName: string;
+      password: string;
+      phone?: string;
+    }>({
+      query: (body) => ({
+        url: "/organization/accept-invite",
+        method: "POST",
+        body,
+      }),
+    }),
+
+    // useGetOrgInvitesQuery
+    GetOrgInvites: builder.query<any, { status?: string } | void>({
+      query: (params) => {
+        const qs = params?.status ? `?status=${params.status}` : "";
+        return `/organization/invites${qs}`;
+      },
+      providesTags: ["OrgInvite"],
+    }),
+
+    // useCancelOrgInviteMutation
+    CancelOrgInvite: builder.mutation<any, { id: string }>({
+      query: ({ id }) => ({
+        url: `/organization/invites/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["OrgInvite"],
+    }),
+
+    // useResendOrgInviteMutation
+    ResendOrgInvite: builder.mutation<any, { id: string }>({
+      query: ({ id }) => ({
+        url: `/organization/invites/${id}/resend`,
+        method: "POST",
+      }),
+      invalidatesTags: ["OrgInvite"],
+    }),
+
+    // useRegisterOrganizationMutation — self-service upgrade to Business (ROLE_MASTER)
+    RegisterOrganization: builder.mutation<any, {
+      companyName: string;
+      industry?: string;
+      companyEmail?: string;
+      companyPhone?: string;
+      companyWebsite?: string;
+      streetAddress?: string;
+      city?: string;
+      state?: string;
+      country?: string;
+      zipCode?: string;
+    }>({
+      query: (body) => ({
+        url: "/organization/register",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["OrgInvite"],
+    }),
+
+    // useGetOrgStatusQuery — check if user is a business + company details
+    GetOrgStatus: builder.query<any, void>({
+      query: () => "/organization/status",
+      providesTags: ["OrgInvite"],
     }),
   }),
 });
@@ -2166,6 +2342,8 @@ export const {
   useGetSurchargesQuery,
   useGetSurchargeAuditLogQuery,
   useGetRateOverviewQuery,
+  useGetDeliverySLAQuery,
+  useUpdateDeliverySLAMutation,
   useGetAdminDashboardQuery,
   useGetAdminInvoicesQuery,
   useVerifyPaymentMutation,
@@ -2187,5 +2365,20 @@ export const {
   useEditCityMutation,
   useEditZoneMutation,
   useGetNotificationsQuery,
+  useGetUnreadNotificationCountQuery,
   useMarkNotificationReadMutation,
+  useMarkAllNotificationsReadMutation,
+  useDeleteNotificationMutation,
+  useBulkDeleteNotificationsMutation,
+  // Sprint 6: Agent KPI & CSAT
+  useGetAgentKpiQuery,
+  useSubmitCsatMutation,
+  // Sprint 8: Org Team Invite
+  useInviteMemberMutation,
+  useAcceptInviteMutation,
+  useGetOrgInvitesQuery,
+  useCancelOrgInviteMutation,
+  useResendOrgInviteMutation,
+  useRegisterOrganizationMutation,
+  useGetOrgStatusQuery,
 } = apiSlice;

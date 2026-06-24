@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTrackShipmentQuery } from "@/store/slice/apiSlice";
+import { useTrackingSocket } from "@/hooks/useTrackingSocket";
 import {
   ShipmentTrackerMap,
   TrackingTimeLineView,
@@ -17,6 +18,8 @@ import {
   AlertCircle,
   RotateCcw,
   ArrowRight,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 
 interface TrackerFormProps {
@@ -127,15 +130,37 @@ export function TrackingForm({
     { trackingNumber: submittedId },
     {
       skip: !submittedId,
-      // Poll every 30s so the map/status feels live without WebSockets.
-      // Pauses automatically when the tab is hidden (RTK Query default).
+      // Sprint 4 fallback: poll every 30s when WebSocket is unavailable.
       pollingInterval: 30000,
       refetchOnFocus: true,
       refetchOnReconnect: true,
     },
   );
 
-  const shipment = (rawData as any)?.data?.shipment as Shipment | undefined;
+  // ─── Sprint 4: WebSocket real-time updates ────────────────────────────────
+  const { liveUpdate, isConnected: wsConnected } = useTrackingSocket(submittedId);
+
+  const restShipment = (rawData as any)?.data?.shipment as Shipment | undefined;
+  // Merge live WS update on top of REST snapshot when WS is connected
+  const shipment: Shipment | undefined = restShipment
+    ? wsConnected && liveUpdate && liveUpdate.trackingNumber === submittedId
+      ? {
+          ...restShipment,
+          status: liveUpdate.status,
+          estimatedDelivery: liveUpdate.estimatedDelivery ?? restShipment.estimatedDelivery,
+          trackingHistory: liveUpdate.timeline.map((e) => ({
+            id: e.timestamp,
+            status: e.status,
+            location: e.location,
+            description: e.description,
+            lat: null,
+            lng: null,
+            proofUrl: null,
+            createdAt: e.timestamp,
+          })),
+        }
+      : restShipment
+    : undefined;
 
   useEffect(() => {
     if (shipment && resultRef.current) {
@@ -240,6 +265,23 @@ export function TrackingForm({
           <Loader2 className="w-5 h-5 animate-spin flex-shrink-0" />
           Looking up{" "}
           <span className="font-mono font-medium">{submittedId}</span>...
+        </div>
+      )}
+
+      {/* Sprint 4: Live / Polling indicator */}
+      {shipment && (
+        <div className={`flex items-center gap-1.5 text-xs mt-1 mb-2 ${dark ? "text-white/40" : "text-gray-400"}`}>
+          {wsConnected ? (
+            <>
+              <Wifi className="w-3 h-3 text-green-500" />
+              <span className="text-green-500 font-medium">Live</span>
+            </>
+          ) : (
+            <>
+              <WifiOff className="w-3 h-3" />
+              <span>Updating every 30s</span>
+            </>
+          )}
         </div>
       )}
 

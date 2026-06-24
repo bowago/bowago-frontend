@@ -571,6 +571,100 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── Testimonials & Certifications ── */}
+      <section className="py-16 px-4 bg-black">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl md:text-4xl font-black mb-2">
+              Trusted by <span className="text-brand">Businesses</span>
+            </h2>
+            <p className="text-white/50">What our customers say about BowaGO</p>
+          </div>
+
+          {/* Testimonial cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-14">
+            {[
+              {
+                name: "Adaeze Okonkwo",
+                role: "E-commerce Owner, Lagos",
+                quote:
+                  "BowaGO transformed our fulfillment. Real-time tracking and instant quotes save us hours every week. Our customers love the transparency.",
+                rating: 5,
+              },
+              {
+                name: "Emeka Nwosu",
+                role: "Operations Manager, Abuja",
+                quote:
+                  "Switching to BowaGO cut our logistics costs by 20%. The zone-based pricing is fair and the delivery SLAs are actually met. Highly recommended.",
+                rating: 5,
+              },
+              {
+                name: "Fatima Aliyu",
+                role: "Small Business Owner, Kano",
+                quote:
+                  "As a small business, I needed reliability. BowaGO gives me peace of mind — packages arrive on time and I can track every step from my phone.",
+                rating: 5,
+              },
+            ].map((t) => (
+              <div
+                key={t.name}
+                className="bg-white/5 border border-white/10 rounded-2xl p-6 hover:border-brand/30 transition-all"
+              >
+                <div className="flex gap-0.5 mb-4">
+                  {Array.from({ length: t.rating }).map((_, i) => (
+                    <span key={i} className="text-yellow-400 text-sm">
+                      ★
+                    </span>
+                  ))}
+                </div>
+                <p className="text-white/70 text-sm leading-relaxed mb-5">
+                  &ldquo;{t.quote}&rdquo;
+                </p>
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-brand/20 flex items-center justify-center text-brand font-bold text-sm">
+                    {t.name.charAt(0)}
+                  </div>
+                  <div>
+                    <p className="text-white text-sm font-semibold">{t.name}</p>
+                    <p className="text-white/40 text-xs">{t.role}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Certifications & trust badges */}
+          <div className="border-t border-white/10 pt-10">
+            <p className="text-center text-white/30 text-xs uppercase tracking-widest mb-6">
+              Certifications & Compliance
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-6 md:gap-10">
+              {[
+                { label: "CAC Registered", sub: "RC 7654321" },
+                { label: "Paystack Secured", sub: "PCI-DSS Compliant" },
+                { label: "NIPOST Compliant", sub: "Licensed Courier" },
+                { label: "SSL Encrypted", sub: "256-bit TLS" },
+              ].map((badge) => (
+                <div
+                  key={badge.label}
+                  className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5"
+                >
+                  <div className="w-6 h-6 rounded-full bg-brand/20 flex items-center justify-center">
+                    <span className="text-brand text-xs">✓</span>
+                  </div>
+                  <div>
+                    <p className="text-white/80 text-xs font-semibold">
+                      {badge.label}
+                    </p>
+                    <p className="text-white/30 text-[10px]">{badge.sub}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── CTA ── */}
       <section className="py-20 px-4 relative overflow-hidden">
         <div

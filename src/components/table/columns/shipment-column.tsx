@@ -193,7 +193,7 @@ function ShipmentActionCell({ shipment }: { shipment: Shipment }) {
   const handlePay = async () => {
     try {
       const callbackUrl = `${window.location.origin}/dashboard/payment/callback`;
-      const result = await initPayment({ shipmentId: shipment.id, callbackUrl }).unwrap();
+      const result = await initPayment({ shipmentId: shipment.id, callbackUrl, refundPolicyAccepted: true }).unwrap();
       const url = (result as any)?.authorizationUrl ?? (result as any)?.data?.authorizationUrl;
       if (url) window.location.href = url;
     } catch {}
