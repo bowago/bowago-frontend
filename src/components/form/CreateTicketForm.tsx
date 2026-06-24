@@ -4,7 +4,7 @@ import { Controller, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { Button } from "../ui/button";
 import { Input, SelectInput, TextArea } from "../ui/input";
-import { CreateTicketFormData, createTicketSchema } from "@/lib/validation";
+import { createTicketSchema } from "@/lib/validation";
 import { useCreateTicketMutation } from "@/store/slice/apiSlice";
 
 const categoryOptions = [
@@ -24,6 +24,16 @@ const priorityOptions = [
   { label: "Urgent", value: "URGENT" },
 ];
 
+// Explicit interface avoids yup InferType ↔ RHF Resolver generic mismatch
+interface TicketFormValues {
+  subject: string;
+  category: string;
+  trackingNumber?: string;
+  shipmentId?: string;
+  body: string;
+  priority: string;
+}
+
 type AddTicketFormProps = {
   onSuccess?: () => void;
 };
@@ -37,8 +47,8 @@ export const AddTicketForm = ({ onSuccess }: AddTicketFormProps) => {
     control,
     reset,
     formState: { errors },
-  } = useForm<CreateTicketFormData>({
-    resolver: yupResolver(createTicketSchema),
+  } = useForm<TicketFormValues>({
+    resolver: yupResolver(createTicketSchema) as any,
     defaultValues: {
       subject: "",
       category: "OTHER",
@@ -49,8 +59,8 @@ export const AddTicketForm = ({ onSuccess }: AddTicketFormProps) => {
     },
   });
 
-  const onSubmit = async (data: CreateTicketFormData) => {
-    await createTicket(data).unwrap();
+  const onSubmit = async (data: TicketFormValues) => {
+    await createTicket(data as any).unwrap();
     reset();
     onSuccess?.();
   };
