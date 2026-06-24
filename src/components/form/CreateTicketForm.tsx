@@ -43,6 +43,7 @@ export const AddTicketForm = ({ onSuccess }: AddTicketFormProps) => {
       subject: "",
       category: "OTHER",
       trackingNumber: "",
+      shipmentId: "",
       body: "",
       priority: "NORMAL",
     },

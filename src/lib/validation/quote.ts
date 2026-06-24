@@ -182,10 +182,17 @@ export const createTicketSchema = yup.object({
     )
     .required("Category is required"),
 
+  // Accept either a tracking number (human-friendly) or a shipmentId UUID.
+  // The backend resolves trackingNumber → shipmentId automatically.
+  trackingNumber: yup
+    .string()
+    .trim()
+    .optional(),
+
   shipmentId: yup
     .string()
     .uuid("Shipment ID must be a valid UUID")
-    .required("Shipment ID is required"),
+    .optional(),
 
   body: yup
     .string()

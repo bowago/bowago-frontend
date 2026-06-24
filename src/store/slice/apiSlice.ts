@@ -451,6 +451,7 @@ export const apiSlice = createApi({
         cartons: number;
         boxDimensionId: string;
         serviceType?: string;
+        termsAccepted?: boolean;
       }
     >({
       query: (formData) => ({

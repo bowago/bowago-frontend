@@ -120,17 +120,17 @@ export const companyInformationSchema = yup.object({
     .min(2, "Company name must be at least 2 characters")
     .required("Company name is required"),
 
-  industry: yup.string().required("Industry is required"),
+  industry: yup.string().optional(),
 
   email: yup
     .string()
     .email("Please enter a valid email address")
-    .required("Email address is required"),
+    .optional(),
 
   companyPhone: yup
     .string()
     .matches(/^\+?[0-9\s\-()]{7,15}$/, "Please enter a valid phone number")
-    .required("Company phone is required"),
+    .optional(),
 
   companyWebsite: yup
     .string()
@@ -141,27 +141,27 @@ export const companyInformationSchema = yup.object({
   streetAddress: yup
     .string()
     .min(5, "Street address must be at least 5 characters")
-    .required("Street address is required"),
+    .optional(),
 
   city: yup
     .string()
     .min(2, "City must be at least 2 characters")
-    .required("City is required"),
+    .optional(),
 
   state: yup
     .string()
     .min(2, "State must be at least 2 characters")
-    .required("State is required"),
+    .optional(),
 
   country: yup
     .string()
     .min(2, "Country must be at least 2 characters")
-    .required("Country is required"),
+    .optional(),
 
   zipCode: yup
     .string()
     .matches(/^[0-9]{4,10}$/, "Please enter a valid ZIP code")
-    .required("ZIP code is required"),
+    .optional(),
 });
 
 export const standardRateSchema = yup.object({

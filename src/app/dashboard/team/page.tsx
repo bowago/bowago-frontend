@@ -101,7 +101,7 @@ export default function TeamManagementPage() {
               <SelectInput
                 label="Role"
                 value={inviteForm.role}
-                onChange={(e) => setInviteForm((p) => ({ ...p, role: e.target.value }))}
+                onValueChange={(val) => setInviteForm((p) => ({ ...p, role: val }))}
                 options={ROLE_OPTIONS}
               />
             </div>

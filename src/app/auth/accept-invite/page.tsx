@@ -35,22 +35,10 @@ export default function AcceptInvitePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) {
-      setError("Invalid invite link. Please check the URL.");
-      return;
-    }
-    if (form.password.length < 8) {
-      setError("Password must be at least 8 characters.");
-      return;
-    }
-    if (form.password !== form.confirmPassword) {
-      setError("Passwords do not match.");
-      return;
-    }
-    if (!form.firstName.trim() || !form.lastName.trim()) {
-      setError("First and last name are required.");
-      return;
-    }
+    if (!token) { setError("Invalid invite link. Please check the URL."); return; }
+    if (form.password.length < 8) { setError("Password must be at least 8 characters."); return; }
+    if (form.password !== form.confirmPassword) { setError("Passwords do not match."); return; }
+    if (!form.firstName.trim() || !form.lastName.trim()) { setError("First and last name are required."); return; }
 
     try {
       const result = await acceptInvite({
@@ -76,12 +64,9 @@ export default function AcceptInvitePage() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <div className="max-w-md w-full bg-white rounded-2xl shadow p-8 text-center">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h1 className="text-xl font-bold text-gray-900 mb-2">
-            Invalid Invite Link
-          </h1>
+          <h1 className="text-xl font-bold text-gray-900 mb-2">Invalid Invite Link</h1>
           <p className="text-gray-500 text-sm">
-            This invite link is missing a token. Please check the email you
-            received and try again.
+            This invite link is missing a token. Please check the email you received and try again.
           </p>
         </div>
       </div>
@@ -93,12 +78,8 @@ export default function AcceptInvitePage() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <div className="max-w-md w-full bg-white rounded-2xl shadow p-8 text-center">
           <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
-          <h1 className="text-xl font-bold text-gray-900 mb-2">
-            Account Created!
-          </h1>
-          <p className="text-gray-500 text-sm">
-            Welcome to BowaGO. Redirecting to your dashboard...
-          </p>
+          <h1 className="text-xl font-bold text-gray-900 mb-2">Account Created!</h1>
+          <p className="text-gray-500 text-sm">Welcome to BowaGO. Redirecting to your dashboard...</p>
         </div>
       </div>
     );
@@ -112,9 +93,7 @@ export default function AcceptInvitePage() {
           <div className="w-14 h-14 bg-[#1F3A70] rounded-2xl flex items-center justify-center mx-auto mb-4">
             <span className="text-white font-bold text-xl">BG</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Accept Your Invite
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900">Accept Your Invite</h1>
           <p className="text-gray-500 text-sm mt-1">
             Set up your BowaGO account to get started.
           </p>
@@ -164,11 +143,7 @@ export default function AcceptInvitePage() {
               onClick={() => setShowPw((v) => !v)}
               className="absolute right-3 top-9 text-gray-400 hover:text-gray-600"
             >
-              {showPw ? (
-                <EyeOff className="w-4 h-4" />
-              ) : (
-                <Eye className="w-4 h-4" />
-              )}
+              {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
 
@@ -189,7 +164,11 @@ export default function AcceptInvitePage() {
             </div>
           )}
 
-          <Button type="submit" isLoading={isLoading} className="w-full">
+          <Button
+            type="submit"
+            isLoading={isLoading}
+            className="w-full"
+          >
             Create Account & Accept Invite
           </Button>
         </form>
