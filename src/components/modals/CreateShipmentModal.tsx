@@ -47,8 +47,8 @@ const createShipmentSchema = yup.object({
       then: (schema) =>
         schema
           .typeError("Must be a number")
-          .min(1, "Insurance value must be greater than 0")
-          .required("Insurance value is required"),
+          .min(1, "Declared value must be greater than 0")
+          .required("Please enter the declared value of your goods"),
       otherwise: (schema) => schema.nullable(),
     }),
   itemDescription: yup.string().nullable(),
@@ -922,12 +922,12 @@ export default function CreateShipmentModal({
                     </label>
                   </div>
                   {hasInsurance && (
-                    <div className="mt-3">
+                    <div className="mt-3 space-y-2">
                       <Input
-                        label="Insurance Value"
+                        label="Declared Value of Goods (NGN)"
                         type="number"
                         min={1}
-                        placeholder="Enter insurance value"
+                        placeholder="e.g. 500000"
                         rightElement={
                           <span className="text-xs font-medium text-gray-400">
                             NGN
@@ -936,6 +936,20 @@ export default function CreateShipmentModal({
                         {...register("insuranceValue", { valueAsNumber: true })}
                         error={errors.insuranceValue?.message}
                       />
+                      {/* Read-only premium preview — user sees what they'll be charged */}
+                      {(getValues("insuranceValue") ?? 0) > 0 && (
+                        <div className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                          <span className="text-xs text-blue-600">
+                            Insurance premium (2.5% of declared value)
+                          </span>
+                          <span className="text-xs font-semibold text-blue-700">
+                            ₦{Math.max(100, Math.ceil((getValues("insuranceValue") ?? 0) * 0.025)).toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+                      <p className="text-[11px] text-gray-400">
+                        Enter the total value of your goods. The insurance premium is calculated automatically at 2.5% (min ₦100).
+                      </p>
                     </div>
                   )}
                 </div>
