@@ -1049,6 +1049,10 @@ export const apiSlice = createApi({
       },
       invalidatesTags: ["FAQ"],
     }),
+    // useCancelPreviewQuery — get refund preview before confirming cancel
+    CancelPreview: builder.query<any, { id: string }>({
+      query: ({ id }) => `/shipments/${id}/cancel/preview`,
+    }),
     // useCancelShipmentMutation
     CancelShipment: builder.mutation<unknown, { id: string; reason: string }>({
       query: ({ id, reason }) => ({
@@ -1402,7 +1406,7 @@ export const apiSlice = createApi({
     // useGetZoneByRouteQuery — looks up zone for a specific city pair (used in CreateShipmentModal)
     GetZoneByRoute: builder.query<any, { fromCity: string; toCity: string }>({
       query: ({ fromCity, toCity }) =>
-        `/pricing/zone-matrix?fromCity=${encodeURIComponent(fromCity)}&toCity=${encodeURIComponent(toCity)}&limit=1`,
+        `/pricing/zone-matrix?fromCity=${encodeURIComponent(fromCity)}&toCity=${encodeURIComponent(toCity)}&exact=true&limit=1`,
       providesTags: ['Zone'],
     }),
 
@@ -2274,6 +2278,7 @@ export const {
   useTrackShipmentQuery,
   useAddShipmentMutation,
   useCancelShipmentMutation,
+  useCancelPreviewQuery,
   useInitiateShipmentPaymentMutation,
   useInitPendingPaymentMutation,
   useDownloadInvoiceMutation,

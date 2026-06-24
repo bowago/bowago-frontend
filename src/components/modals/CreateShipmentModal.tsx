@@ -484,7 +484,7 @@ export default function CreateShipmentModal({
   // Disable Continue/Create Shipment if any field for the current step has an error
   const currentStepFields = STEP_FIELDS[step];
   const stepHasErrors = currentStepFields.some(
-    (field) => !!errors[field as keyof typeof errors]
+    (field) => !!errors[field as keyof typeof errors],
   );
 
   const formatPickupDate = (value?: Date | string | null) => {
@@ -659,11 +659,11 @@ export default function CreateShipmentModal({
 
   // Live zone lookup — fires whenever both cities are selected (including same city = Zone 1)
   const watchedOrigin = useWatch({ control, name: "originCity" });
-  const watchedDest   = useWatch({ control, name: "destinationCity" });
+  const watchedDest = useWatch({ control, name: "destinationCity" });
   const canLookupZone = !!(watchedOrigin && watchedDest);
   const { data: zoneRouteData } = useGetZoneByRouteQuery(
     { fromCity: watchedOrigin ?? "", toCity: watchedDest ?? "" },
-    { skip: !canLookupZone }
+    { skip: !canLookupZone },
   );
   const liveZone: number | null =
     zoneRouteData?.data?.matrix?.[0]?.zone ?? null;
@@ -671,9 +671,24 @@ export default function CreateShipmentModal({
   // Hardcoded SLA fallback — used when DB seed hasn't run yet or SLA table is empty.
   // Mirrors the values in seed.js exactly.
   const SLA_FALLBACK: Record<string, Record<string, string>> = {
-    EXPRESS:  { "1": "Same day – next day", "2": "1–2 business days", "3": "2–3 business days", "4": "3–5 business days" },
-    STANDARD: { "1": "1–2 business days",   "2": "2–4 business days", "3": "3–5 business days", "4": "5–7 business days" },
-    ECONOMY:  { "1": "2–4 business days",   "2": "4–7 business days", "3": "5–10 business days","4": "7–14 business days" },
+    EXPRESS: {
+      "1": "Same day – next day",
+      "2": "1–2 business days",
+      "3": "2–3 business days",
+      "4": "3–5 business days",
+    },
+    STANDARD: {
+      "1": "1–2 business days",
+      "2": "2–4 business days",
+      "3": "3–5 business days",
+      "4": "5–7 business days",
+    },
+    ECONOMY: {
+      "1": "2–4 business days",
+      "2": "4–7 business days",
+      "3": "5–10 business days",
+      "4": "7–14 business days",
+    },
   };
 
   const cities = useMemo(
@@ -709,7 +724,10 @@ export default function CreateShipmentModal({
         const match = slas.find(
           (s: any) => s.zone === zone && s.serviceType === svcKey,
         );
-        if (match) return match.label ?? `${match.minDays}–${match.maxDays} business days`;
+        if (match)
+          return (
+            match.label ?? `${match.minDays}–${match.maxDays} business days`
+          );
       }
       // 2. Fallback to hardcoded table (covers case where seed hasn't run)
       const fallback = SLA_FALLBACK[svcKey]?.[String(zone)];
@@ -717,9 +735,9 @@ export default function CreateShipmentModal({
     }
     // 3. Generic placeholder when zone not yet known
     const generic: Record<string, string> = {
-      EXPRESS:  "1–4 business days (by zone)",
+      EXPRESS: "1–4 business days (by zone)",
       STANDARD: "2–7 business days (by zone)",
-      ECONOMY:  "4–14 business days (by zone)",
+      ECONOMY: "4–14 business days (by zone)",
     };
     return generic[svcKey] ?? "Varies by zone";
   };
@@ -758,46 +776,7 @@ export default function CreateShipmentModal({
             {/* ── STEP 1 ── */}
             {step === 1 && (
               <>
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">
-                    Service Type
-                  </p>
-                  <Controller
-                    name="serviceType"
-                    control={control}
-                    render={({ field }) => (
-                      <RadioGroupCard
-                        label=""
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        className="flex flex-row gap-2"
-                        options={[
-                          {
-                            label: "Express",
-                            description: getSLALabel("EXPRESS", liveZone),
-                            value: "EXPRESS",
-                          },
-                          {
-                            label: "Standard",
-                            description: getSLALabel("STANDARD", liveZone),
-                            value: "STANDARD",
-                          },
-                          {
-                            label: "Economy",
-                            description: getSLALabel("ECONOMY", liveZone),
-                            value: "ECONOMY",
-                          },
-                        ]}
-                      />
-                    )}
-                  />
-                  {errors.serviceType && (
-                    <p className="text-xs text-red-500 mt-1">
-                      {errors.serviceType.message}
-                    </p>
-                  )}
-                </div>
-
+                {/* ── ROUTE first — city selection drives SLA labels ── */}
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">
                     Route
@@ -847,7 +826,6 @@ export default function CreateShipmentModal({
                       {...register("pickupDate")}
                       error={errors.pickupDate?.message}
                     />
-                    {/* Cutoff warning — same-day bookings after 2 PM shift to next day */}
                     {(() => {
                       const now = new Date();
                       const isToday = (() => {
@@ -868,6 +846,60 @@ export default function CreateShipmentModal({
                       return null;
                     })()}
                   </div>
+                </div>
+
+                {/* ── SERVICE TYPE — shown after route so SLA labels are zone-aware ── */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+                      Service Type
+                    </p>
+                    {!canLookupZone && (
+                      <p className="text-[10px] text-gray-400 italic">
+                        Select both cities to see delivery times
+                      </p>
+                    )}
+                  </div>
+                  <Controller
+                    name="serviceType"
+                    control={control}
+                    render={({ field }) => (
+                      <RadioGroupCard
+                        label=""
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        className="flex flex-row gap-2"
+                        options={[
+                          {
+                            label: "Express",
+                            description: canLookupZone
+                              ? getSLALabel("EXPRESS", liveZone)
+                              : "Fastest delivery",
+                            value: "EXPRESS",
+                          },
+                          {
+                            label: "Standard",
+                            description: canLookupZone
+                              ? getSLALabel("STANDARD", liveZone)
+                              : "Balanced speed & cost",
+                            value: "STANDARD",
+                          },
+                          {
+                            label: "Economy",
+                            description: canLookupZone
+                              ? getSLALabel("ECONOMY", liveZone)
+                              : "Most affordable",
+                            value: "ECONOMY",
+                          },
+                        ]}
+                      />
+                    )}
+                  />
+                  {errors.serviceType && (
+                    <p className="text-xs text-red-500 mt-1">
+                      {errors.serviceType.message}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -992,12 +1024,19 @@ export default function CreateShipmentModal({
                             Insurance premium (2.5% of declared value)
                           </span>
                           <span className="text-xs font-semibold text-blue-700">
-                            ₦{Math.max(100, Math.ceil((getValues("insuranceValue") ?? 0) * 0.025)).toLocaleString()}
+                            ₦
+                            {Math.max(
+                              100,
+                              Math.ceil(
+                                (getValues("insuranceValue") ?? 0) * 0.025,
+                              ),
+                            ).toLocaleString()}
                           </span>
                         </div>
                       )}
                       <p className="text-[11px] text-gray-400">
-                        Enter the total value of your goods. The insurance premium is calculated automatically at 2.5% (min ₦100).
+                        Enter the total value of your goods. The insurance
+                        premium is calculated automatically at 2.5% (min ₦100).
                       </p>
                     </div>
                   )}
