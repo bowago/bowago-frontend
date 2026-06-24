@@ -4,24 +4,42 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import {
-  Building2, Mail, Phone, Globe, MapPin,
-  CheckCircle, Users, ArrowRight, Loader2,
+  Building2,
+  Mail,
+  Phone,
+  Globe,
+  MapPin,
+  CheckCircle,
+  Users,
+  ArrowRight,
+  Loader2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useDispatch } from "react-redux";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  CompanyInformationFormData,
-  companyInformationSchema,
-} from "@/lib/validation";
+import { companyInformationSchema } from "@/lib/validation";
 import {
   useGetOrgStatusQuery,
   useRegisterOrganizationMutation,
 } from "@/store/slice/apiSlice";
 import { useAppSelector } from "@/hooks/useStore";
 import { setUserData } from "@/store/slice/authSlice";
+
+// ─── Explicit form type (avoids yup InferType optional/required clash with RHF) ─
+interface CompanyFormValues {
+  companyName: string;
+  industry?: string;
+  email?: string;
+  companyPhone?: string;
+  companyWebsite?: string;
+  streetAddress?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  zipCode?: string;
+}
 
 // ─── Business status banner ───────────────────────────────────────────────────
 function BusinessBadge({ teamCount }: { teamCount: number }) {
@@ -33,7 +51,9 @@ function BusinessBadge({ teamCount }: { teamCount: number }) {
           <CheckCircle className="w-5 h-5 text-green-600" />
         </div>
         <div>
-          <p className="text-sm font-semibold text-green-800">Business Account Active</p>
+          <p className="text-sm font-semibold text-green-800">
+            Business Account Active
+          </p>
           <p className="text-xs text-green-600 mt-0.5">
             {teamCount > 0
               ? `${teamCount} team member${teamCount !== 1 ? "s" : ""} in your organisation`
@@ -62,20 +82,32 @@ function UpgradeCTA() {
           <Building2 className="w-5 h-5 text-white" />
         </div>
         <div>
-          <p className="font-semibold text-base">Upgrade to a Business Account</p>
+          <p className="font-semibold text-base">
+            Upgrade to a Business Account
+          </p>
           <p className="text-sm text-white/70 mt-1 leading-relaxed">
-            Register your company to unlock team management. You'll be able to invite
-            Dispatchers, Finance officers, and Viewers — each with the right level of access.
+            Register your company to unlock team management. You'll be able to
+            invite Dispatchers, Finance officers, and Viewers — each with the
+            right level of access.
           </p>
           <div className="flex flex-wrap gap-2 mt-3">
-            {["Invite Dispatchers", "Assign Finance roles", "Manage team access", "View all company shipments"].map((f) => (
-              <span key={f} className="text-xs bg-white/10 text-white/80 px-2.5 py-1 rounded-full">
+            {[
+              "Invite Dispatchers",
+              "Assign Finance roles",
+              "Manage team access",
+              "View all company shipments",
+            ].map((f) => (
+              <span
+                key={f}
+                className="text-xs bg-white/10 text-white/80 px-2.5 py-1 rounded-full"
+              >
                 {f}
               </span>
             ))}
           </div>
           <p className="text-xs text-white/50 mt-3">
-            Fill in your company details below and click <strong>Register as Business</strong> to activate.
+            Fill in your company details below and click{" "}
+            <strong>Register as Business</strong> to activate.
           </p>
         </div>
       </div>
@@ -86,58 +118,76 @@ function UpgradeCTA() {
 // ─── Main Form ────────────────────────────────────────────────────────────────
 export function CompanyInformationForm() {
   const dispatch = useDispatch();
-  const user     = useAppSelector((s) => s.auth.user);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const user = useAppSelector((s) => s.auth.user);
 
-  const { data: statusData, isLoading: statusLoading, refetch } = useGetOrgStatusQuery();
-  const [registerOrg, { isLoading: upgrading }] = useRegisterOrganizationMutation();
+  const {
+    data: statusData,
+    isLoading: statusLoading,
+    refetch,
+  } = useGetOrgStatusQuery();
+  const [registerOrg, { isLoading: upgrading }] =
+    useRegisterOrganizationMutation();
 
   const isBusiness: boolean = statusData?.data?.isBusiness ?? false;
-  const teamCount: number   = statusData?.data?.teamCount   ?? 0;
-  const company             = statusData?.data?.company;
+  const teamCount: number = statusData?.data?.teamCount ?? 0;
+  const company = statusData?.data?.company;
 
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors, isDirty },
-  } = useForm<CompanyInformationFormData>({
-    resolver: yupResolver(companyInformationSchema),
+  } = useForm<CompanyFormValues>({
+    // Cast to any to avoid yup InferType ↔ RHF Resolver generic mismatch
+    resolver: yupResolver(companyInformationSchema) as any,
+    defaultValues: {
+      companyName: "",
+      industry: "",
+      email: "",
+      companyPhone: "",
+      companyWebsite: "",
+      streetAddress: "",
+      city: "",
+      state: "",
+      country: "",
+      zipCode: "",
+    },
   });
 
   // Pre-fill form if already a business
   useEffect(() => {
     if (company) {
       reset({
-        companyName:   company.name        ?? "",
-        industry:      company.industry    ?? "",
-        email:         company.email       ?? "",
-        companyPhone:  company.phone       ?? "",
-        companyWebsite: company.website    ?? "",
-        streetAddress: company.address?.street  ?? "",
-        city:          company.address?.city    ?? "",
-        state:         company.address?.state   ?? "",
-        country:       company.address?.country ?? "",
-        zipCode:       company.address?.zip     ?? "",
+        companyName: company.name ?? "",
+        industry: company.industry ?? "",
+        email: company.email ?? "",
+        companyPhone: company.phone ?? "",
+        companyWebsite: company.website ?? "",
+        streetAddress: company.address?.street ?? "",
+        city: company.address?.city ?? "",
+        state: company.address?.state ?? "",
+        country: company.address?.country ?? "",
+        zipCode: company.address?.zip ?? "",
       });
     }
   }, [company, reset]);
 
-  const onSubmit = async (data: CompanyInformationFormData) => {
+  const onSubmit = async (data: CompanyFormValues) => {
     try {
       const result = await registerOrg({
-        companyName:    data.companyName,
-        industry:       data.industry       || undefined,
-        companyEmail:   data.email          || undefined,
-        companyPhone:   data.companyPhone   || undefined,
+        companyName: data.companyName,
+        industry: data.industry || undefined,
+        companyEmail: data.email || undefined,
+        companyPhone: data.companyPhone || undefined,
         companyWebsite: data.companyWebsite || undefined,
-        streetAddress:  data.streetAddress  || undefined,
-        city:           data.city           || undefined,
-        state:          data.state          || undefined,
-        country:        data.country        || undefined,
-        zipCode:        data.zipCode        || undefined,
+        streetAddress: data.streetAddress || undefined,
+        city: data.city || undefined,
+        state: data.state || undefined,
+        country: data.country || undefined,
+        zipCode: data.zipCode || undefined,
       }).unwrap();
 
-      // Update Redux user state so ROLE_MASTER is reflected immediately
       if (result?.data?.user) {
         dispatch(setUserData(result.data.user));
       }
@@ -159,11 +209,7 @@ export function CompanyInformationForm() {
 
   return (
     <div>
-      {isBusiness ? (
-        <BusinessBadge teamCount={teamCount} />
-      ) : (
-        <UpgradeCTA />
-      )}
+      {isBusiness ? <BusinessBadge teamCount={teamCount} /> : <UpgradeCTA />}
 
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
         {/* Row 1 */}
@@ -210,7 +256,9 @@ export function CompanyInformationForm() {
 
         {/* Address */}
         <div className="flex flex-col gap-4">
-          <p className="font-medium text-base text-gray-800">Address Information</p>
+          <p className="font-medium text-base text-gray-800">
+            Address Information
+          </p>
           <Input
             label="Street Address"
             type="text"
@@ -219,18 +267,42 @@ export function CompanyInformationForm() {
             {...register("streetAddress")}
           />
           <div className="grid grid-cols-3 gap-4">
-            <Input label="City"    type="text" error={errors.city?.message}    {...register("city")} />
-            <Input label="State"   type="text" error={errors.state?.message}   {...register("state")} />
-            <Input label="Country" type="text" error={errors.country?.message} {...register("country")} />
+            <Input
+              label="City"
+              type="text"
+              error={errors.city?.message}
+              {...register("city")}
+            />
+            <Input
+              label="State"
+              type="text"
+              error={errors.state?.message}
+              {...register("state")}
+            />
+            <Input
+              label="Country"
+              type="text"
+              error={errors.country?.message}
+              {...register("country")}
+            />
           </div>
           <div className="grid grid-cols-3 gap-4">
-            <Input label="ZIP Code" type="text" error={errors.zipCode?.message} {...register("zipCode")} />
+            <Input
+              label="ZIP Code"
+              type="text"
+              error={errors.zipCode?.message}
+              {...register("zipCode")}
+            />
           </div>
         </div>
 
         {/* Submit */}
         <div className="flex items-center gap-3">
-          <Button type="submit" isLoading={upgrading} disabled={!isDirty && isBusiness}>
+          <Button
+            type="submit"
+            isLoading={upgrading}
+            disabled={!isDirty && isBusiness}
+          >
             {isBusiness ? "Update Company Details" : "Register as Business"}
           </Button>
           {!isBusiness && (
