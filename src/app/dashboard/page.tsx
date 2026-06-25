@@ -1,115 +1,256 @@
 "use client";
+
+/**
+ * Dashboard — role-aware
+ *
+ * What each role sees:
+ *
+ * SUPER_ADMIN / LOGISTICS_MANAGER
+ *   Full stats: shipments, revenue, users, trend chart, service chart, top routes
+ *
+ * ROLE_ADMIN (custom caps)
+ *   Shipment counts + revenue (if canViewAnalytics) + charts
+ *
+ * ROLE_DISPATCHER
+ *   Their assigned/active shipments only — no revenue, no user counts, no charts
+ *
+ * ROLE_FINANCE
+ *   Revenue banner + invoice counts — no operational shipment details
+ *
+ * ROLE_AGENT
+ *   Open ticket count + recent shipments for context — no revenue
+ *
+ * ROLE_MASTER (enterprise owner)
+ *   Company shipment stats only — no platform revenue
+ *
+ * CUSTOMER
+ *   Own shipments — total, pending, delivered
+ */
+
 import { useState } from "react";
-import ShipmentCard from "@/components/cards/ShipmentCard";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store/store";
 import StatCard from "@/components/cards/StatCard";
+import ShipmentCard from "@/components/cards/ShipmentCard";
 import ServiceDistribution from "@/components/charts/ServiceDistribution";
 import ShipmentTrend from "@/components/charts/ShipmentTrend";
 import TopRoutes from "@/components/List/TopRoute";
 import {
-  ChevronDown,
-  Clock,
-  Package,
-  PackagePlus,
-  Route,
-  Users,
+  ChevronDown, Clock, Package, PackagePlus, Route, Users,
+  Wallet, Ticket, Truck,
 } from "lucide-react";
 import {
   useGetAdminDashboardQuery,
   useGetAdminShipmentsQuery,
   useGetUserShipmentsQuery,
+  useGetInvoiceFinancialOverviewQuery,
+  useGetTicketsQuery,
 } from "@/store/slice/apiSlice";
-import { useSelector } from "react-redux";
-import { RootState } from "@/store/store";
 
 const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December",
 ];
 
-const CURRENT_MONTH = MONTHS[new Date().getMonth()];
-
 type ShipmentItem = {
-  id: string;
-  trackingNumber: string;
-  status: string;
-  senderCity: string;
-  recipientCity: string;
-  quotedPrice: number;
-  estimatedDelivery?: string;
+  id: string; trackingNumber: string; status: string;
+  senderCity: string; recipientCity: string;
+  quotedPrice: number; estimatedDelivery?: string;
 };
 
+function getShipmentList(data: any): ShipmentItem[] {
+  const d = data?.data;
+  if (Array.isArray(d)) return d.slice(0, 3);
+  if (d?.shipments) return d.shipments.slice(0, 3);
+  return [];
+}
+
+// ── Role helpers ───────────────────────────────────────────────────────────────
+const SUPER  = ["SUPER_ADMIN", "LOGISTICS_MANAGER"];
+const isSuperRole  = (s: string) => SUPER.includes(s);
+const isDispatcher = (s: string) => s === "ROLE_DISPATCHER";
+const isFinance    = (s: string) => s === "ROLE_FINANCE";
+const isAgent      = (s: string) => s === "ROLE_AGENT";
+const isMaster     = (s: string) => s === "ROLE_MASTER";
+
 export default function Page() {
-  const [selectedMonth, setSelectedMonth] = useState(CURRENT_MONTH);
-  const [open, setOpen] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState(MONTHS[new Date().getMonth()]);
+  const [monthOpen, setMonthOpen] = useState(false);
 
-  const user = useSelector((s: RootState) => s.auth.user);
-  const isAdmin = user?.role === "ADMIN";
+  const user    = useSelector((s: RootState) => s.auth.user) as any;
+  const role    = user?.role;
+  const subRole = user?.adminSubRole ?? "";
 
-  // Admin gets full dashboard stats; customers get their own shipments count
-  const { data: dashData, isLoading: dashLoading } = useGetAdminDashboardQuery(undefined, {
-    skip: !isAdmin,
-  });
+  const isCustomer   = role === "CUSTOMER";
+  const isAdmin      = role === "ADMIN";
+  const showRevenue  = isAdmin && (isSuperRole(subRole) || subRole === "ROLE_ADMIN");
+  const showCharts   = isAdmin && (isSuperRole(subRole) || subRole === "ROLE_ADMIN" || isDispatcher(subRole));
+  const showUsers    = isAdmin && isSuperRole(subRole);
+
+  // ── Data fetching — skip what the role doesn't need ──────────────────────
+  const { data: dashData,    isLoading: dashLoading }    = useGetAdminDashboardQuery(undefined, { skip: !isAdmin || isAgent(subRole) });
   const { data: shipmentsData } = useGetAdminShipmentsQuery(
-    // "Active" = anything still progressing toward delivery — not just
-    // IN_TRANSIT. A freshly-booked PENDING shipment is just as "active"
-    // from an operations standpoint and shouldn't be hidden here.
-    { status: "PENDING,CONFIRMED,PICKED_UP,IN_TRANSIT,OUT_FOR_DELIVERY" },
-    { skip: !isAdmin }
+    { status: "PENDING,CONFIRMED,AWAITING_PICKUP,PICKED_UP,IN_TRANSIT,OUT_FOR_DELIVERY" },
+    { skip: !isAdmin || isFinance(subRole) }
   );
+  const { data: financeData } = useGetInvoiceFinancialOverviewQuery(undefined, { skip: !isFinance(subRole) });
+  const { data: ticketData  } = useGetTicketsQuery({ status: "OPEN" } as any, { skip: !isAgent(subRole) });
+  const { data: myData }      = useGetUserShipmentsQuery({}, { skip: isAdmin });
 
-  // Customers query their own shipments for the stats cards
-  const { data: myShipmentData } = useGetUserShipmentsQuery({}, { skip: isAdmin });
+  const stats    = (dashData as any)?.data;
+  const finStats = (financeData as any)?.data?.summary;
   const myShipments: any[] = (() => {
-    const d = (myShipmentData as any)?.data;
+    const d = (myData as any)?.data;
     if (Array.isArray(d)) return d;
-    if (d?.shipments) return d.shipments;
-    return [];
+    return d?.shipments ?? [];
   })();
 
-  const myTotal = myShipments.length;
-  const myPending = myShipments.filter((s: any) => s.status === "PENDING" || s.paymentStatus === "PENDING").length;
-  const myDelivered = myShipments.filter((s: any) => s.status === "DELIVERED").length;
+  const activeShipments = isAdmin ? getShipmentList(shipmentsData) : myShipments.filter(
+    (s: any) => !["DELIVERED","CANCELLED","RETURNED"].includes(s.status)
+  ).slice(0, 3);
 
-  const stats = dashData?.data;
-  const activeShipments: ShipmentItem[] = (() => {
-    if (!isAdmin) {
-      // Customer: show their own non-delivered shipments
-      return myShipments
-        .filter((s: any) => !["DELIVERED", "CANCELLED", "RETURNED"].includes(s.status))
-        .slice(0, 3);
-    }
-    if (!shipmentsData) return [];
-    const d = (shipmentsData as any)?.data;
-    if (Array.isArray(d)) return d.slice(0, 3);
-    if (d?.shipments) return d.shipments.slice(0, 3);
-    return [];
-  })();
+  const openTickets = (ticketData as any)?.data?.tickets?.length ?? (ticketData as any)?.meta?.total ?? 0;
 
+  // ── DISPATCHER view ───────────────────────────────────────────────────────
+  if (isDispatcher(subRole)) {
+    const total   = (shipmentsData as any)?.meta?.total ?? getShipmentList(shipmentsData).length ?? 0;
+    const active  = getShipmentList(shipmentsData);
+    return (
+      <div className="pb-10">
+        <div className="text-dashboard-heading">Dashboard</div>
+        <main className="flex-1 overflow-auto">
+          <div className="grid grid-cols-2 xl:grid-cols-3 gap-4 mb-6 mt-4">
+            <StatCard icon={<PackagePlus className="w-6 h-6 text-orange-500"/>} iconBg="bg-orange-50"
+              value={String(total)} label="Total Shipments" trend={0} trendPositive delay={0}/>
+            <StatCard icon={<Truck className="w-6 h-6 text-blue-500"/>} iconBg="bg-blue-50"
+              value={String(active.length)} label="Active Shipments" trend={0} trendPositive delay={80}/>
+            <StatCard icon={<Package className="w-6 h-6 text-green-500"/>} iconBg="bg-green-50"
+              value={String(stats?.shipments?.delivered ?? 0)} label="Delivered Today" trend={0} trendPositive delay={160}/>
+          </div>
+          {showCharts && (
+            <div className="grid grid-cols-12 gap-4 mb-6">
+              <div className="col-span-7"><ShipmentTrend /></div>
+              <div className="col-span-5"><TopRoutes /></div>
+            </div>
+          )}
+          <ActiveShipmentsSection items={active} />
+        </main>
+      </div>
+    );
+  }
+
+  // ── FINANCE view ──────────────────────────────────────────────────────────
+  if (isFinance(subRole)) {
+    return (
+      <div className="pb-10">
+        <div className="text-dashboard-heading">Dashboard</div>
+        <main className="flex-1 overflow-auto mt-4">
+          <div className="bg-gradient-to-r from-[#1F3A70] to-[#2E75B6] rounded-2xl p-5 mb-6 flex items-center justify-between text-white">
+            <div>
+              <p className="text-sm opacity-75">Total Revenue (All Time)</p>
+              <p className="text-3xl font-bold mt-1">₦{Number(finStats?.totalRevenueNaira ?? 0).toLocaleString()}</p>
+            </div>
+            <Wallet className="w-10 h-10 opacity-30"/>
+          </div>
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+            <StatCard icon={<Wallet className="w-6 h-6 text-green-500"/>} iconBg="bg-green-50"
+              value={`₦${Number(finStats?.pendingRevenueNaira ?? 0).toLocaleString()}`}
+              label={`${finStats?.pendingInvoices ?? 0} Pending Invoices`} trend={0} trendPositive delay={0}/>
+            <StatCard icon={<Clock className="w-6 h-6 text-blue-500"/>} iconBg="bg-blue-50"
+              value={String(finStats?.paidInvoices ?? 0)} label="Paid Invoices" trend={0} trendPositive delay={80}/>
+            <StatCard icon={<Route className="w-6 h-6 text-red-400"/>} iconBg="bg-red-50"
+              value={`₦${Number(finStats?.refundedNaira ?? 0).toLocaleString()}`}
+              label={`${finStats?.refundedCount ?? 0} Refunds`} trend={0} trendPositive delay={160}/>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // ── AGENT view ────────────────────────────────────────────────────────────
+  if (isAgent(subRole)) {
+    return (
+      <div className="pb-10">
+        <div className="text-dashboard-heading">Dashboard</div>
+        <main className="flex-1 overflow-auto mt-4">
+          <div className="grid grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
+            <StatCard icon={<Ticket className="w-6 h-6 text-orange-500"/>} iconBg="bg-orange-50"
+              value={String(openTickets)} label="Open Tickets" trend={0} trendPositive delay={0}/>
+            <StatCard icon={<Package className="w-6 h-6 text-blue-500"/>} iconBg="bg-blue-50"
+              value={String(stats?.shipments?.total ?? 0)} label="Total Shipments" trend={0} trendPositive delay={80}/>
+          </div>
+          <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 text-sm text-blue-700">
+            Head to <strong>Support → All Tickets</strong> to manage customer tickets.
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // ── MASTER (enterprise owner) view ────────────────────────────────────────
+  if (isMaster(subRole)) {
+    const total  = getShipmentList(shipmentsData).length;
+    const active = getShipmentList(shipmentsData);
+    return (
+      <div className="pb-10">
+        <div className="text-dashboard-heading">Dashboard</div>
+        <main className="flex-1 overflow-auto mt-4">
+          <div className="grid grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
+            <StatCard icon={<PackagePlus className="w-6 h-6 text-orange-500"/>} iconBg="bg-orange-50"
+              value={String(total)} label="Company Shipments" trend={0} trendPositive delay={0}/>
+            <StatCard icon={<Package className="w-6 h-6 text-purple-500"/>} iconBg="bg-purple-50"
+              value={String(active.length)} label="Active Shipments" trend={0} trendPositive delay={80}/>
+          </div>
+          <ActiveShipmentsSection items={active} />
+        </main>
+      </div>
+    );
+  }
+
+  // ── CUSTOMER view ─────────────────────────────────────────────────────────
+  if (isCustomer) {
+    const total     = myShipments.length;
+    const pending   = myShipments.filter((s: any) => s.paymentStatus === "PENDING" || s.status === "PENDING").length;
+    const delivered = myShipments.filter((s: any) => s.status === "DELIVERED").length;
+    return (
+      <div className="pb-10">
+        <div className="text-dashboard-heading">Dashboard</div>
+        <main className="flex-1 overflow-auto mt-4">
+          <div className="grid grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
+            <StatCard icon={<PackagePlus className="w-6 h-6 text-orange-500"/>} iconBg="bg-orange-50"
+              value={String(total)} label="Total Shipments" trend={0} trendPositive delay={0}/>
+            <StatCard icon={<Package className="w-6 h-6 text-purple-500"/>} iconBg="bg-purple-50"
+              value={String(pending)} label="Pending" trend={0} trendPositive delay={80}/>
+            <StatCard icon={<Clock className="w-6 h-6 text-blue-400"/>} iconBg="bg-blue-50"
+              value={String(delivered)} label="Delivered" trend={0} trendPositive delay={160}/>
+          </div>
+          <ActiveShipmentsSection items={activeShipments} />
+        </main>
+      </div>
+    );
+  }
+
+  // ── SUPER_ADMIN / LOGISTICS_MANAGER / ROLE_ADMIN — full dashboard ─────────
   return (
     <div className="pb-10">
       <div className="text-dashboard-heading">Dashboard</div>
       <main className="flex-1 overflow-auto">
         <div>
-          {/* Month selector */}
+          {/* Month picker */}
           <div className="flex items-center justify-end mb-6">
             <div className="relative">
               <button
-                onClick={() => setOpen(!open)}
+                onClick={() => setMonthOpen(!monthOpen)}
                 className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 font-medium hover:bg-gray-50 transition-colors shadow-sm"
               >
                 {selectedMonth}
-                <ChevronDown
-                  className={`w-4 h-4 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}
-                />
+                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${monthOpen ? "rotate-180" : ""}`}/>
               </button>
-              {open && (
+              {monthOpen && (
                 <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-100 rounded-xl shadow-xl z-20 overflow-hidden">
-                  {MONTHS.map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => { setSelectedMonth(m); setOpen(false); }}
-                      className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors ${m === selectedMonth ? "text-[#e8432d] font-semibold bg-red-50" : "text-gray-700"}`}
-                    >
+                  {MONTHS.map(m => (
+                    <button key={m} onClick={() => { setSelectedMonth(m); setMonthOpen(false); }}
+                      className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 ${m === selectedMonth ? "text-brand font-semibold bg-red-50" : "text-gray-700"}`}>
                       {m}
                     </button>
                   ))}
@@ -118,112 +259,84 @@ export default function Page() {
             </div>
           </div>
 
-          {/* Stats grid */}
+          {/* Stats */}
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-            <StatCard
-              icon={<PackagePlus className="w-6 h-6 text-orange-500" />}
-              iconBg="bg-orange-50"
-              value={isAdmin ? (dashLoading ? "..." : String(stats?.shipments?.total ?? 0)) : String(myTotal)}
-              label="Total Shipments"
-              trend={0}
-              trendPositive={true}
-              delay={0}
-            />
-            <StatCard
-              icon={<Package className="w-6 h-6 text-purple-500" />}
-              iconBg="bg-purple-50"
-              value={isAdmin ? (dashLoading ? "..." : String(stats?.shipments?.pending ?? 0)) : String(myPending)}
-              label="Pending Shipments"
-              trend={0}
-              trendPositive={true}
-              delay={80}
-            />
-            <StatCard
-              icon={<Clock className="w-6 h-6 text-blue-400" />}
-              iconBg="bg-blue-50"
-              value={isAdmin ? (dashLoading ? "..." : String(stats?.shipments?.delivered ?? 0)) : String(myDelivered)}
-              label="Delivered"
-              trend={0}
-              trendPositive={true}
-              delay={160}
-            />
-            <StatCard
-              icon={<Users className="w-6 h-6 text-pink-400" />}
-              iconBg="bg-pink-50"
-              value={dashLoading ? "..." : String(stats?.users?.customers ?? 0)}
-              label="Customers"
-              trend={0}
-              trendPositive={true}
-              delay={240}
-            />
+            <StatCard icon={<PackagePlus className="w-6 h-6 text-orange-500"/>} iconBg="bg-orange-50"
+              value={dashLoading ? "..." : String(stats?.shipments?.total ?? 0)}
+              label="Total Shipments" trend={0} trendPositive={true} delay={0}/>
+            <StatCard icon={<Package className="w-6 h-6 text-purple-500"/>} iconBg="bg-purple-50"
+              value={dashLoading ? "..." : String(stats?.shipments?.pending ?? 0)}
+              label="Pending Shipments" trend={0} trendPositive={true} delay={80}/>
+            <StatCard icon={<Clock className="w-6 h-6 text-blue-400"/>} iconBg="bg-blue-50"
+              value={dashLoading ? "..." : String(stats?.shipments?.delivered ?? 0)}
+              label="Delivered" trend={0} trendPositive={true} delay={160}/>
+            {showUsers && (
+              <StatCard icon={<Users className="w-6 h-6 text-pink-400"/>} iconBg="bg-pink-50"
+                value={dashLoading ? "..." : String(stats?.users?.customers ?? 0)}
+                label="Customers" trend={0} trendPositive={true} delay={240}/>
+            )}
           </div>
 
-          {/* Revenue banner (admin only) */}
-          {isAdmin && stats?.revenue && (
+          {/* Revenue banner — super admin and role_admin only */}
+          {showRevenue && stats?.revenue && (
             <div className="bg-gradient-to-r from-[#1F3A70] to-[#2E75B6] rounded-2xl p-5 mb-6 flex items-center justify-between text-white">
               <div>
                 <p className="text-sm opacity-75">Total Revenue (All Time)</p>
-                <p className="text-3xl font-bold mt-1">
-                  ₦{Number(stats.revenue.total).toLocaleString()}
-                </p>
+                <p className="text-3xl font-bold mt-1">₦{Number(stats.revenue.total).toLocaleString()}</p>
               </div>
-              <Route className="w-10 h-10 opacity-30" />
+              <Route className="w-10 h-10 opacity-30"/>
             </div>
           )}
 
-          {/* Charts row */}
-          <div className="grid grid-cols-12 gap-4 mb-6">
-            <div className="col-span-4">
-              <ServiceDistribution />
+          {/* Charts */}
+          {showCharts && (
+            <div className="grid grid-cols-12 gap-4 mb-6">
+              <div className="col-span-4"><ServiceDistribution /></div>
+              <div className="col-span-5"><ShipmentTrend /></div>
+              <div className="col-span-3"><TopRoutes /></div>
             </div>
-            <div className="col-span-5">
-              <ShipmentTrend />
-            </div>
-            <div className="col-span-3">
-              <TopRoutes />
-            </div>
-          </div>
+          )}
 
-          {/* Active Shipments */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-display font-bold text-gray-900">
-                Active Shipments
-              </h2>
-              <button
-                onClick={() => window.location.href = "/dashboard/shipments"}
-                className="text-sm font-semibold text-[#e8432d] hover:underline transition-all"
-              >
-                See all
-              </button>
-            </div>
-            {activeShipments.length === 0 ? (
-              <div className="text-center py-12 text-gray-400 text-sm">
-                No active shipments
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {activeShipments.map((s: ShipmentItem, i: number) => (
-                  <ShipmentCard
-                    key={s.id}
-                    id={s.trackingNumber}
-                    trackingId={s.trackingNumber}
-                    status={s.status as any}
-                    from={s.senderCity}
-                    to={s.recipientCity}
-                    progress={50}
-                    currentLocation={s.senderCity}
-                    estDelivery={s.estimatedDelivery
-                      ? new Date(s.estimatedDelivery).toLocaleDateString("en-NG", { dateStyle: "medium" })
-                      : "TBD"}
-                    delay={i * 80}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+          <ActiveShipmentsSection items={activeShipments} />
         </div>
       </main>
+    </div>
+  );
+}
+
+// ── Shared active shipments section ───────────────────────────────────────────
+function ActiveShipmentsSection({ items }: { items: ShipmentItem[] }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-base font-display font-bold text-gray-900">Active Shipments</h2>
+        <button onClick={() => window.location.href = "/dashboard/shipments"}
+          className="text-sm font-semibold text-brand hover:underline">
+          See all
+        </button>
+      </div>
+      {items.length === 0 ? (
+        <div className="text-center py-12 text-gray-400 text-sm">No active shipments</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {items.map((s: ShipmentItem, i: number) => (
+            <ShipmentCard
+              key={s.id}
+              id={s.trackingNumber}
+              trackingId={s.trackingNumber}
+              status={s.status as any}
+              from={s.senderCity}
+              to={s.recipientCity}
+              progress={50}
+              currentLocation={s.senderCity}
+              estDelivery={s.estimatedDelivery
+                ? new Date(s.estimatedDelivery).toLocaleDateString("en-NG", { dateStyle: "medium" })
+                : "TBD"}
+              delay={i * 80}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
