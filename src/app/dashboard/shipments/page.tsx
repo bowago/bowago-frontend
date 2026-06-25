@@ -14,18 +14,7 @@ import {
   UserShipmentQueryParams,
 } from "@/store/slice/apiSlice";
 import { Package, Plus, Download } from "lucide-react";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-type Shipment = {
-  id: string;
-  trackingNumber: string;
-  status: string;
-  senderCity: string;
-  recipientCity: string;
-  quotedPrice: number;
-  estimatedDelivery?: string;
-  [key: string]: any;
-};
+import { Shipment } from "@/components/table/columns/shipment-column";
 
 function getShipments(response: any): Shipment[] {
   if (!response) return [];
