@@ -1,182 +1,350 @@
 "use client";
 
-import { ShipmentColumns } from "@/components/table/columns/shipment-column";
-import { AppTable } from "@/components/table/Table";
+import { useParams, useRouter } from "next/navigation";
+import { useTrackShipmentQuery } from "@/store/slice/apiSlice";
 import {
-  AdminShipmentQueryParams,
-  useGetAdminShipmentsQuery,
-} from "@/store/slice/apiSlice";
-import { Filter } from "lucide-react";
-import { useState } from "react";
-import { Shipment } from "../table/columns/shipment-column";
+  ArrowLeft,
+  Package,
+  MapPin,
+  Clock,
+  CheckCircle,
+  Truck,
+  AlertCircle,
+} from "lucide-react";
+import Link from "next/link";
+import dynamic from "next/dynamic";
 
-type ShipmentsResponse =
-  | Shipment[]
-  | {
-      data?: Shipment[] | { shipments?: Shipment[] };
-      shipments?: Shipment[];
-    };
+// ── Leaflet map — loaded client-side only (no SSR) ──────────────────────────
+// Uses react-leaflet. Install with: npm i leaflet react-leaflet
+// Types:            npm i -D @types/leaflet
+const ShipmentMap = dynamic(() => import("@/components/tracking/ShipmentMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-52 bg-white/5 rounded-2xl border border-white/10 flex items-center justify-center">
+      <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+    </div>
+  ),
+});
 
-const emptyFilters = {
-  status: "",
-  search: "",
-  assignedTo: "",
-  fromDate: "",
-  toDate: "",
-};
+// ── Step definitions ─────────────────────────────────────────────────────────
+const STATUS_STEPS = [
+  { key: "PENDING", label: "Order Placed", icon: Package },
+  { key: "AWAITING_PICKUP", label: "Awaiting Pickup", icon: Clock },
+  { key: "PICKED_UP", label: "Picked Up", icon: Package },
+  { key: "IN_TRANSIT", label: "In Transit", icon: Truck },
+  { key: "OUT_FOR_DELIVERY", label: "Out for Delivery", icon: MapPin },
+  { key: "DELIVERED", label: "Delivered", icon: CheckCircle },
+];
 
-const getShipments = (response?: ShipmentsResponse): Shipment[] => {
-  if (!response) return [];
-  if (Array.isArray(response)) return response;
-  if (Array.isArray(response.data)) return response.data;
-  if (response.data && "shipments" in response.data) {
-    return response.data.shipments ?? [];
-  }
-  return response.shipments ?? [];
-};
+const STATUS_ORDER = STATUS_STEPS.map((s) => s.key);
 
-const getQueryParams = (
-  filters: typeof emptyFilters,
-): AdminShipmentQueryParams => {
-  return Object.fromEntries(
-    Object.entries(filters).filter(([, value]) => Boolean(value)),
+function getStepIndex(status: string): number {
+  const idx = STATUS_ORDER.indexOf(status);
+  return idx === -1 ? 0 : idx;
+}
+
+// ── Map data helpers ─────────────────────────────────────────────────────────
+/**
+ * Derive the three map points from shipment + tracking history.
+ *
+ * Origin / destination: the Shipment record stores senderCity/recipientCity.
+ * We use the first and last TrackingEvent with lat/lng for precise coordinates;
+ * fall back to null (map hidden) if no coordinates are available yet.
+ *
+ * Current location: the most-recent TrackingEvent that has lat/lng.
+ */
+function deriveMapPoints(shipment: any): {
+  origin: [number, number] | null;
+  current: [number, number] | null;
+  destination: [number, number] | null;
+  originLabel: string;
+  currentLabel: string;
+  destinationLabel: string;
+} {
+  const history: any[] = shipment?.trackingHistory ?? [];
+
+  const withCoords = history.filter((e) => e.lat != null && e.lng != null);
+
+  const first = withCoords[0] ?? null;
+  const latest = withCoords[withCoords.length - 1] ?? null;
+
+  return {
+    origin: first ? [first.lat, first.lng] : null,
+    current: latest ? [latest.lat, latest.lng] : null,
+    destination: null, // destination coordinates are not stored yet — will show once driver nears drop-off
+    originLabel: `${shipment.senderCity ?? "Origin"}, ${shipment.senderState ?? ""}`,
+    currentLabel: latest?.location ?? "Current Location",
+    destinationLabel: `${shipment.recipientCity ?? "Destination"}, ${shipment.recipientState ?? ""}`,
+  };
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
+export default function TrackShipmentPage() {
+  const params = useParams();
+  const router = useRouter();
+  const trackingNumber = params?.trackingNumber as string;
+
+  const { data, isLoading, isError } = useTrackShipmentQuery(
+    { trackingNumber },
+    { skip: !trackingNumber, pollingInterval: 10_000 },
   );
-};
 
-export default function AdminShipmentView() {
-  const [filters, setFilters] = useState(emptyFilters);
+  const shipmentData = (data as { data?: any })?.data;
+  const shipment = shipmentData?.shipment ?? shipmentData;
+  const currentStep = shipment ? getStepIndex(shipment.status) : -1;
+  const isCancelled = shipment?.status === "CANCELLED";
+  const isFailed = shipment?.status === "FAILED";
 
-  const [appliedFilters, setAppliedFilters] = useState(filters);
-  const { data, isLoading, isError } = useGetAdminShipmentsQuery(
-    getQueryParams(appliedFilters),
-  );
-  const shipments = getShipments(data as ShipmentsResponse | undefined);
-
-  const handleChange = (key: string, value: string) => {
-    setFilters((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
-  };
-
-  const applyFilters = () => {
-    setAppliedFilters(filters);
-  };
-
-  const clearFilters = () => {
-    setFilters(emptyFilters);
-    setAppliedFilters(emptyFilters);
-  };
-
-  const removeFilter = (key: string) => {
-    setAppliedFilters((prev) => ({
-      ...prev,
-      [key]: "",
-    }));
-
-    setFilters((prev) => ({
-      ...prev,
-      [key]: "",
-    }));
-  };
+  const mapPoints = shipment ? deriveMapPoints(shipment) : null;
+  // Show map only when we have at least an origin coordinate
+  const showMap = !!mapPoints?.origin;
 
   return (
-    <div>
-      {/* Filters */}
-      <div className="flex flex-wrap gap-4 items-end">
-        <input
-          value={filters.search}
-          onChange={(e) => handleChange("search", e.target.value)}
-          placeholder="Search tracking, name, or city"
-          className="border rounded-md p-2"
-        />
-
-        <select
-          value={filters.status}
-          onChange={(e) => handleChange("status", e.target.value)}
-          className="border rounded-md p-2"
-        >
-          <option value="">Status</option>
-          <option value="PENDING">Pending</option>
-          <option value="CONFIRMED">Confirmed</option>
-          <option value="PICKED_UP">Picked Up</option>
-          <option value="IN_TRANSIT">In Transit</option>
-          <option value="OUT_FOR_DELIVERY">Out for Delivery</option>
-          <option value="DELIVERED">Delivered</option>
-          <option value="FAILED">Failed</option>
-          <option value="CANCELLED">Cancelled</option>
-          <option value="RETURNED">Returned</option>
-          <option value="PENDING_ADMIN_REVIEW">Admin Review</option>
-        </select>
-
-        <input
-          value={filters.assignedTo}
-          onChange={(e) => handleChange("assignedTo", e.target.value)}
-          placeholder="Assigned staff ID"
-          className="border rounded-md p-2"
-        />
-
-        <input
-          type="date"
-          value={filters.fromDate}
-          onChange={(e) => handleChange("fromDate", e.target.value)}
-          className="border rounded-md p-2"
-        />
-
-        <input
-          type="date"
-          value={filters.toDate}
-          onChange={(e) => handleChange("toDate", e.target.value)}
-          className="border rounded-md p-2"
-        />
-
-        <button
-          onClick={applyFilters}
-          className="bg-red-600 text-white px-5 py-2 rounded-md flex gap-2 items-center"
-        >
-          Filter <Filter size={16} />
-        </button>
-      </div>
-
-      {/* Applied Filters */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <span className="text-sm text-gray-500">Applied Filters:</span>
-
-        {Object.entries(appliedFilters).map(([key, value]) =>
-          value ? (
-            <span
-              key={key}
-              className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-md text-sm"
-            >
-              {key}: {value}
-              <button
-                onClick={() => removeFilter(key)}
-                className="text-red-500 hover:text-red-700"
-              >
-                ✕
-              </button>
-            </span>
-          ) : null,
-        )}
-
-        {Object.values(appliedFilters).some(Boolean) && (
+    <div className="min-h-screen bg-black text-white">
+      {/* Header */}
+      <div className="border-b border-white/10 px-6 py-4">
+        <div className="max-w-2xl mx-auto flex items-center gap-3">
           <button
-            onClick={clearFilters}
-            className="text-red-600 text-sm font-medium ml-2"
+            onClick={() => router.back()}
+            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors"
           >
-            Clear All
+            <ArrowLeft className="w-4 h-4" />
           </button>
-        )}
+          <div>
+            <p className="text-xs text-gray-400">Tracking</p>
+            <p className="font-bold text-white">{trackingNumber}</p>
+          </div>
+        </div>
       </div>
 
-      {/* Table */}
-      {isLoading && <div className="mt-4">...Loading shipments</div>}
-      {isError && (
-        <div className="mt-4 text-sm text-red-600">
-          Unable to load shipments.
-        </div>
-      )}
-      <AppTable columns={ShipmentColumns} data={shipments} />
+      <div className="max-w-2xl mx-auto px-6 py-8 space-y-6">
+        {/* Loading */}
+        {isLoading && (
+          <div className="flex justify-center py-20">
+            <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+          </div>
+        )}
+
+        {/* Error / Not found */}
+        {isError && !isLoading && (
+          <div className="text-center py-20 space-y-3">
+            <AlertCircle className="w-12 h-12 text-red-400 mx-auto" />
+            <p className="text-lg font-semibold">Shipment not found</p>
+            <p className="text-sm text-gray-400">
+              No shipment found for tracking number{" "}
+              <strong>{trackingNumber}</strong>. Check the number and try again.
+            </p>
+            <Link
+              href="/track"
+              className="inline-block mt-4 px-5 py-2 rounded-xl bg-white text-black text-sm font-semibold hover:bg-gray-100 transition-colors"
+            >
+              Track Another Shipment
+            </Link>
+          </div>
+        )}
+
+        {/* Shipment found */}
+        {shipment && !isLoading && (
+          <>
+            {/* Summary card */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-gray-400">Status</p>
+                <span
+                  className={`px-3 py-0.5 rounded-full text-xs font-semibold ${
+                    isCancelled
+                      ? "bg-red-500/20 text-red-400"
+                      : isFailed
+                        ? "bg-gray-500/20 text-gray-400"
+                        : shipment.status === "DELIVERED"
+                          ? "bg-green-500/20 text-green-400"
+                          : "bg-blue-500/20 text-blue-400"
+                  }`}
+                >
+                  {shipment.status?.replace(/_/g, " ")}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-xs text-gray-400 mb-0.5">From</p>
+                  <p className="font-medium">
+                    {shipment.senderCity}, {shipment.senderState}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 mb-0.5">To</p>
+                  <p className="font-medium">
+                    {shipment.recipientCity}, {shipment.recipientState}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 mb-0.5">Service</p>
+                  <p className="font-medium capitalize">
+                    {shipment.serviceType?.toLowerCase()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 mb-0.5">Est. Delivery</p>
+                  <p className="font-medium">
+                    {shipment.estimatedDelivery
+                      ? new Date(shipment.estimatedDelivery).toLocaleDateString(
+                          "en-NG",
+                          { day: "numeric", month: "short", year: "numeric" },
+                        )
+                      : "—"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Live Map (Sprint 4 requirement) ──────────────────────────── */}
+            {showMap && mapPoints && (
+              <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+                <div className="px-5 pt-4 pb-2">
+                  <p className="text-xs text-gray-400 uppercase tracking-widest font-semibold">
+                    Live Location
+                  </p>
+                </div>
+                <div className="h-56">
+                  <ShipmentMap
+                    origin={mapPoints.origin}
+                    current={mapPoints.current}
+                    destination={mapPoints.destination}
+                    originLabel={mapPoints.originLabel}
+                    currentLabel={mapPoints.currentLabel}
+                    destinationLabel={mapPoints.destinationLabel}
+                  />
+                </div>
+                <p className="px-5 py-2 text-[10px] text-gray-500">
+                  Location updates every 10 seconds
+                </p>
+              </div>
+            )}
+
+            {/* Progress tracker */}
+            {!isCancelled && !isFailed && (
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+                <p className="text-xs text-gray-400 uppercase tracking-widest font-semibold mb-5">
+                  Shipment Progress
+                </p>
+                <div className="space-y-0">
+                  {STATUS_STEPS.map((step, idx) => {
+                    const Icon = step.icon;
+                    const isDone = idx < currentStep;
+                    const isCurrent = idx === currentStep;
+                    return (
+                      <div key={step.key} className="flex items-start gap-4">
+                        <div className="flex flex-col items-center">
+                          <div
+                            className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                              isDone
+                                ? "bg-green-500"
+                                : isCurrent
+                                  ? "bg-white"
+                                  : "bg-white/10"
+                            }`}
+                          >
+                            <Icon
+                              className={`w-4 h-4 ${
+                                isDone || isCurrent
+                                  ? "text-black"
+                                  : "text-gray-500"
+                              }`}
+                            />
+                          </div>
+                          {idx < STATUS_STEPS.length - 1 && (
+                            <div
+                              className={`w-0.5 h-8 mt-1 ${
+                                isDone ? "bg-green-500" : "bg-white/10"
+                              }`}
+                            />
+                          )}
+                        </div>
+                        <div className="pt-1.5 pb-7 last:pb-0">
+                          <p
+                            className={`text-sm font-medium ${
+                              isDone
+                                ? "text-green-400"
+                                : isCurrent
+                                  ? "text-white"
+                                  : "text-gray-500"
+                            }`}
+                          >
+                            {step.label}
+                          </p>
+                          {isCurrent && (
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              Current status
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Cancelled state */}
+            {isCancelled && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-5 text-center space-y-2">
+                <AlertCircle className="w-10 h-10 text-red-400 mx-auto" />
+                <p className="font-semibold text-red-400">Shipment Cancelled</p>
+                <p className="text-sm text-gray-400">
+                  This shipment has been cancelled. Contact support if you need
+                  assistance.
+                </p>
+              </div>
+            )}
+
+            {/* Tracking history */}
+            {shipment.trackingHistory?.length > 0 && (
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+                <p className="text-xs text-gray-400 uppercase tracking-widest font-semibold mb-4">
+                  History
+                </p>
+                <div className="space-y-3">
+                  {[...shipment.trackingHistory]
+                    .reverse()
+                    .map((event: any, i: number) => (
+                      <div key={i} className="flex gap-3 text-sm">
+                        <div className="w-1.5 h-1.5 rounded-full bg-gray-400 mt-1.5 shrink-0" />
+                        <div>
+                          <p className="font-medium text-white">
+                            {event.status?.replace(/_/g, " ")}
+                          </p>
+                          {event.description && (
+                            <p className="text-xs text-gray-400">
+                              {event.description}
+                            </p>
+                          )}
+                          {event.location && (
+                            <p className="text-xs text-gray-500">
+                              📍 {event.location}
+                            </p>
+                          )}
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {new Date(event.createdAt).toLocaleString("en-NG")}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Track another */}
+            <div className="text-center">
+              <Link
+                href="/track"
+                className="text-sm text-gray-400 hover:text-white transition-colors underline underline-offset-4"
+              >
+                Track a different shipment
+              </Link>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

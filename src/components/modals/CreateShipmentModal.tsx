@@ -4,7 +4,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Controller, type Resolver, useForm, useWatch } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Input, TextArea, RadioGroupCard, SelectInput } from "../ui/input";
 import { Button } from "../ui/button";
 import { Calendar, MapPin, Package, User } from "lucide-react";
@@ -441,6 +441,16 @@ export default function CreateShipmentModal({
       termsAccepted: false,
     },
   });
+
+  // When opened from the quote flow, prefill origin/destination cities
+  useEffect(() => {
+    if (isOpen && initialValue?.fromCity) {
+      setValue("originCity", initialValue.fromCity);
+    }
+    if (isOpen && initialValue?.toCity) {
+      setValue("destinationCity", initialValue.toCity);
+    }
+  }, [isOpen, initialValue]);
 
   const handleClose = () => {
     reset();

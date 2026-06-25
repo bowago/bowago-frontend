@@ -20,12 +20,11 @@ import {
   IUpdateEmployee,
 } from "./types";
 import { RootState } from "../store";
-import { authTokenChange, logoutUser, setUserData } from "./authSlice";
+import { authTokenChange, logoutUser, setUserData, setMfaVerified } from "./authSlice";
 import { StaffResponseData } from "./types/staff.types";
 import { errorToast, successToast } from "@/lib/toast/toast";
 import {
   ContractRateFormData,
-  CreateClaimFormData,
   CreateFAQFormData,
   CreateTicketFormData,
 } from "@/lib/validation";
@@ -89,12 +88,19 @@ export const baseQueryWithReauth: BaseQueryFn<
 
     if (refreshResult.data) {
       // Response is { success, data: { accessToken, refreshToken } }
-      const refreshData = (refreshResult.data as any)?.data ?? refreshResult.data;
+      const refreshData =
+        (refreshResult.data as any)?.data ?? refreshResult.data;
       const newAccessToken = refreshData?.accessToken;
-      const newRefreshToken = refreshData?.refreshToken ?? authState.refreshToken;
+      const newRefreshToken =
+        refreshData?.refreshToken ?? authState.refreshToken;
 
       if (newAccessToken) {
-        store.dispatch(authTokenChange({ accessToken: newAccessToken, refreshToken: newRefreshToken }));
+        store.dispatch(
+          authTokenChange({
+            accessToken: newAccessToken,
+            refreshToken: newRefreshToken,
+          }),
+        );
         // Retry the original request with the new token
         result = await baseQuery(args, store, extraOptions);
       } else {
@@ -130,6 +136,7 @@ export const apiSlice = createApi({
     "Notification",
     "DeliverySLA",
     "OrgInvite",
+    "CannedResponse",
   ],
   baseQuery: baseQueryWithReauth,
   endpoints: (builder) => ({
@@ -340,7 +347,9 @@ export const apiSlice = createApi({
       }
     >({
       query: ({ existingId, ...body }) => ({
-        url: existingId ? `/users/me/addresses/${existingId}` : `/users/me/addresses`,
+        url: existingId
+          ? `/users/me/addresses/${existingId}`
+          : `/users/me/addresses`,
         method: existingId ? "PUT" : "POST",
         body: { ...body, isDefault: true },
       }),
@@ -612,29 +621,34 @@ export const apiSlice = createApi({
       invalidatesTags: ["Shipment"],
     }),
 
-
     // useGeneratePersistedQuoteMutation — POST /quotes (15-min TTL, returns quoteId)
     // Use this for the booking flow so price is locked at quote time.
-    GeneratePersistedQuote: builder.mutation<any, {
-      originCity: string;
-      destinationCity: string;
-      weightKg?: number;
-      tons?: number;
-      cartons?: number;
-      lengthCm?: number;
-      widthCm?: number;
-      heightCm?: number;
-      boxDimensionId?: string;
-      serviceType?: string;
-      insuranceSelected?: boolean;
-      declaredValue?: number;
-      promoCode?: string;
-      termsAccepted: true; // Sprint 7: required — logged server-side in consent_logs
-    }>({
+    GeneratePersistedQuote: builder.mutation<
+      any,
+      {
+        originCity: string;
+        destinationCity: string;
+        weightKg?: number;
+        tons?: number;
+        cartons?: number;
+        lengthCm?: number;
+        widthCm?: number;
+        heightCm?: number;
+        boxDimensionId?: string;
+        serviceType?: string;
+        insuranceSelected?: boolean;
+        declaredValue?: number;
+        promoCode?: string;
+        termsAccepted: true; // Sprint 7: required — logged server-side in consent_logs
+      }
+    >({
       query: (body) => ({ url: "/quotes", method: "POST", body }),
       async onQueryStarted(_, { queryFulfilled }) {
-        try { await queryFulfilled; }
-        catch (e: any) { /* silent — caller handles */ }
+        try {
+          await queryFulfilled;
+        } catch (e: any) {
+          /* silent — caller handles */
+        }
       },
     }),
 
@@ -950,7 +964,9 @@ export const apiSlice = createApi({
           const { data } = await queryFulfilled;
           if (data) successToast("Invoice ready");
         } catch (error: any) {
-          errorToast(error.error?.data?.message || "Failed to generate invoice");
+          errorToast(
+            error.error?.data?.message || "Failed to generate invoice",
+          );
         }
       },
       invalidatesTags: ["Shipment"],
@@ -959,7 +975,10 @@ export const apiSlice = createApi({
     // useDownloadInvoiceMutation — fetches the invoice PDF as a blob and
     // triggers a browser download. Requires a paymentId (from
     // InitPendingPayment or an existing Payment record on the shipment).
-    DownloadInvoice: builder.mutation<void, { paymentId: string; filename?: string }>({
+    DownloadInvoice: builder.mutation<
+      void,
+      { paymentId: string; filename?: string }
+    >({
       query: ({ paymentId }) => ({
         url: `/invoices/${paymentId}/download`,
         method: "GET",
@@ -984,7 +1003,11 @@ export const apiSlice = createApi({
           a.remove();
           window.URL.revokeObjectURL(url);
         } catch (error: any) {
-          errorToast(error?.data?.message || error?.error?.data?.message || "Failed to download invoice");
+          errorToast(
+            error?.data?.message ||
+              error?.error?.data?.message ||
+              "Failed to download invoice",
+          );
         }
       },
     }),
@@ -1010,11 +1033,17 @@ export const apiSlice = createApi({
       invalidatesTags: ["Ticket"],
     }),
     // useCreateClaimMutation
-    CreateClaim: builder.mutation<unknown, CreateClaimFormData>({
+    // useCreateClaimMutation
+    // Gap 2: accepts FormData (multipart/form-data) so multer receives binary file parts.
+    // Do NOT set Content-Type — the browser sets it automatically with the multipart boundary.
+    CreateClaim: builder.mutation<unknown, FormData>({
       query: (formData) => ({
         url: "/claims",
         method: "POST",
         body: formData,
+        // RTK Query / fetch: when body is FormData, browser auto-sets Content-Type: multipart/form-data; boundary=...
+        // Explicitly setting Content-Type here would break the boundary and multer would reject the upload.
+        formData: true,
       }),
       async onQueryStarted(args, { queryFulfilled }) {
         try {
@@ -1074,6 +1103,159 @@ export const apiSlice = createApi({
       invalidatesTags: ["Shipment"],
     }),
 
+    // ─── Sprint 4: Driver location update ─────────────────────────────────────
+    UpdateDriverLocation: builder.mutation<
+      any,
+      { id: string; lat: number; lng: number; location?: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/shipments/${id}/driver-location`,
+        method: "POST",
+        body,
+      }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+        } catch (error) {
+          const e = error as CustomError;
+          errorToast(e.error?.data?.message || "Location update failed");
+        }
+      },
+    }),
+
+    // ─── Sprint 6: CSV export ─────────────────────────────────────────────────
+    // Downloads shipments as a .csv file using blob download pattern
+    ExportShipmentsCsv: builder.mutation<
+      void,
+      { status?: string; fromDate?: string; toDate?: string }
+    >({
+      queryFn: async (params, api, _extraOptions, _baseQuery) => {
+        const qs = new URLSearchParams();
+        if (params.status) qs.set("status", params.status);
+        if (params.fromDate) qs.set("fromDate", params.fromDate);
+        if (params.toDate) qs.set("toDate", params.toDate);
+
+        const state = api.getState() as any;
+        const token = state?.auth?.accessToken;
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+        const queryStr = qs.toString();
+
+        try {
+          const response = await fetch(
+            `${baseUrl}/shipments/export/csv${queryStr ? `?${queryStr}` : ""}`,
+            {
+              headers: {
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              },
+            },
+          );
+          if (!response.ok) {
+            errorToast("CSV export failed");
+            return {
+              error: { status: response.status, data: "Export failed" } as any,
+            };
+          }
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `BowaGo-Shipments-${new Date().toISOString().slice(0, 10)}.csv`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          successToast("Shipments exported to CSV");
+          return { data: undefined };
+        } catch (err: any) {
+          errorToast(err?.message || "Export failed");
+          return {
+            error: { status: "FETCH_ERROR", data: err?.message } as any,
+          };
+        }
+      },
+    }),
+
+    // ─── Sprint 6: Canned Responses ───────────────────────────────────────────
+    GetCannedResponses: builder.query<any, { category?: string } | void>({
+      query: (args) => {
+        const category = (args as any)?.category;
+        return {
+          url: `/support/canned-responses${category ? `?category=${encodeURIComponent(category)}` : ""}`,
+        };
+      },
+      providesTags: ["CannedResponse"],
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+        } catch {}
+      },
+    }),
+
+    CreateCannedResponse: builder.mutation<
+      any,
+      { title: string; body: string; category?: string }
+    >({
+      query: (body) => ({
+        url: "/support/canned-responses",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["CannedResponse"],
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Template created");
+        } catch (error) {
+          const e = error as CustomError;
+          errorToast(e.error?.data?.message || "Failed to create template");
+        }
+      },
+    }),
+
+    UpdateCannedResponse: builder.mutation<
+      any,
+      {
+        id: string;
+        title?: string;
+        body?: string;
+        category?: string;
+        isActive?: boolean;
+      }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/support/canned-responses/${id}`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: ["CannedResponse"],
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Template updated");
+        } catch (error) {
+          const e = error as CustomError;
+          errorToast(e.error?.data?.message || "Failed to update template");
+        }
+      },
+    }),
+
+    DeleteCannedResponse: builder.mutation<any, { id: string }>({
+      query: ({ id }) => ({
+        url: `/support/canned-responses/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["CannedResponse"],
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Template deleted");
+        } catch (error) {
+          const e = error as CustomError;
+          errorToast(e.error?.data?.message || "Failed to delete template");
+        }
+      },
+    }),
+
     // useDeleteCityMutation — pass force:true to cascade-delete dependent routes
     deleteCity: builder.mutation<unknown, { id: string; force?: boolean }>({
       query: ({ id, force }) => ({
@@ -1083,7 +1265,8 @@ export const apiSlice = createApi({
       async onQueryStarted(_, { queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          if (data) successToast((data as any)?.message || "City Deleted Successfully");
+          if (data)
+            successToast((data as any)?.message || "City Deleted Successfully");
         } catch (error: any) {
           // 409 = city has dependent zone/km routes — UI shows a confirmation
           // dialog for this instead of a generic error toast.
@@ -1234,9 +1417,12 @@ export const apiSlice = createApi({
     >({
       query: (params) => {
         const searchParams = new URLSearchParams();
-        if (params?.isActive) searchParams.append("isActive", params.isActive.toString());
-        if ((params as any)?.serviceType) searchParams.append("serviceType", (params as any).serviceType);
-        if ((params as any)?.zone) searchParams.append("zone", String((params as any).zone));
+        if (params?.isActive)
+          searchParams.append("isActive", params.isActive.toString());
+        if ((params as any)?.serviceType)
+          searchParams.append("serviceType", (params as any).serviceType);
+        if ((params as any)?.zone)
+          searchParams.append("zone", String((params as any).zone));
         return `/promo-rates?${searchParams.toString()}`;
       },
       providesTags: ["PromoRate"],
@@ -1256,9 +1442,12 @@ export const apiSlice = createApi({
       query: (params) => {
         const searchParams = new URLSearchParams();
         if (params?.zone) searchParams.append("zone", String(params.zone));
-        if (params?.serviceType) searchParams.append("serviceType", params.serviceType);
-        if (params?.minKg !== undefined) searchParams.append("minKg", String(params.minKg));
-        if (params?.maxKg !== undefined) searchParams.append("maxKg", String(params.maxKg));
+        if (params?.serviceType)
+          searchParams.append("serviceType", params.serviceType);
+        if (params?.minKg !== undefined)
+          searchParams.append("minKg", String(params.minKg));
+        if (params?.maxKg !== undefined)
+          searchParams.append("maxKg", String(params.maxKg));
         if (params?.isActive) searchParams.append("isActive", params.isActive);
         return `/pricing/price-bands?${searchParams.toString()}`;
       },
@@ -1317,12 +1506,46 @@ export const apiSlice = createApi({
       },
       providesTags: ["Ticket"],
     }),
-    // useGetClaimsQuery
-    GetClaims: builder.query<unknown, void>({
-      query: () => {
-        return `/claims`;
+    // useGetClaimsQuery — admin: all claims
+    GetClaims: builder.query<unknown, { status?: string; type?: string } | void>({
+      query: (params) => {
+        const q = new URLSearchParams();
+        if (params?.status) q.append("status", params.status);
+        if (params?.type)   q.append("type",   params.type);
+        const qs = q.toString();
+        return `/claims${qs ? `?${qs}` : ""}`;
       },
       providesTags: ["Claim"],
+    }),
+    // useGetMyClaimsQuery — customer: own claims
+    GetMyClaims: builder.query<unknown, void>({
+      query: () => `/claims/my`,
+      providesTags: ["Claim"],
+    }),
+    // useGetClaimByIdQuery — single claim detail
+    GetClaimById: builder.query<unknown, { id: string }>({
+      query: ({ id }) => `/claims/${id}`,
+      providesTags: ["Claim"],
+    }),
+    // useReviewClaimMutation — admin: approve/reject/mark paid
+    ReviewClaim: builder.mutation<
+      unknown,
+      { id: string; status: string; reviewNote?: string; approvedAmount?: number }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/claims/${id}/review`,
+        method: "PATCH",
+        body,
+      }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Claim updated successfully");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Failed to update claim");
+        }
+      },
+      invalidatesTags: ["Claim"],
     }),
     // useGetFAQQuery
     GetFAQ: builder.query<
@@ -1407,13 +1630,19 @@ export const apiSlice = createApi({
     GetZoneByRoute: builder.query<any, { fromCity: string; toCity: string }>({
       query: ({ fromCity, toCity }) =>
         `/pricing/zone-matrix?fromCity=${encodeURIComponent(fromCity)}&toCity=${encodeURIComponent(toCity)}&exact=true&limit=1`,
-      providesTags: ['Zone'],
+      providesTags: ["Zone"],
     }),
 
-        // useGetZoneQuery
+    // useGetZoneQuery
     GetZone: builder.query<
       any,
-      { fromCity?: string; toCity?: string; page?: number; limit?: number; isActive?: string }
+      {
+        fromCity?: string;
+        toCity?: string;
+        page?: number;
+        limit?: number;
+        isActive?: string;
+      }
     >({
       query: (params) => {
         const searchParams = new URLSearchParams();
@@ -1546,22 +1775,44 @@ export const apiSlice = createApi({
       invalidatesTags: ["Shipment"],
     }),
 
+    // ── Sprint 8: Assign shipment to a dispatcher ───────────────────────────────
+    // PATCH /shipments/:id/assign — requireLogisticsOrAbove
+    AssignShipment: builder.mutation<any, { id: string; userId: string }>({
+      query: ({ id, userId }) => ({
+        url: `/shipments/${id}/assign`,
+        method: "PATCH",
+        body: { userId },
+      }),
+      invalidatesTags: ["Shipment"],
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Dispatcher assigned");
+        } catch (error) {
+          const e = error as CustomError;
+          errorToast(e.error?.data?.message || "Failed to assign dispatcher");
+        }
+      },
+    }),
+
     // ─── Custom Admin Capabilities (Super Admin) ──────────────────────────────
     // useGetCapabilitiesQuery — full list of toggleable capability flags
     GetCapabilities: builder.query<any, void>({
       query: () => "/admin/roles/capabilities",
     }),
     // useGetAdminRolesQuery — list all staff with custom role assignments
-    GetAdminRoles: builder.query<any, { page?: number; limit?: number } | void>({
-      query: (params) => {
-        const searchParams = new URLSearchParams();
-        if (params?.page) searchParams.append("page", String(params.page));
-        if (params?.limit) searchParams.append("limit", String(params.limit));
-        const qs = searchParams.toString();
-        return `/admin/roles${qs ? `?${qs}` : ""}`;
+    GetAdminRoles: builder.query<any, { page?: number; limit?: number } | void>(
+      {
+        query: (params) => {
+          const searchParams = new URLSearchParams();
+          if (params?.page) searchParams.append("page", String(params.page));
+          if (params?.limit) searchParams.append("limit", String(params.limit));
+          const qs = searchParams.toString();
+          return `/admin/roles${qs ? `?${qs}` : ""}`;
+        },
+        providesTags: ["AdminRole"],
       },
-      providesTags: ["AdminRole"],
-    }),
+    ),
     // useGetAdminRoleQuery — get one user's capability set
     GetAdminRole: builder.query<any, { userId: string }>({
       query: ({ userId }) => `/admin/roles/${userId}`,
@@ -1596,7 +1847,10 @@ export const apiSlice = createApi({
       async onQueryStarted(_, { queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          if (data) successToast((data as any)?.message || "Custom role assigned successfully");
+          if (data)
+            successToast(
+              (data as any)?.message || "Custom role assigned successfully",
+            );
         } catch (e: any) {
           errorToast(e.error?.data?.message || "Failed to assign custom role");
         }
@@ -1632,7 +1886,8 @@ export const apiSlice = createApi({
       async onQueryStarted(_, { queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          if (data) successToast((data as any)?.message || "Custom role revoked");
+          if (data)
+            successToast((data as any)?.message || "Custom role revoked");
         } catch (e: any) {
           errorToast(e.error?.data?.message || "Failed to revoke custom role");
         }
@@ -1665,7 +1920,10 @@ export const apiSlice = createApi({
       async onQueryStarted(_, { queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          if (data) successToast((data as any)?.message || "Webhook re-processed successfully");
+          if (data)
+            successToast(
+              (data as any)?.message || "Webhook re-processed successfully",
+            );
         } catch (e: any) {
           errorToast(e.error?.data?.message || "Retry failed");
         }
@@ -1815,11 +2073,14 @@ export const apiSlice = createApi({
           window.URL.revokeObjectURL(url);
           successToast("Pricing data exported");
         } catch (error: any) {
-          errorToast(error?.data?.message || error?.error?.data?.message || "Export failed");
+          errorToast(
+            error?.data?.message ||
+              error?.error?.data?.message ||
+              "Export failed",
+          );
         }
       },
     }),
-
 
     // useGetNotificationsQuery — polls every 30s for real-time bell updates
     GetNotifications: builder.query<any, { page?: number } | void>({
@@ -1841,10 +2102,11 @@ export const apiSlice = createApi({
       query: () => ({ url: "/notifications/mark-all-read", method: "PATCH" }),
       invalidatesTags: ["Notification"],
       async onQueryStarted(_, { queryFulfilled }) {
-        try { await queryFulfilled; } catch {}
+        try {
+          await queryFulfilled;
+        } catch {}
       },
     }),
-
 
     // useMarkNotificationReadMutation
     MarkNotificationRead: builder.mutation<unknown, { id: string }>({
@@ -1879,23 +2141,26 @@ export const apiSlice = createApi({
       async onQueryStarted(_, { queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          if (data) successToast((data as any)?.message || "Verification code sent");
+          if (data)
+            successToast((data as any)?.message || "Verification code sent");
         } catch (e: any) {
           errorToast(e.error?.data?.message || "2FA setup failed");
         }
       },
     }),
-    Verify2FA: builder.mutation<any, { otp: string; method?: "EMAIL" | "SMS" }>({
-      query: (body) => ({ url: "/auth/verify-2fa", method: "POST", body }),
-      async onQueryStarted(_, { queryFulfilled }) {
-        try {
-          const { data } = await queryFulfilled;
-          if (data) successToast("Two-factor authentication enabled");
-        } catch (e: any) {
-          errorToast(e.error?.data?.message || "Verification failed");
-        }
+    Verify2FA: builder.mutation<any, { otp: string; method?: "EMAIL" | "SMS" }>(
+      {
+        query: (body) => ({ url: "/auth/verify-2fa", method: "POST", body }),
+        async onQueryStarted(_, { queryFulfilled }) {
+          try {
+            const { data } = await queryFulfilled;
+            if (data) successToast("Two-factor authentication enabled");
+          } catch (e: any) {
+            errorToast(e.error?.data?.message || "Verification failed");
+          }
+        },
       },
-    }),
+    ),
     // useDisable2FAMutation
     Disable2FA: builder.mutation<any, { password: string }>({
       query: (body) => ({ url: "/auth/disable-2fa", method: "POST", body }),
@@ -1909,7 +2174,10 @@ export const apiSlice = createApi({
       },
     }),
     // useVerifyLogin2FAMutation — completes login after Login returns requires2FA:true
-    VerifyLogin2FA: builder.mutation<AuthResponse, { email: string; otp: string }>({
+    VerifyLogin2FA: builder.mutation<
+      AuthResponse,
+      { email: string; otp: string }
+    >({
       query: (body) => ({ url: "/auth/login-2fa", method: "POST", body }),
       async onQueryStarted(_, { dispatch, queryFulfilled }) {
         try {
@@ -1920,6 +2188,8 @@ export const apiSlice = createApi({
           };
           dispatch(authTokenChange(userToken));
           dispatch(setUserData((data as any).data.user));
+          // Gap 5: record MFA completion time for invoice page guard
+          dispatch(setMfaVerified(new Date().toISOString()));
         } catch (error) {
           const errorM = error as CustomError;
           errorToast(errorM.error?.data?.message || "Invalid or expired code");
@@ -1987,7 +2257,6 @@ export const apiSlice = createApi({
       invalidatesTags: ["User"],
     }),
 
-
     // useDeleteAccountMutation — lets a customer delete their own account
     DeleteAccount: builder.mutation<any, { password: string }>({
       query: (body) => ({
@@ -2029,7 +2298,15 @@ export const apiSlice = createApi({
     }),
 
     // useMarkAsPaidMutation — Admin: manually record offline payment
-    MarkAsPaid: builder.mutation<any, { shipmentId: string; method?: string; reference?: string; notes?: string }>({
+    MarkAsPaid: builder.mutation<
+      any,
+      {
+        shipmentId: string;
+        method?: string;
+        reference?: string;
+        notes?: string;
+      }
+    >({
       query: ({ shipmentId, ...body }) => ({
         url: `/payments/${shipmentId}/mark-paid`,
         method: "POST",
@@ -2047,7 +2324,10 @@ export const apiSlice = createApi({
     }),
 
     // useWaivePaymentMutation — Super Admin: waive/comp a shipment
-    WaivePayment: builder.mutation<any, { shipmentId: string; reason?: string }>({
+    WaivePayment: builder.mutation<
+      any,
+      { shipmentId: string; reason?: string }
+    >({
       query: ({ shipmentId, ...body }) => ({
         url: `/payments/${shipmentId}/waive`,
         method: "POST",
@@ -2088,7 +2368,18 @@ export const apiSlice = createApi({
     }),
 
     // useUpdateFAQMutation — Super Admin: update a FAQ item
-    UpdateFAQ: builder.mutation<any, { id: string; question?: string; answer?: string; category?: string; sortOrder?: number; isFeatured?: boolean; isActive?: boolean }>({
+    UpdateFAQ: builder.mutation<
+      any,
+      {
+        id: string;
+        question?: string;
+        answer?: string;
+        category?: string;
+        sortOrder?: number;
+        isFeatured?: boolean;
+        isActive?: boolean;
+      }
+    >({
       query: ({ id, ...body }) => ({
         url: `/faq/${id}`,
         method: "PATCH",
@@ -2119,7 +2410,6 @@ export const apiSlice = createApi({
       invalidatesTags: ["FAQ"],
     }),
 
-
     // useGetDeliverySLAQuery — fetches zone×serviceType delivery days for booking modal
     GetDeliverySLA: builder.query<any, void>({
       query: () => "/pricing/delivery-sla",
@@ -2127,7 +2417,10 @@ export const apiSlice = createApi({
     }),
 
     // useUpdateDeliverySLAMutation — Super Admin: edit days for a zone×service
-    UpdateDeliverySLA: builder.mutation<any, { id: string; minDays: number; maxDays: number }>({
+    UpdateDeliverySLA: builder.mutation<
+      any,
+      { id: string; minDays: number; maxDays: number }
+    >({
       query: ({ id, ...body }) => ({
         url: `/pricing/delivery-sla/${id}`,
         method: "PATCH",
@@ -2154,13 +2447,18 @@ export const apiSlice = createApi({
 
     // ─── Sprint 6: Agent KPI Dashboard ───────────────────────────────────
     // useGetAgentKpiQuery
-    GetAgentKpi: builder.query<any, { from?: string; to?: string; agentId?: string } | void>({
+    GetAgentKpi: builder.query<
+      any,
+      { from?: string; to?: string; agentId?: string } | void
+    >({
       query: (params) => {
         const qs = params
           ? new URLSearchParams(
               Object.fromEntries(
-                Object.entries(params).filter(([, v]) => v !== undefined && v !== "")
-              ) as Record<string, string>
+                Object.entries(params).filter(
+                  ([, v]) => v !== undefined && v !== "",
+                ),
+              ) as Record<string, string>,
             ).toString()
           : "";
         return `/support/kpi${qs ? `?${qs}` : ""}`;
@@ -2189,19 +2487,24 @@ export const apiSlice = createApi({
       async onQueryStarted(_, { queryFulfilled }) {
         try {
           await queryFulfilled;
-        } catch (e: any) { /* caller handles */ }
+        } catch (e: any) {
+          /* caller handles */
+        }
       },
       invalidatesTags: ["OrgInvite"],
     }),
 
     // useAcceptInviteMutation — public: creates account from invite token
-    AcceptInvite: builder.mutation<any, {
-      token: string;
-      firstName: string;
-      lastName: string;
-      password: string;
-      phone?: string;
-    }>({
+    AcceptInvite: builder.mutation<
+      any,
+      {
+        token: string;
+        firstName: string;
+        lastName: string;
+        password: string;
+        phone?: string;
+      }
+    >({
       query: (body) => ({
         url: "/organization/accept-invite",
         method: "POST",
@@ -2237,18 +2540,21 @@ export const apiSlice = createApi({
     }),
 
     // useRegisterOrganizationMutation — self-service upgrade to Business (ROLE_MASTER)
-    RegisterOrganization: builder.mutation<any, {
-      companyName: string;
-      industry?: string;
-      companyEmail?: string;
-      companyPhone?: string;
-      companyWebsite?: string;
-      streetAddress?: string;
-      city?: string;
-      state?: string;
-      country?: string;
-      zipCode?: string;
-    }>({
+    RegisterOrganization: builder.mutation<
+      any,
+      {
+        companyName: string;
+        industry?: string;
+        companyEmail?: string;
+        companyPhone?: string;
+        companyWebsite?: string;
+        streetAddress?: string;
+        city?: string;
+        state?: string;
+        country?: string;
+        zipCode?: string;
+      }
+    >({
       query: (body) => ({
         url: "/organization/register",
         method: "POST",
@@ -2317,6 +2623,9 @@ export const {
   useGetMyInvoiceSummaryQuery,
   useGetAllTicketQuery,
   useGetClaimsQuery,
+  useGetMyClaimsQuery,
+  useGetClaimByIdQuery,
+  useReviewClaimMutation,
   useGetFAQQuery,
   useGetFeaturedFAQsQuery,
   useToggleFeaturedFAQMutation,
@@ -2395,4 +2704,11 @@ export const {
   useResendOrgInviteMutation,
   useRegisterOrganizationMutation,
   useGetOrgStatusQuery,
+  useUpdateDriverLocationMutation,
+  useExportShipmentsCsvMutation,
+  useAssignShipmentMutation,
+  useGetCannedResponsesQuery,
+  useCreateCannedResponseMutation,
+  useUpdateCannedResponseMutation,
+  useDeleteCannedResponseMutation,
 } = apiSlice;

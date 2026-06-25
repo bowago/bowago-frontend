@@ -429,16 +429,46 @@ export default function LandingPage() {
                         {quoteResult.distanceKm?.toLocaleString()} km
                       </p>
                     )}
+                    {/* Gap 2: show pricing mode badge for enterprise/promo users */}
+                    {quoteResult.pricingMode && quoteResult.pricingMode !== "STANDARD" && (
+                      <span className={`inline-block mt-2 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
+                        quoteResult.pricingMode === "CONTRACT"
+                          ? "bg-green-500/20 text-green-400"
+                          : "bg-yellow-500/20 text-yellow-400"
+                      }`}>
+                        {quoteResult.pricingMode === "CONTRACT" ? "Enterprise Rate Applied" : "Promo Rate Applied"}
+                      </span>
+                    )}
                   </div>
-                  {quoteResult.surchargeBreakdown?.map((s: any) => (
-                    <div
-                      key={s.label}
-                      className="flex justify-between text-xs text-white/60 py-1"
-                    >
-                      <span>{s.label}</span>
-                      <span>{fmt(s.amount)}</span>
-                    </div>
-                  ))}
+
+                  {/* Gap 1: always show Base Price line item, then surcharges */}
+                  <div className="space-y-1 mb-3">
+                    {/* Base price — derived from breakdown or pricing struct */}
+                    {(quoteResult.breakdown?.finalBasePrice != null || quoteResult.pricing?.basePriceNaira != null) && (
+                      <div className="flex justify-between text-xs text-white/60 py-1 border-b border-white/10">
+                        <span>Base Price</span>
+                        <span>{fmt(quoteResult.pricing?.basePriceNaira ?? quoteResult.breakdown?.finalBasePrice)}</span>
+                      </div>
+                    )}
+                    {/* Surcharge line items from DB (FUEL, VAT, etc.) */}
+                    {quoteResult.surchargeBreakdown?.map((s: any) => (
+                      <div
+                        key={s.label}
+                        className="flex justify-between text-xs text-white/60 py-1"
+                      >
+                        <span>{s.label}</span>
+                        <span>{fmt(s.amount)}</span>
+                      </div>
+                    ))}
+                    {/* Applied discount if any */}
+                    {quoteResult.appliedDiscount && (
+                      <div className="flex justify-between text-xs text-green-400 py-1">
+                        <span>{quoteResult.appliedDiscount.label ?? "Discount"}</span>
+                        <span>-{fmt(quoteResult.appliedDiscount.discountAmount ?? quoteResult.appliedDiscount.amount)}</span>
+                      </div>
+                    )}
+                  </div>
+
                   <Link
                     href="/auth/login"
                     className="mt-4 w-full inline-flex items-center justify-center gap-2 bg-brand hover:bg-red-700 text-white py-2.5 rounded-xl text-sm font-bold transition-all"

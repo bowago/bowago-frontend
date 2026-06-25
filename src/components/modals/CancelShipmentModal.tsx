@@ -22,11 +22,24 @@ export default function CancelShipmentModal({
   isOpen,
   setIsOpen,
   id,
+  shipmentStatus = "",
 }: {
   isOpen: boolean;
   setIsOpen: (e: boolean) => void;
   id: string;
+  shipmentStatus?: string;
 }) {
+  // Gap 6: statuses where cancellation is not permitted — mirrors backend logic
+  // PRD Sprint 5: "IN_TRANSIT / OUT_FOR_DELIVERY / DELIVERED → Cannot cancel"
+  const NON_CANCELLABLE = ["IN_TRANSIT", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED", "RETURNED"];
+  const cannotCancel = NON_CANCELLABLE.includes(shipmentStatus);
+
+  const cancelBlockedMessage =
+    shipmentStatus === "DELIVERED"
+      ? "This shipment has been delivered. Please file a damage or loss claim instead."
+      : shipmentStatus === "CANCELLED"
+        ? "This shipment is already cancelled."
+        : "This shipment is in transit and cannot be cancelled. Contact support or file a claim after delivery.";
   const [handleCancelShipment, { isLoading }] = useCancelShipmentMutation();
   // Accumulated data across steps
 
@@ -117,7 +130,22 @@ export default function CancelShipmentModal({
               <span className="w-6" />
             </div>
 
-            <DeleteForm />
+            {/* Gap 6: blocked state — show clear message instead of the form */}
+            {cannotCancel ? (
+              <div className="mt-6 rounded-xl bg-red-50 border border-red-100 p-4 text-sm text-red-700">
+                <p className="font-semibold mb-1">Cannot Cancel</p>
+                <p>{cancelBlockedMessage}</p>
+                <div className="flex justify-end mt-4">
+                  <Dialog.Close asChild>
+                    <button className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-medium transition-colors">
+                      Close
+                    </button>
+                  </Dialog.Close>
+                </div>
+              </div>
+            ) : (
+              <DeleteForm />
+            )}
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>

@@ -1,10 +1,22 @@
 "use client";
 import { useState } from "react";
 import RequestQuoteModal from "../modals/RequestQuoteModal";
+import CreateShipmentModal from "../modals/CreateShipmentModal";
 import { Button } from "../ui/button";
 
 export default function ShippingCard() {
-  const [openQuote, setOpenQuote] = useState(false);
+  const [openQuote, setOpenQuote]       = useState(false);
+  const [openShipment, setOpenShipment] = useState(false);
+  const [shipmentPrefill, setShipmentPrefill] = useState<{
+    fromCity?: string;
+    toCity?: string;
+  } | null>(null);
+
+  const handleCreateShipmentFromQuote = (prefill: { fromCity: string; toCity: string }) => {
+    setShipmentPrefill(prefill);
+    setOpenShipment(true);
+  };
+
   return (
     <>
       <div className="bg-black text-white border-2 rounded-2xl p-5 flex flex-col gap-5 flex-1 justify-center items-center text-center">
@@ -25,7 +37,17 @@ export default function ShippingCard() {
         </div>
       </div>
 
-      <RequestQuoteModal isOpen={openQuote} setIsOpen={setOpenQuote} />
+      <RequestQuoteModal
+        isOpen={openQuote}
+        setIsOpen={setOpenQuote}
+        onCreateShipment={handleCreateShipmentFromQuote}
+      />
+
+      <CreateShipmentModal
+        isOpen={openShipment}
+        setIsOpen={setOpenShipment}
+        initialValue={shipmentPrefill}
+      />
     </>
   );
 }

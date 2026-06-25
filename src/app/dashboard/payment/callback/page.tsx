@@ -95,6 +95,13 @@ function PaymentCallbackInner() {
               >
                 View Invoice
               </button>
+              {/* Gap 7: Packaging guide — Sprint 5 DoD: accessible within 2 clicks of booking confirmation */}
+              <button
+                onClick={() => router.push("/packaging-guide")}
+                className="w-full border border-dashed border-gray-300 text-gray-500 py-3 rounded-xl font-medium text-sm hover:border-gray-400 hover:text-gray-700 transition-colors"
+              >
+                📦 How to Package Your Item
+              </button>
             </div>
           </>
         )}

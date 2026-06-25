@@ -78,9 +78,11 @@ type BoxDimension = {
 export default function CreateQuoteModal({
   isOpen,
   setIsOpen,
+  onCreateShipment,
 }: {
   isOpen: boolean;
   setIsOpen: (v: boolean) => void;
+  onCreateShipment?: (prefill: { fromCity: string; toCity: string }) => void;
 }) {
   const [handleCreateQuote, { isLoading: isLoadingQuote, data }] =
     useCreateQuoteMutation();
@@ -253,7 +255,12 @@ export default function CreateQuoteModal({
     );
 
     const maxWeight = selectedBox?.weightKgLimit || 0;
-    const maxTons = maxWeight / 1000;
+    const maxTons   = maxWeight / 1000;
+    const cartons   = values.cartons || 1;
+
+    // Total weight = box limit × number of boxes
+    const totalWeight = selectedBox ? maxWeight * cartons : 0;
+    const totalTons   = selectedBox ? maxTons   * cartons : 0;
 
     return (
       <div className="flex flex-col gap-4">
@@ -277,38 +284,59 @@ export default function CreateQuoteModal({
               value={field.value}
               onValueChange={(val) => {
                 field.onChange(val);
-
-                // Don't pre-fill weightKg/tons from the box's weight limit —
-                // weightKg takes priority on the backend and would override
-                // the boxDimensionId + "Number of Boxes" (cartons) total-weight
-                // calculation, silently discarding the quantity the user enters.
-                // Clear weightKg/tons so the backend computes total weight as
-                // (box weight limit × number of boxes).
-                setValue("weightKg", undefined as any);
-                setValue("tons", undefined as any);
+                // Pre-fill weight/tons from box limit so fields aren't blank
+                const box = dimensions.find((d) => d.id === val);
+                if (box) {
+                  setValue("weightKg", box.weightKgLimit);
+                  setValue("tons", parseFloat((box.weightKgLimit / 1000).toFixed(3)));
+                } else {
+                  setValue("weightKg", undefined as any);
+                  setValue("tons", undefined as any);
+                }
               }}
               error={errors.boxDimensionId?.message}
             />
           )}
         />
 
+        {/* Box info banner — shown once a box is selected */}
+        {selectedBox && (
+          <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-xs text-blue-700">
+            <p className="font-semibold mb-0.5">{selectedBox.displayName}</p>
+            <p className="text-blue-500">
+              Max <strong>{maxWeight} kg</strong> per box &nbsp;·&nbsp;
+              Best for: {selectedBox.bestFor}
+            </p>
+            {values.cartons > 1 && (
+              <p className="mt-1 text-blue-600 font-medium">
+                {values.cartons} boxes × {maxWeight} kg = <strong>{totalWeight} kg total</strong>
+                &nbsp;({totalTons.toFixed(3)} t)
+              </p>
+            )}
+          </div>
+        )}
+
         {/* INPUTS */}
         <div className="grid grid-cols-2 gap-4">
           {/* WEIGHT */}
           <Input
-            label={`Weight (kg) (max ${maxWeight})`}
+            label={`Weight (kg)${selectedBox ? ` (max ${maxWeight})` : ""}`}
             type="number"
             step="0.01"
             leftIcon={<Scale size={16} />}
             {...register("weightKg", {
               valueAsNumber: true,
               required: "Weight is required",
+              min: { value: 0.1, message: "Weight must be greater than 0" },
               validate: (v) =>
-                v <= maxWeight || `Max allowed is ${maxWeight}kg`,
+                !selectedBox || v <= maxWeight || `Max allowed is ${maxWeight} kg`,
               onChange: (e) => {
                 const val = Number(e.target.value);
-                if (val > maxWeight) {
+                // Sync tons from kg
+                setValue("tons", parseFloat((val / 1000).toFixed(3)));
+                if (selectedBox && val > maxWeight) {
                   setValue("weightKg", maxWeight);
+                  setValue("tons", parseFloat(maxTons.toFixed(3)));
                 }
               },
             })}
@@ -317,7 +345,7 @@ export default function CreateQuoteModal({
 
           {/* TONS */}
           <Input
-            label={`Tons (max ${maxTons.toFixed(3)})`}
+            label={`Tons${selectedBox ? ` (max ${maxTons.toFixed(3)})` : ""}`}
             type="number"
             step="0.001"
             leftIcon={<Scale size={16} />}
@@ -325,18 +353,21 @@ export default function CreateQuoteModal({
               valueAsNumber: true,
               required: "Tons is required",
               validate: (v) =>
-                v <= maxTons || `Max allowed is ${maxTons.toFixed(3)}t`,
+                !selectedBox || v <= maxTons || `Max allowed is ${maxTons.toFixed(3)} t`,
               onChange: (e) => {
                 const val = Number(e.target.value);
-                if (val > maxTons) {
-                  setValue("tons", maxTons);
+                // Sync kg from tons
+                setValue("weightKg", parseFloat((val * 1000).toFixed(2)));
+                if (selectedBox && val > maxTons) {
+                  setValue("tons", parseFloat(maxTons.toFixed(3)));
+                  setValue("weightKg", maxWeight);
                 }
               },
             })}
             error={errors.tons?.message}
           />
 
-          {/* CARTONS / BOX QUANTITY */}
+          {/* NUMBER OF BOXES */}
           <Input
             label={values.boxDimensionId ? "Number of Boxes" : "Cartons"}
             type="number"
@@ -537,7 +568,17 @@ export default function CreateQuoteModal({
         </div>
 
         <div className="flex gap-3 w-full">
-          <Button type="button" className="flex-1">
+          <Button
+            type="button"
+            className="flex-1"
+            onClick={() => {
+              handleClose(false);
+              onCreateShipment?.({
+                fromCity: quote?.fromCity?.name ?? values.fromCity,
+                toCity:   quote?.toCity?.name   ?? values.toCity,
+              });
+            }}
+          >
             <Check size={16} /> Create Shipment
           </Button>
 
@@ -558,8 +599,8 @@ export default function CreateQuoteModal({
     <Dialog.Root open={isOpen} onOpenChange={handleClose}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-white rounded-2xl shadow-xl w-full max-w-xl p-6">
-          <div className="flex justify-between items-center mb-4">
+        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-white rounded-2xl shadow-xl w-full max-w-xl p-6 max-h-[90vh] flex flex-col">
+          <div className="flex justify-between items-center mb-4 shrink-0">
             <Dialog.Title className="text-lg font-semibold">
               Create Quote
             </Dialog.Title>
@@ -567,8 +608,10 @@ export default function CreateQuoteModal({
               <button className="text-gray-400 hover:text-black">✕</button>
             </Dialog.Close>
           </div>
-          <Stepper />
-          <form onSubmit={handleSubmit(onSubmit)}>
+          <div className="shrink-0">
+            <Stepper />
+          </div>
+          <form onSubmit={handleSubmit(onSubmit)} className="flex-1 overflow-y-auto pr-1">
             {step === 1 && <Step1 />}
             {step === 2 && <Step2 />}
             {step === 3 && <Step3 data={data as CreateQuoteResponse} />}

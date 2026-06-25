@@ -214,7 +214,7 @@ export const createClaimSchema = yup.object({
     .uuid("Shipment ID must be a valid UUID")
     .required("Shipment ID is required"),
 
-  type: yup.string().oneOf(["DAMAGE"], "Please select a valid type").required(),
+  type: yup.string().oneOf(["DAMAGE", "LOSS", "OTHER"], "Please select a valid claim type").required("Claim type is required"),
 
   description: yup
     .string()

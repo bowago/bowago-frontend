@@ -31,6 +31,7 @@ import {
   BookOpen,
   X,
   BarChart2,
+  MessageSquare,
 } from "lucide-react";
 
 const ICON_CLS = "w-4 h-4 flex-shrink-0";
@@ -149,6 +150,13 @@ const menuList: MenuItem[] = [
         href: "/dashboard/support/kpi",
         roles: ["ADMIN"],
         icon: <BarChart2 className={ICON_CLS} />,
+      },
+      // ── Sprint 6: Canned response library ──────────────────────────────
+      {
+        label: "Canned Responses",
+        href: "/dashboard/support/canned-responses",
+        roles: ["ADMIN"],
+        icon: <MessageSquare className={ICON_CLS} />,
       },
     ],
   },
@@ -481,7 +489,6 @@ export default function Sidebar({
 
               {/* Role badges */}
               <div className="flex flex-wrap gap-1 mt-2">
-                {/* Main role */}
                 <span
                   className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wide ${
                     user?.role === "ADMIN"
@@ -492,7 +499,6 @@ export default function Sidebar({
                   {user?.role ?? "CUSTOMER"}
                 </span>
 
-                {/* Sub role — only shown for admin users */}
                 {user?.role === "ADMIN" && user?.adminSubRole && (
                   <span
                     className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium capitalize ${

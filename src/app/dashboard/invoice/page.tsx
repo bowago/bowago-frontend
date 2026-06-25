@@ -1,18 +1,72 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import StatCard from "@/components/cards/StatCard";
-import { ChevronDown, LucideReceiptText, Wallet, Clock, RotateCcw, CheckCircle } from "lucide-react";
+import { ChevronDown, LucideReceiptText, Wallet, Clock, RotateCcw, CheckCircle, ShieldAlert } from "lucide-react";
 import InvoiceTableView from "@/components/layout/InvoiceTableView";
 import { useGetInvoiceFinancialOverviewQuery, useGetMyInvoiceSummaryQuery } from "@/store/slice/apiSlice";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
+import { useRouter } from "next/navigation";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - i);
+const MFA_SESSION_HOURS = 8; // must match backend MFA_SESSION_HOURS env
 
 const formatMoney = (amount = 0) =>
   new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 }).format(amount);
+
+// ─── Gap 5: 2FA Gate ──────────────────────────────────────────────────────────
+// Returns true if the current session satisfies the 2FA requirement:
+//   • User has 2FA disabled → always passes (no second factor to require)
+//   • User has 2FA enabled  → mfaVerifiedAt must be present and within MFA_SESSION_HOURS
+function useInvoiceMfaGate() {
+  const user    = useSelector((s: RootState) => s.auth.user) as any;
+  const mfaTs   = useSelector((s: RootState) => (s.auth as any).mfaVerifiedAt) as string | null;
+
+  // User has no 2FA configured — no gate needed
+  if (!user?.twoFactorEnabled) return { gated: false, reason: null };
+
+  if (!mfaTs) {
+    return { gated: true, reason: "mfa_required" };
+  }
+
+  const ageMs = Date.now() - new Date(mfaTs).getTime();
+  if (ageMs > MFA_SESSION_HOURS * 60 * 60 * 1000) {
+    return { gated: true, reason: "mfa_expired" };
+  }
+
+  return { gated: false, reason: null };
+}
+
+// ─── Blocked screen shown when 2FA is required ────────────────────────────────
+function MfaRequiredScreen({ reason }: { reason: string | null }) {
+  const router = useRouter();
+
+  const heading = reason === "mfa_expired"
+    ? "Session Expired"
+    : "Verification Required";
+
+  const body = reason === "mfa_expired"
+    ? `Your two-factor session has expired (sessions last ${MFA_SESSION_HOURS} hours). Please log in again and complete 2FA to access your invoices.`
+    : "Your account has two-factor authentication enabled. Please log in again and complete verification to access this page.";
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+      <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mb-5">
+        <ShieldAlert className="w-8 h-8 text-brand" />
+      </div>
+      <h2 className="text-xl font-bold text-gray-900 mb-2">{heading}</h2>
+      <p className="text-sm text-gray-500 max-w-sm mb-6">{body}</p>
+      <button
+        onClick={() => router.push("/auth/login")}
+        className="bg-brand hover:bg-red-700 text-white px-6 py-2.5 rounded-xl text-sm font-semibold transition-all"
+      >
+        Log in again
+      </button>
+    </div>
+  );
+}
 
 export default function Page() {
   const now = new Date();
@@ -21,16 +75,22 @@ export default function Page() {
   const [monthOpen, setMonthOpen] = useState(false);
   const [yearOpen, setYearOpen] = useState(false);
 
-  const user = useSelector((s: RootState) => s.auth.user) as any;
+  // Gap 5: enforce 2FA gate before rendering any invoice data
+  const { gated, reason } = useInvoiceMfaGate();
+
+  const user    = useSelector((s: RootState) => s.auth.user) as any;
   const isAdmin = user?.role === "ADMIN";
 
-  // Admin uses the full financial overview; customers use their own summary
-  const { data: adminData, isLoading: adminLoading } = useGetInvoiceFinancialOverviewQuery(undefined, { skip: !isAdmin });
-  const { data: customerData, isLoading: customerLoading } = useGetMyInvoiceSummaryQuery(undefined, { skip: isAdmin });
+  // Skip data fetching entirely if 2FA gate blocks access
+  const { data: adminData, isLoading: adminLoading }       = useGetInvoiceFinancialOverviewQuery(undefined, { skip: !isAdmin || gated });
+  const { data: customerData, isLoading: customerLoading } = useGetMyInvoiceSummaryQuery(undefined, { skip: isAdmin || gated });
 
-  const isLoading = isAdmin ? adminLoading : customerLoading;
-  const adminSummary = (adminData as any)?.data?.summary;
+  const isLoading  = isAdmin ? adminLoading : customerLoading;
+  const adminSummary    = (adminData as any)?.data?.summary;
   const customerSummary = (customerData as any)?.data?.summary;
+
+  // ─── Gate check ───────────────────────────────────────────────────────────
+  if (gated) return <MfaRequiredScreen reason={reason} />;
 
   return (
     <div className="pb-10">
@@ -82,7 +142,6 @@ export default function Page() {
 
           {/* Stats cards — role-aware */}
           {isAdmin ? (
-            /* Admin: platform-wide financials */
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
               <StatCard icon={<LucideReceiptText className="w-6 h-6 text-green-500" />} iconBg="bg-green-50"
                 value={isLoading ? "..." : formatMoney(adminSummary?.totalRevenueNaira)}
@@ -98,7 +157,6 @@ export default function Page() {
                 label="Paid Invoice Count" trend={0} withTrend={false} delay={240} />
             </div>
           ) : (
-            /* Customer: their own payment stats */
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
               <StatCard icon={<Wallet className="w-6 h-6 text-green-500" />} iconBg="bg-green-50"
                 value={isLoading ? "..." : formatMoney(customerSummary?.totalSpentNaira)}
