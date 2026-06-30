@@ -29,7 +29,7 @@ const addressChangeSchema = yup.object({
     .required("New address is required"),
   newRecipientCity: yup.string().trim().required("City is required"),
   newRecipientState: yup.string().trim().required("State is required"),
-  reason: yup.string().trim().optional(),
+  reason: yup.string().trim().optional().default(""),
 });
 
 type AddressChangeFormValues = yup.InferType<typeof addressChangeSchema>;
@@ -45,7 +45,8 @@ export const RequestAddressChangeForm = ({
   currentAddress,
   onSuccess,
 }: RequestAddressChangeFormProps) => {
-  const [requestAddressChange, { isLoading }] = useRequestAddressChangeMutation();
+  const [requestAddressChange, { isLoading }] =
+    useRequestAddressChangeMutation();
 
   const {
     register,
@@ -76,7 +77,8 @@ export const RequestAddressChangeForm = ({
     <form onSubmit={handleSubmit(onSubmit)}>
       {currentAddress && (
         <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mt-4 mb-1">
-          Current delivery address: <span className="font-medium text-gray-700">{currentAddress}</span>
+          Current delivery address:{" "}
+          <span className="font-medium text-gray-700">{currentAddress}</span>
         </p>
       )}
 
@@ -115,9 +117,10 @@ export const RequestAddressChangeForm = ({
       </div>
 
       <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-1">
-        ⚠ Your shipment will pause for admin review until this change is approved.
-        If approving the change moves your delivery to a new pricing zone, you may
-        be asked to acknowledge a price adjustment before dispatch continues.
+        ⚠ Your shipment will pause for admin review until this change is
+        approved. If approving the change moves your delivery to a new pricing
+        zone, you may be asked to acknowledge a price adjustment before dispatch
+        continues.
       </p>
 
       <div className="flex justify-end gap-2 mt-4">
