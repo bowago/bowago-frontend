@@ -257,6 +257,26 @@ export default function TwoFASetupSection() {
               </p>
             </div>
           </div>
+
+          {/* FIX: accounts that already had 2FA enabled (including before
+              this session-token fix shipped) had no way to refresh their
+              mfaVerifiedAt session — setup2FA used to refuse to send a code
+              once 2FA was already on. It now will, so this button lets
+              anyone re-verify on demand, e.g. right before visiting a
+              2FA-gated page like Invoices. */}
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+            <p className="text-sm font-medium text-amber-800 mb-1">
+              Accessing a secure page like Invoices?
+            </p>
+            <p className="text-xs text-amber-700 mb-3">
+              If you're being asked to verify again, request a fresh code below.
+            </p>
+            {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
+            <Button isLoading={setting} onClick={handleSetup} className="w-full">
+              Send Verification Code
+            </Button>
+          </div>
+
           <button
             onClick={() => {
               setStep("disable");

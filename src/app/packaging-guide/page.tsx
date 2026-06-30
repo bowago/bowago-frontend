@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Package, AlertTriangle, CheckCircle, XCircle, Info, Box, Shield } from "lucide-react";
+import PublicHeader from "@/components/layout/PublicHeader";
 
 const GUIDELINES = [
   {
@@ -85,29 +86,7 @@ export default function PackagingGuidePage() {
           style={{ background: "radial-gradient(circle, rgba(204,0,0,0.06) 0%, transparent 70%)" }} />
       </div>
 
-      {/* ── Navbar ── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-xl border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
-          <Link href="/">
-            <Image src="/bowago-logo.svg" alt="BowaGO" width={110} height={44} className="flex-shrink-0" />
-          </Link>
-          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-white/70">
-            <Link href="/#quote" className="hover:text-white transition-colors">Quote</Link>
-            <Link href="/track" className="hover:text-white transition-colors">Track</Link>
-            <Link href="/faq" className="hover:text-white transition-colors">FAQ</Link>
-            <Link href="/packaging-guide" className="text-white font-semibold">Packaging</Link>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link href="/auth/login" className="text-sm text-white/70 hover:text-white transition-colors hidden sm:block">
-              Login
-            </Link>
-            <Link href="/auth/signup"
-              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors">
-              Get Started
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <PublicHeader />
 
       {/* ── Hero ── */}
       <section className="pt-32 pb-16 px-4 text-center relative">

@@ -20,6 +20,7 @@ import {
   ArrowRight,
   Wifi,
   WifiOff,
+  Share2,
 } from "lucide-react";
 
 interface TrackerFormProps {
@@ -338,6 +339,25 @@ export function TrackingForm({
                   shipment.status.replace(/_/g, " ")}
               </span>
             </div>
+
+            {/* Sprint 4 DoD: share tracking link via WhatsApp */}
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(
+                `Track my BowaGO shipment ${shipment.trackingNumber}: ${
+                  typeof window !== "undefined" ? window.location.origin : ""
+                }/track?q=${shipment.trackingNumber}`,
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Share via WhatsApp"
+              className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition-colors mb-5 ${
+                dark
+                  ? "border-white/15 text-white/70 hover:text-white hover:border-white/30 hover:bg-white/5"
+                  : "border-white/20 text-white/90 hover:bg-white/10"
+              }`}
+            >
+              <Share2 className="w-3.5 h-3.5" /> Share via WhatsApp
+            </a>
 
             {/* Route */}
             <div

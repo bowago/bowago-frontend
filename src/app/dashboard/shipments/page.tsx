@@ -118,6 +118,21 @@ function AdminShipmentsList({
     );
   };
 
+  // PRD Sprint 6: "Admin can download a CSV report of all Delivered shipments
+  // for the previous month" — one-click shortcut instead of manually setting filters.
+  const handleExportLastMonthDelivered = () => {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
+    const now = new Date();
+    const firstOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const firstOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const qs = new URLSearchParams({
+      status: "DELIVERED",
+      fromDate: firstOfLastMonth.toISOString(),
+      toDate: firstOfThisMonth.toISOString(),
+    }).toString();
+    window.open(`${apiBase}/api/v1/shipments/export/csv?${qs}`, "_blank");
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3 items-end">
@@ -167,6 +182,15 @@ function AdminShipmentsList({
               className="flex items-center gap-1.5 border rounded-xl px-4 py-2 text-sm font-medium hover:bg-gray-50 transition-colors"
             >
               <Download className="w-4 h-4" /> Export CSV
+            </button>
+          )}
+          {canExport && (
+            <button
+              onClick={handleExportLastMonthDelivered}
+              title="Delivered shipments, previous calendar month"
+              className="flex items-center gap-1.5 border rounded-xl px-4 py-2 text-sm font-medium hover:bg-gray-50 transition-colors"
+            >
+              <Download className="w-4 h-4" /> Last Month (Delivered)
             </button>
           )}
           {canCreate && (
@@ -325,7 +349,7 @@ export default function ShipmentsPage() {
     "ROLE_DISPATCHER",
     "ROLE_MASTER",
   ].includes(subRole);
-  const canExport = ["SUPER_ADMIN", "LOGISTICS_MANAGER"].includes(subRole);
+  const canExport = ["SUPER_ADMIN", "LOGISTICS_MANAGER", "ROLE_ADMIN"].includes(subRole);
   const isReadOnly = ["ROLE_FINANCE", "ROLE_AGENT"].includes(subRole);
 
   // Page title personalised for org members

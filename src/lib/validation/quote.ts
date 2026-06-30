@@ -191,6 +191,15 @@ export const createTicketSchema = yup.object({
 
   shipmentId: yup
     .string()
+    .trim()
+    // FIX: CreateTicketForm sets a default value of "" for shipmentId (it's
+    // not a visible field in the UI). yup's .optional() only skips validation
+    // for `undefined`, not for an empty string — so .uuid() was still running
+    // against "" and failing every single submission with an invisible error
+    // (shipmentId has no rendered <input>, so the error never appeared on
+    // screen). This is why "the ticket system does not work": the form was
+    // silently blocked by react-hook-form before it ever called the API.
+    .transform((value) => (value === "" ? undefined : value))
     .uuid("Shipment ID must be a valid UUID")
     .optional(),
 

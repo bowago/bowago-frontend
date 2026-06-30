@@ -38,8 +38,8 @@ const ALL_ADMIN_SUBROLES = [
 ];
 const SUPER = ["SUPER_ADMIN","LOGISTICS_MANAGER"];
 const RATE_MANAGERS  = [...SUPER, "ROLE_ADMIN"];
-const OPS_ROLES      = [...SUPER, "ROLE_ADMIN", "ROLE_DISPATCHER", "ROLE_MASTER"];
-const FINANCE_ROLES  = [...SUPER, "ROLE_ADMIN", "ROLE_FINANCE"];
+const OPS_ROLES      = [...SUPER, "ROLE_ADMIN", "ROLE_DISPATCHER", "ROLE_MASTER", "ROLE_USER"];
+const FINANCE_ROLES  = [...SUPER, "ROLE_ADMIN", "ROLE_FINANCE", "ROLE_USER"];
 const TICKET_ROLES   = [...SUPER, "ROLE_ADMIN", "ROLE_AGENT"];
 const TEAM_ROLES     = [...SUPER, "ROLE_MASTER"];
 
@@ -105,6 +105,24 @@ const menuList: MenuItem[] = [
     href: "/dashboard/payment/webhooks",
     roles: ["ADMIN"],
     subRoles: SUPER,
+    icon: <AlertTriangle className={ICON_CLS} />,
+  },
+
+  // ── Address Changes (Sprint 5 — dispatcher reviews; ops roles) ────────────
+  {
+    label: "Address Changes",
+    href: "/dashboard/address-changes",
+    roles: ["ADMIN"],
+    subRoles: OPS_ROLES,
+    icon: <MapPin className={ICON_CLS} />,
+  },
+
+  // ── Delay Alerts (Sprint 5 — dispatcher sends batch delay notices) ────────
+  {
+    label: "Delay Alerts",
+    href: "/dashboard/delay-alerts",
+    roles: ["ADMIN"],
+    subRoles: OPS_ROLES,
     icon: <AlertTriangle className={ICON_CLS} />,
   },
 

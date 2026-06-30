@@ -25,7 +25,7 @@ import { format } from "date-fns";
 const ROLE_OPTIONS = [
   { value: "ROLE_DISPATCHER", label: "Dispatcher — Create & manage shipments" },
   { value: "ROLE_FINANCE", label: "Finance — View invoices & payments" },
-  { value: "ROLE_USER", label: "Viewer — Read-only access" },
+  { value: "ROLE_USER", label: "Viewer — Tracking Only (read-only)" },
   { value: "ROLE_MASTER", label: "Master — Manage team" },
   { value: "ROLE_ADMIN", label: "Admin — Full company access" },
 ];

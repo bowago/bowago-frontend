@@ -167,6 +167,7 @@ export const apiSlice = createApi({
     "DeliverySLA",
     "OrgInvite",
     "CannedResponse",
+    "AddressChange",
   ],
   baseQuery: baseQueryWithReauth,
   endpoints: (builder) => ({
@@ -1091,7 +1092,122 @@ export const apiSlice = createApi({
       },
       invalidatesTags: ["Claim"],
     }),
-    // useCreateFAQMutation
+
+    // ─── Sprint 5: Address Change Approval Workflow (frontend was missing) ───
+    // useRequestAddressChangeMutation
+    RequestAddressChange: builder.mutation<
+      unknown,
+      {
+        shipmentId: string;
+        newRecipientAddress: string;
+        newRecipientCity: string;
+        newRecipientState: string;
+        reason?: string;
+      }
+    >({
+      query: (body) => ({
+        url: "/address-changes",
+        method: "POST",
+        body,
+      }),
+      async onQueryStarted(_args, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) {
+            successToast("Address change request submitted — awaiting admin approval");
+          }
+        } catch (error) {
+          const errorM = error as CustomError;
+          errorToast(errorM.error?.data?.message || "Unexpected error");
+        }
+      },
+      invalidatesTags: ["AddressChange"],
+    }),
+
+    // useMyAddressChangeRequestsQuery
+    MyAddressChangeRequests: builder.query<unknown, void>({
+      query: () => ({ url: "/address-changes/my", method: "GET" }),
+      providesTags: ["AddressChange"],
+    }),
+
+    // useListAddressChangeRequestsQuery (Admin)
+    ListAddressChangeRequests: builder.query<
+      unknown,
+      { status?: string; page?: number } | void
+    >({
+      query: (params) => ({
+        url: "/address-changes",
+        method: "GET",
+        params: params ?? undefined,
+      }),
+      providesTags: ["AddressChange"],
+    }),
+
+    // useReviewAddressChangeMutation (Admin — approve/reject)
+    ReviewAddressChange: builder.mutation<
+      unknown,
+      { id: string; action: "APPROVE" | "REJECT"; reviewNote?: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/address-changes/${id}/review`,
+        method: "PATCH",
+        body,
+      }),
+      async onQueryStarted({ action }, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) {
+            successToast(
+              action === "APPROVE"
+                ? "Address change approved — customer notified"
+                : "Address change rejected — customer notified",
+            );
+          }
+        } catch (error) {
+          const errorM = error as CustomError;
+          errorToast(errorM.error?.data?.message || "Unexpected error");
+        }
+      },
+      invalidatesTags: ["AddressChange", "Shipment"],
+    }),
+
+    // ─── Sprint 5: Proactive batch Delay Alerts (frontend was missing) ───────
+    // useSendDelayAlertMutation
+    SendDelayAlert: builder.mutation<
+      unknown,
+      {
+        shipmentIds: string[];
+        reason: string;
+        newEstimatedDelivery?: string;
+        message?: string;
+      }
+    >({
+      query: (body) => ({
+        url: "/delay-alerts/send",
+        method: "POST",
+        body,
+      }),
+      async onQueryStarted(_args, { queryFulfilled }) {
+        try {
+          const { data } = (await queryFulfilled) as any;
+          const notified = data?.data?.results?.notified;
+          successToast(
+            typeof notified === "number"
+              ? `Delay alert sent to ${notified} customer${notified === 1 ? "" : "s"}`
+              : "Delay alert sent",
+          );
+        } catch (error) {
+          const errorM = error as CustomError;
+          errorToast(errorM.error?.data?.message || "Unexpected error");
+        }
+      },
+    }),
+
+    // useGetOverdueShipmentsQuery (Admin — candidates for delay alerts)
+    GetOverdueShipments: builder.query<unknown, void>({
+      query: () => ({ url: "/delay-alerts/overdue", method: "GET" }),
+    }),
+
     CreateFAQ: builder.mutation<unknown, CreateFAQFormData>({
       query: (formData) => ({
         url: "/faq",
@@ -1539,7 +1655,72 @@ export const apiSlice = createApi({
       },
       providesTags: ["Ticket"],
     }),
-    // useGetClaimsQuery — admin: all claims
+
+    // useGetMyTicketQuery — FIX: customer "My Tickets" page was calling
+    // GetAllTicket (admin-only /support/tickets, 403 for customers) instead
+    // of this endpoint. This is why every customer saw "Unable to load
+    // tickets" right after submitting one.
+    GetMyTicket: builder.query<unknown, { status?: string } | void>({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        if (params?.status) searchParams.append("status", params.status);
+        const qs = searchParams.toString();
+        return `/support/tickets/my${qs ? `?${qs}` : ""}`;
+      },
+      providesTags: ["Ticket"],
+    }),
+
+    // useGetTicketByIdQuery — full thread + customerContext (admin) for the ticket detail modal
+    GetTicketById: builder.query<unknown, string>({
+      query: (id) => `/support/tickets/${id}`,
+      providesTags: (_r, _e, id) => [{ type: "Ticket", id }],
+    }),
+
+    // useUpdateTicketMutation — Admin: assign / change status / change priority.
+    // Wires up what were previously "(TODO)" placeholder modals.
+    UpdateTicket: builder.mutation<
+      unknown,
+      { id: string; status?: string; assignedToId?: string; priority?: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/support/tickets/${id}`,
+        method: "PATCH",
+        body,
+      }),
+      async onQueryStarted(_args, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast("Ticket updated");
+        } catch (error) {
+          const errorM = error as CustomError;
+          errorToast(errorM.error?.data?.message || "Failed to update ticket");
+        }
+      },
+      invalidatesTags: ["Ticket"],
+    }),
+
+    // useReplyToTicketMutation — agent/customer reply on the ticket thread
+    ReplyToTicket: builder.mutation<
+      unknown,
+      { id: string; body: string; isInternal?: boolean }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/support/tickets/${id}/reply`,
+        method: "POST",
+        body,
+      }),
+      async onQueryStarted(_args, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast("Reply sent");
+        } catch (error) {
+          const errorM = error as CustomError;
+          errorToast(errorM.error?.data?.message || "Failed to send reply");
+        }
+      },
+      invalidatesTags: ["Ticket"],
+    }),
+
     GetClaims: builder.query<
       unknown,
       { status?: string; type?: string } | void
@@ -1719,11 +1900,12 @@ export const apiSlice = createApi({
       },
     }),
     // useGetUsersQuery
-    GetUsers: builder.query<any, { search?: string; role?: string } | void>({
+    GetUsers: builder.query<any, { search?: string; role?: string; adminSubRole?: string } | void>({
       query: (params) => {
         const searchParams = new URLSearchParams();
         if (params?.search) searchParams.append("search", params.search);
         if (params?.role) searchParams.append("role", params.role);
+        if (params?.adminSubRole) searchParams.append("adminSubRole", params.adminSubRole);
         const qs = searchParams.toString();
         return `/users${qs ? `?${qs}` : ""}`;
       },
@@ -2192,10 +2374,24 @@ export const apiSlice = createApi({
     Verify2FA: builder.mutation<any, { otp: string; method?: "EMAIL" | "SMS" }>(
       {
         query: (body) => ({ url: "/auth/verify-2fa", method: "POST", body }),
-        async onQueryStarted(_, { queryFulfilled }) {
+        async onQueryStarted(_, { dispatch, queryFulfilled }) {
           try {
             const { data } = await queryFulfilled;
             if (data) successToast("Two-factor authentication enabled");
+            // FIX: the backend now reissues tokens (carrying the mfaVerifiedAt
+            // claim requireRecentMFA checks) and the updated user object on
+            // setup confirmation. Without dispatching these, twoFactorEnabled
+            // stayed stale in redux (and in localStorage via redux-persist)
+            // until the next full login — so the Settings tab reverted to
+            // "choose a method" on refresh, and the Invoices page kept
+            // demanding 2FA even though it had just been enabled.
+            const userToken = {
+              accessToken: (data as any)?.data?.accessToken,
+              refreshToken: (data as any)?.data?.refreshToken,
+            };
+            if (userToken.accessToken) dispatch(authTokenChange(userToken));
+            if ((data as any)?.data?.user) dispatch(setUserData((data as any).data.user));
+            dispatch(setMfaVerified(new Date().toISOString()));
           } catch (e: any) {
             errorToast(e.error?.data?.message || "Verification failed");
           }
@@ -2205,10 +2401,11 @@ export const apiSlice = createApi({
     // useDisable2FAMutation
     Disable2FA: builder.mutation<any, { password: string }>({
       query: (body) => ({ url: "/auth/disable-2fa", method: "POST", body }),
-      async onQueryStarted(_, { queryFulfilled }) {
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
           if (data) successToast("Two-factor authentication disabled");
+          if ((data as any)?.data?.user) dispatch(setUserData((data as any).data.user));
         } catch (e: any) {
           errorToast(e.error?.data?.message || "Failed to disable 2FA");
         }
@@ -2663,6 +2860,10 @@ export const {
   useGetInvoiceFinancialOverviewQuery,
   useGetMyInvoiceSummaryQuery,
   useGetAllTicketQuery,
+  useGetMyTicketQuery,
+  useGetTicketByIdQuery,
+  useUpdateTicketMutation,
+  useReplyToTicketMutation,
   useGetClaimsQuery,
   useGetMyClaimsQuery,
   useGetClaimByIdQuery,
@@ -2752,4 +2953,11 @@ export const {
   useCreateCannedResponseMutation,
   useUpdateCannedResponseMutation,
   useDeleteCannedResponseMutation,
+  // Sprint 5: Address Changes & Delay Alerts
+  useRequestAddressChangeMutation,
+  useMyAddressChangeRequestsQuery,
+  useListAddressChangeRequestsQuery,
+  useReviewAddressChangeMutation,
+  useSendDelayAlertMutation,
+  useGetOverdueShipmentsQuery,
 } = apiSlice;

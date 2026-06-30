@@ -6,6 +6,7 @@ import { TrackingForm } from "@/components/form/TrackerForm";
 import Link from "next/link";
 import Image from "next/image";
 import { Package, Map, Bell, ArrowLeft, ArrowRight } from "lucide-react";
+import PublicHeader from "@/components/layout/PublicHeader";
 
 const features = [
   {
@@ -57,35 +58,7 @@ function TrackPageInner() {
         />
       </div>
 
-      {/* Navbar */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-xl border-b border-white/10">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3 group">
-            <ArrowLeft className="w-4 h-4 text-white/40 group-hover:text-white/70 transition-colors" />
-            <Image
-              src="/bowago-logo.svg"
-              alt="BowaGO"
-              width={100}
-              height={40}
-              loading="eager"
-            />
-          </Link>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/auth/login"
-              className="text-sm text-white/60 hover:text-white transition-colors hidden sm:block"
-            >
-              Login
-            </Link>
-            <Link
-              href="/auth/signup"
-              className="bg-brand hover:bg-red-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors"
-            >
-              Get Started
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <PublicHeader />
 
       {/* Hero */}
       <div className="relative pt-28 pb-12 px-4">

@@ -11,6 +11,7 @@ import {
 } from "@/store/slice/apiSlice";
 import CancelShipmentModal from "@/components/modals/CancelShipmentModal";
 import ViewShipmentModal from "@/components/modals/ViewShipmentModal";
+import RequestAddressChangeModal from "@/components/modals/RequestAddressChangeModal";
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 const STATUS_STYLES: Record<string, { label: string; className: string }> = {
@@ -180,6 +181,7 @@ function ShipmentActionCell({ shipment }: { shipment: Shipment }) {
   const [openViewModal, setOpenViewModal] = useState(false);
   const [openCancelModal, setOpenCancelModal] = useState(false);
   const [openMarkPaidModal, setOpenMarkPaidModal] = useState(false);
+  const [openAddressChangeModal, setOpenAddressChangeModal] = useState(false);
 
   const user = useSelector((s: RootState) => s.auth.user) as any;
   const isAdmin = user?.role === "ADMIN";
@@ -238,6 +240,16 @@ function ShipmentActionCell({ shipment }: { shipment: Shipment }) {
           View
         </button>
 
+        {/* Change Address (customer, only before PICKED_UP — per PRD Sprint 5) */}
+        {!isAdmin && !["PICKED_UP", "IN_TRANSIT", "OUT_FOR_DELIVERY", "DELIVERED", "FAILED", "CANCELLED", "RETURNED", "PENDING_ADMIN_REVIEW"].includes(shipment.status) && (
+          <button
+            onClick={() => setOpenAddressChangeModal(true)}
+            className="text-amber-600 border border-amber-400 px-2.5 py-1 rounded-md text-xs hover:bg-amber-50 transition-colors"
+          >
+            Change Address
+          </button>
+        )}
+
         {/* Cancel */}
         {!isTerminal && (
           <button
@@ -260,6 +272,14 @@ function ShipmentActionCell({ shipment }: { shipment: Shipment }) {
           shipmentId={shipment.id}
           isSuperAdmin={isSuperAdmin}
           onClose={() => setOpenMarkPaidModal(false)}
+        />
+      )}
+      {openAddressChangeModal && (
+        <RequestAddressChangeModal
+          isOpen={openAddressChangeModal}
+          setIsOpen={setOpenAddressChangeModal}
+          shipmentId={shipment.id}
+          currentAddress={`${shipment.recipientCity}`}
         />
       )}
     </>

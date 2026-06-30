@@ -1,5 +1,6 @@
 "use client";
 import FeaturedFAQs from "@/components/layout/FeaturedFAQs";
+import PublicHeader from "@/components/layout/PublicHeader";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -155,73 +156,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-black text-white overflow-x-hidden">
-      {/* ── Navbar ── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-xl border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
-          <Image
-            src="/bowago-logo.svg"
-            alt="BowaGO"
-            width={110}
-            height={44}
-            className="flex-shrink-0"
-          />
-          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-white/70">
-            <a href="#quote" className="hover:text-white transition-colors">
-              Quote
-            </a>
-            <a href="#track" className="hover:text-white transition-colors">
-              Track
-            </a>
-            <a href="#features" className="hover:text-white transition-colors">
-              Services
-            </a>
-            <Link href="/faq" className="hover:text-white transition-colors">
-              FAQ
-            </Link>
-          </div>
-          <div className="flex items-center gap-3">
-            {isAuthenticated ? (
-              <Link
-                href="/dashboard"
-                className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full border border-white/15 hover:border-white/30 bg-white/5 hover:bg-white/10 transition-colors"
-              >
-                {user?.avatar ? (
-                  <Image
-                    src={user.avatar}
-                    alt={user?.firstName ?? "Account"}
-                    width={32}
-                    height={32}
-                    className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-                  />
-                ) : (
-                  <span className="w-8 h-8 rounded-full bg-brand/20 text-brand flex items-center justify-center text-xs font-bold flex-shrink-0">
-                    {user?.firstName?.[0]}
-                    {user?.lastName?.[0]}
-                  </span>
-                )}
-                <span className="hidden sm:block text-sm font-medium text-white/90">
-                  Dashboard
-                </span>
-              </Link>
-            ) : (
-              <>
-                <Link
-                  href="/auth/login"
-                  className="text-sm text-white/70 hover:text-white transition-colors hidden sm:block"
-                >
-                  Login
-                </Link>
-                <Link
-                  href="/auth/signup"
-                  className="bg-brand hover:bg-red-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors"
-                >
-                  Get Started
-                </Link>
-              </>
-            )}
-          </div>
-        </div>
-      </nav>
+      <PublicHeader />
 
       {/* ── Hero ── */}
       <section className="relative pt-24 md:pt-32 pb-20 px-4 overflow-hidden">

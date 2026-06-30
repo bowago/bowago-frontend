@@ -1,9 +1,11 @@
 "use client";
 
 import { AppTable } from "@/components/table/Table";
-import { useGetAllTicketQuery } from "@/store/slice/apiSlice";
+import { useGetAllTicketQuery, useGetMyTicketQuery } from "@/store/slice/apiSlice";
 import { Filter } from "lucide-react";
 import { useState } from "react";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store/store";
 import {
   Ticket,
   TicketColumns,
@@ -37,9 +39,18 @@ export default function TicketTableView() {
 
   const [appliedFilters, setAppliedFilters] = useState(filters);
 
-  const { data, isLoading, isError } = useGetAllTicketQuery({
-    status: appliedFilters.status || undefined,
-  });
+  const user = useSelector((s: RootState) => s.auth.user) as any;
+  const isAdmin = user?.role === "ADMIN";
+
+  const adminQuery = useGetAllTicketQuery(
+    { status: appliedFilters.status || undefined },
+    { skip: !isAdmin },
+  );
+  const customerQuery = useGetMyTicketQuery(
+    { status: appliedFilters.status || undefined },
+    { skip: isAdmin },
+  );
+  const { data, isLoading, isError } = isAdmin ? adminQuery : customerQuery;
   const tickets = getTickets(data as TicketsResponse | undefined);
 
   // Apply filtering only using appliedFilters

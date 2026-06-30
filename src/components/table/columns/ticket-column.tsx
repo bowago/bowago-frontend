@@ -4,8 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog/dialog";
 import { ColumnDef } from "@tanstack/react-table";
 import { useState } from "react";
-import { Eye, MoreHorizontal } from "lucide-react";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store/store";
+import { Eye, MoreHorizontal, Loader2 } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
+import {
+  useUpdateTicketMutation,
+  useGetUsersQuery,
+  useGetTicketByIdQuery,
+  useReplyToTicketMutation,
+} from "@/store/slice/apiSlice";
 /* ───────────────── TYPES ───────────────── */
 
 export type TicketCategory =
@@ -30,7 +38,7 @@ export type Ticket = {
   id: string;
   subject: string;
   category: TicketCategory;
-  trackingNumber: string;
+  trackingNumber: string | null;
   priority: TicketPriority;
   status: TicketStatus;
   email: string;
@@ -138,7 +146,7 @@ export const TicketColumns: ColumnDef<Ticket>[] = [
     header: "Tracking No.",
     cell: ({ row }) => (
       <span className="font-mono text-xs text-gray-500">
-        {row.getValue<string>("trackingNumber")}
+        {row.getValue<string | null>("trackingNumber") || "—"}
       </span>
     ),
   },
@@ -176,6 +184,8 @@ export const TicketColumns: ColumnDef<Ticket>[] = [
     header: "Action",
     cell: ({ row }) => {
       const ticket = row.original;
+      const user = useSelector((s: RootState) => s.auth.user) as any;
+      const isAdmin = user?.role === "ADMIN";
 
       const [isDetailsOpen, setIsDetailsOpen] = useState(false);
       const [isAssignOpen, setIsAssignOpen] = useState(false);
@@ -192,74 +202,88 @@ export const TicketColumns: ColumnDef<Ticket>[] = [
             <Eye size={16} />
           </button>
 
-          {/* ⋯ MORE ACTIONS */}
-          <Popover.Root>
-            <Popover.Trigger asChild>
-              <button className="p-2 rounded-md border text-gray-500 hover:bg-gray-50">
-                <MoreHorizontal size={16} />
-              </button>
-            </Popover.Trigger>
-
-            <Popover.Content
-              align="end"
-              sideOffset={6}
-              className="bg-white rounded-lg shadow-lg border w-44 p-1 z-50"
-            >
-              <div className="flex flex-col text-sm">
-                {/* ASSIGN */}
-                <button
-                  onClick={() => setIsAssignOpen(true)}
-                  className="px-3 py-2 text-left hover:bg-gray-50 rounded-md"
-                >
-                  Assign Ticket
+          {/* ⋯ MORE ACTIONS (admin only — assign/status/priority are admin operations) */}
+          {isAdmin && (
+            <Popover.Root>
+              <Popover.Trigger asChild>
+                <button className="p-2 rounded-md border text-gray-500 hover:bg-gray-50">
+                  <MoreHorizontal size={16} />
                 </button>
+              </Popover.Trigger>
 
-                {/* STATUS */}
-                <button
-                  onClick={() => setIsStatusOpen(true)}
-                  className="px-3 py-2 text-left hover:bg-gray-50 rounded-md"
-                >
-                  Update Status
-                </button>
-
-                {/* PRIORITY */}
-                <button
-                  onClick={() => setIsPriorityOpen(true)}
-                  className="px-3 py-2 text-left hover:bg-gray-50 rounded-md"
-                >
-                  Update Priority
-                </button>
-              </div>
-            </Popover.Content>
-          </Popover.Root>
+              <Popover.Content
+                align="end"
+                sideOffset={6}
+                className="bg-white rounded-lg shadow-lg border w-44 p-1 z-50"
+              >
+                <div className="flex flex-col text-sm">
+                  <button
+                    onClick={() => setIsAssignOpen(true)}
+                    className="px-3 py-2 text-left hover:bg-gray-50 rounded-md"
+                  >
+                    Assign Ticket
+                  </button>
+                  <button
+                    onClick={() => setIsStatusOpen(true)}
+                    className="px-3 py-2 text-left hover:bg-gray-50 rounded-md"
+                  >
+                    Update Status
+                  </button>
+                  <button
+                    onClick={() => setIsPriorityOpen(true)}
+                    className="px-3 py-2 text-left hover:bg-gray-50 rounded-md"
+                  >
+                    Update Priority
+                  </button>
+                </div>
+              </Popover.Content>
+            </Popover.Root>
+          )}
 
           {/* ───── MODALS ───── */}
 
           {/* VIEW */}
           <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-            <DialogContent>
-              <TicketDetails ticket={ticket} />
+            <DialogContent size="lg">
+              {isDetailsOpen && <TicketDetails ticketId={ticket.id} />}
             </DialogContent>
           </Dialog>
 
           {/* ASSIGN */}
           <Dialog open={isAssignOpen} onOpenChange={setIsAssignOpen}>
             <DialogContent>
-              <div className="p-6 text-center">Assign Ticket (TODO)</div>
+              <AssignTicketForm
+                ticketId={ticket.id}
+                onDone={() => setIsAssignOpen(false)}
+              />
             </DialogContent>
           </Dialog>
 
           {/* STATUS */}
           <Dialog open={isStatusOpen} onOpenChange={setIsStatusOpen}>
             <DialogContent>
-              <div className="p-6 text-center">Update Status (TODO)</div>
+              <UpdateTicketFieldForm
+                ticketId={ticket.id}
+                field="status"
+                currentValue={ticket.status}
+                options={["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED", "ESCALATED"]}
+                title="Update Status"
+                onDone={() => setIsStatusOpen(false)}
+              />
             </DialogContent>
           </Dialog>
 
           {/* PRIORITY */}
           <Dialog open={isPriorityOpen} onOpenChange={setIsPriorityOpen}>
             <DialogContent>
-              <div className="p-6 text-center">Update Priority (TODO)</div>
+              <UpdateTicketFieldForm
+                ticketId={ticket.id}
+                field="priority"
+                currentValue={ticket.priority}
+                options={["LOW", "NORMAL", "HIGH", "URGENT"]}
+                title="Update Priority"
+                onDone={() => setIsPriorityOpen(false)}
+              />
             </DialogContent>
           </Dialog>
         </div>
@@ -268,31 +292,292 @@ export const TicketColumns: ColumnDef<Ticket>[] = [
   },
 ];
 
-/* ───────────────── DETAILS ───────────────── */
+/* ───────────────── ASSIGN / STATUS / PRIORITY FORMS ─────────────────
+ * FIX: these were "(TODO)" placeholders that did nothing. Now wired to
+ * PATCH /support/tickets/:id via useUpdateTicketMutation.
+ */
 
-const TicketDetails = ({ ticket }: { ticket: Ticket }) => {
-  const rows: [string, string][] = [
-    ["Subject", ticket.subject],
-    ["User", ticket.username],
-    ["Email", ticket.email],
-    ["Tracking No.", ticket.trackingNumber],
-    ["Category", formatText(ticket.category)],
-    ["Priority", formatText(ticket.priority)],
-    ["Status", formatText(ticket.status)],
-  ];
+const AssignTicketForm = ({
+  ticketId,
+  onDone,
+}: {
+  ticketId: string;
+  onDone: () => void;
+}) => {
+  const [selected, setSelected] = useState("");
+  const [updateTicket, { isLoading }] = useUpdateTicketMutation();
+  // Agents are admin users with the ROLE_AGENT sub-role (matches backend's
+  // auto-assignment logic in support.controller.js::autoAssignTicket)
+  const { data, isLoading: loadingAgents } = useGetUsersQuery({
+    role: "ADMIN",
+    adminSubRole: "ROLE_AGENT",
+  });
+  const agents: any[] = (data as any)?.data?.users ?? (data as any)?.users ?? [];
+
+  const handleAssign = async () => {
+    if (!selected) return;
+    try {
+      await updateTicket({ id: ticketId, assignedToId: selected }).unwrap();
+      onDone();
+    } catch {
+      // error toast already shown by the mutation
+    }
+  };
 
   return (
     <div className="p-6">
-      <h2 className="text-lg font-semibold mb-4">Ticket Details</h2>
+      <h2 className="text-lg font-semibold mb-4">Assign Ticket</h2>
+      {loadingAgents ? (
+        <div className="flex items-center gap-2 text-sm text-gray-500 py-4">
+          <Loader2 className="w-4 h-4 animate-spin" /> Loading agents...
+        </div>
+      ) : agents.length === 0 ? (
+        <p className="text-sm text-gray-400 py-4">
+          No support agents found. Add a user with the Agent role first.
+        </p>
+      ) : (
+        <select
+          value={selected}
+          onChange={(e) => setSelected(e.target.value)}
+          className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm mb-4"
+        >
+          <option value="">Select an agent</option>
+          {agents.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.firstName} {a.lastName} ({a.email})
+            </option>
+          ))}
+        </select>
+      )}
+      <Button
+        className="w-full"
+        isLoading={isLoading}
+        disabled={!selected}
+        onClick={handleAssign}
+      >
+        Assign
+      </Button>
+    </div>
+  );
+};
 
-      <div className="space-y-2">
-        {rows.map(([label, value]) => (
-          <div key={label} className="flex justify-between text-sm">
-            <span className="text-gray-500">{label}</span>
-            <span className="font-medium">{value}</span>
-          </div>
+const UpdateTicketFieldForm = ({
+  ticketId,
+  field,
+  currentValue,
+  options,
+  title,
+  onDone,
+}: {
+  ticketId: string;
+  field: "status" | "priority";
+  currentValue: string;
+  options: string[];
+  title: string;
+  onDone: () => void;
+}) => {
+  const [value, setValue] = useState(currentValue);
+  const [updateTicket, { isLoading }] = useUpdateTicketMutation();
+
+  const handleUpdate = async () => {
+    try {
+      await updateTicket({ id: ticketId, [field]: value } as any).unwrap();
+      onDone();
+    } catch {
+      // error toast already shown by the mutation
+    }
+  };
+
+  return (
+    <div className="p-6">
+      <h2 className="text-lg font-semibold mb-4">{title}</h2>
+      <select
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm mb-4"
+      >
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {formatText(o)}
+          </option>
         ))}
+      </select>
+      <Button className="w-full" isLoading={isLoading} onClick={handleUpdate}>
+        Save
+      </Button>
+    </div>
+  );
+};
+
+/* ───────────────── DETAILS (thread + reply + customer context) ───────────────── */
+
+const formatNaira = (kobo?: number | null) =>
+  typeof kobo === "number" ? `₦${(kobo / 100).toLocaleString()}` : "—";
+
+const formatDate = (d?: string | null) =>
+  d ? new Date(d).toLocaleString("en-NG", { dateStyle: "medium", timeStyle: "short" }) : "—";
+
+const TicketDetails = ({ ticketId }: { ticketId: string }) => {
+  const currentUser = useSelector((s: RootState) => s.auth.user) as any;
+  const isAdmin = currentUser?.role === "ADMIN";
+
+  const { data, isLoading, isError } = useGetTicketByIdQuery(ticketId);
+  const [replyToTicket, { isLoading: isReplying }] = useReplyToTicketMutation();
+
+  const [replyBody, setReplyBody] = useState("");
+  const [isInternal, setIsInternal] = useState(false);
+
+  const payload: any = (data as any)?.data ?? data ?? {};
+  const ticket = payload.ticket;
+  const customerContext = payload.customerContext;
+
+  const handleReply = async () => {
+    if (!replyBody.trim()) return;
+    try {
+      await replyToTicket({ id: ticketId, body: replyBody, isInternal }).unwrap();
+      setReplyBody("");
+      setIsInternal(false);
+    } catch {
+      // error toast already shown by the mutation
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-6 flex items-center gap-2 text-sm text-gray-500">
+        <Loader2 className="w-4 h-4 animate-spin" /> Loading ticket...
       </div>
+    );
+  }
+
+  if (isError || !ticket) {
+    return <div className="p-6 text-sm text-red-500">Unable to load ticket.</div>;
+  }
+
+  return (
+    <div className="p-6">
+      <h2 className="text-lg font-semibold mb-1">{ticket.subject}</h2>
+      <div className="flex flex-wrap gap-2 mb-4">
+        <CategoryBadge category={ticket.category} />
+        <PriorityBadge priority={ticket.priority} />
+        <StatusBadge status={ticket.status} />
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 text-sm mb-5 bg-gray-50 rounded-lg p-3">
+        <div><span className="text-gray-500">Customer: </span>{ticket.username || "—"}</div>
+        <div><span className="text-gray-500">Email: </span>{ticket.email || "—"}</div>
+        <div><span className="text-gray-500">Tracking No.: </span>{ticket.trackingNumber || "—"}</div>
+        <div>
+          <span className="text-gray-500">Assigned to: </span>
+          {ticket.assignedTo ? `${ticket.assignedTo.firstName} ${ticket.assignedTo.lastName}` : "Unassigned"}
+        </div>
+      </div>
+
+      {/* Agent-only: customer context card — last 5 shipments + payments */}
+      {isAdmin && customerContext && (
+        <div className="mb-5 border border-gray-200 rounded-lg p-3">
+          <h3 className="text-sm font-semibold mb-2">Customer Context</h3>
+          <div className="text-xs text-gray-500 mb-1">Last 5 shipments</div>
+          {customerContext.recentShipments?.length ? (
+            <div className="space-y-1 mb-3">
+              {customerContext.recentShipments.map((s: any, i: number) => (
+                <div key={i} className="flex justify-between text-xs bg-gray-50 rounded px-2 py-1.5">
+                  <span className="font-mono">{s.trackingNumber}</span>
+                  <span>{formatText(s.status)}</span>
+                  <span>{formatNaira(s.quotedPrice)}</span>
+                  <span className="text-gray-400">{formatDate(s.createdAt)}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-xs text-gray-400 mb-3">No shipments yet.</div>
+          )}
+          <div className="text-xs text-gray-500 mb-1">Last 5 payments</div>
+          {customerContext.recentPayments?.length ? (
+            <div className="space-y-1">
+              {customerContext.recentPayments.map((p: any, i: number) => (
+                <div key={i} className="flex justify-between text-xs bg-gray-50 rounded px-2 py-1.5">
+                  <span className="font-mono">{p.reference}</span>
+                  <span>{formatText(p.status)}</span>
+                  <span>{formatNaira(p.amountKobo)}</span>
+                  <span className="text-gray-400">{formatDate(p.paidAt)}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-xs text-gray-400">No payments yet.</div>
+          )}
+        </div>
+      )}
+
+      {/* Message thread */}
+      <div className="mb-4">
+        <h3 className="text-sm font-semibold mb-2">Conversation</h3>
+        <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+          {ticket.messages?.length ? (
+            ticket.messages.map((m: any) => {
+              const isMine = m.senderId === currentUser?.id;
+              const isCustomerMsg = m.senderId === ticket.customerId;
+              return (
+                <div
+                  key={m.id}
+                  className={`rounded-lg px-3 py-2 text-sm max-w-[85%] ${
+                    m.isInternal
+                      ? "bg-yellow-50 border border-yellow-200 ml-auto"
+                      : isCustomerMsg
+                        ? "bg-gray-100"
+                        : "bg-brand/10 ml-auto"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3 mb-1">
+                    <span className="text-xs font-medium text-gray-600">
+                      {isMine ? "You" : isCustomerMsg ? "Customer" : "Agent"}
+                      {m.isInternal && " · Internal note"}
+                    </span>
+                    <span className="text-[10px] text-gray-400">{formatDate(m.createdAt)}</span>
+                  </div>
+                  <div className="whitespace-pre-wrap">{m.body}</div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="text-xs text-gray-400">No messages yet.</div>
+          )}
+        </div>
+      </div>
+
+      {/* Reply box */}
+      {ticket.status !== "CLOSED" && (
+        <div className="border-t pt-3">
+          <textarea
+            value={replyBody}
+            onChange={(e) => setReplyBody(e.target.value)}
+            placeholder="Write a reply..."
+            rows={3}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none mb-2"
+          />
+          <div className="flex items-center justify-between">
+            {isAdmin && (
+              <label className="flex items-center gap-2 text-xs text-gray-500">
+                <input
+                  type="checkbox"
+                  checked={isInternal}
+                  onChange={(e) => setIsInternal(e.target.checked)}
+                />
+                Internal note (hidden from customer)
+              </label>
+            )}
+            <Button
+              className="ml-auto"
+              isLoading={isReplying}
+              disabled={!replyBody.trim()}
+              onClick={handleReply}
+            >
+              Send Reply
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

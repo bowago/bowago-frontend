@@ -679,6 +679,7 @@ export default function CreateShipmentModal({
   const hasInsurance = useWatch({ control, name: "hasInsurance" });
 
   // Live zone lookup — fires whenever both cities are selected (including same city = Zone 1)
+  const watchedPickupDate = useWatch({ control, name: "pickupDate" });
   const watchedOrigin = useWatch({ control, name: "originCity" });
   const watchedDest = useWatch({ control, name: "destinationCity" });
   const canLookupZone = !!(watchedOrigin && watchedDest);
@@ -850,7 +851,7 @@ export default function CreateShipmentModal({
                     {(() => {
                       const now = new Date();
                       const isToday = (() => {
-                        const pd = getValues("pickupDate");
+                        const pd = watchedPickupDate;
                         if (!pd) return false;
                         const d = new Date(pd);
                         return d.toDateString() === now.toDateString();

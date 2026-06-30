@@ -60,9 +60,13 @@ export const AddTicketForm = ({ onSuccess }: AddTicketFormProps) => {
   });
 
   const onSubmit = async (data: TicketFormValues) => {
-    await createTicket(data as any).unwrap();
-    reset();
-    onSuccess?.();
+    try {
+      await createTicket(data as any).unwrap();
+      reset();
+      onSuccess?.();
+    } catch {
+      // Error toast already shown by useCreateTicketMutation's onQueryStarted
+    }
   };
 
   return (
