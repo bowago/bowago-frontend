@@ -4,11 +4,15 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store/store";
 import {
   useGetCitiesQuery,
   useGetDimensionsQuery,
   useCreateQuoteMutation,
 } from "@/store/slice/apiSlice";
+import { saveShipmentDraft } from "@/lib/shipmentDraft";
+import LandingAuthModal from "@/components/modals/LandingAuthModal";
 import {
   Loader2,
   Truck,
@@ -45,6 +49,17 @@ export default function LandingPage() {
   const [boxQuantity, setBoxQuantity] = useState("1");
   const [serviceType, setServiceType] = useState("STANDARD");
   const [quoteResult, setQuoteResult] = useState<any>(null);
+  // Custom dimension toggle — hidden until the user explicitly opts in
+  const [useCustomDimension, setUseCustomDimension] = useState(false);
+  const [customLength, setCustomLength] = useState("");
+  const [customWidth, setCustomWidth] = useState("");
+  const [customHeight, setCustomHeight] = useState("");
+  const [customWeight, setCustomWeight] = useState("");
+
+  const user = useSelector((s: RootState) => s.auth.user) as any;
+  const accessToken = useSelector((s: RootState) => s.auth.accessToken);
+  const isAuthenticated = !!accessToken && !!user;
+  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -65,18 +80,32 @@ export default function LandingPage() {
   const handleQuote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fromCity || !toCity) return;
-    if (!boxDimensionId && !weight) return;
+
+    const isCustom = useCustomDimension && !boxDimensionId;
+    if (
+      isCustom &&
+      (!customLength || !customWidth || !customHeight || !customWeight)
+    )
+      return;
+    if (!isCustom && !boxDimensionId && !weight) return;
 
     try {
       const result = await createQuote({
         fromCity,
         toCity,
-        weightKg: boxDimensionId ? 0 : parseFloat(weight),
+        weightKg: boxDimensionId
+          ? 0
+          : isCustom
+            ? parseFloat(customWeight)
+            : parseFloat(weight),
         tons: 0,
         cartons: boxDimensionId
           ? Math.max(1, parseInt(boxQuantity || "1", 10))
           : 1,
-        boxDimensionId,
+        boxDimensionId: isCustom ? undefined : boxDimensionId,
+        customLength: isCustom ? parseFloat(customLength) : undefined,
+        customWidth: isCustom ? parseFloat(customWidth) : undefined,
+        customHeight: isCustom ? parseFloat(customHeight) : undefined,
         serviceType,
       }).unwrap();
       setQuoteResult((result as any)?.data?.quote ?? (result as any)?.data);
@@ -151,18 +180,45 @@ export default function LandingPage() {
             </Link>
           </div>
           <div className="flex items-center gap-3">
-            <Link
-              href="/auth/login"
-              className="text-sm text-white/70 hover:text-white transition-colors hidden sm:block"
-            >
-              Login
-            </Link>
-            <Link
-              href="/auth/signup"
-              className="bg-brand hover:bg-red-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors"
-            >
-              Get Started
-            </Link>
+            {isAuthenticated ? (
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full border border-white/15 hover:border-white/30 bg-white/5 hover:bg-white/10 transition-colors"
+              >
+                {user?.avatar ? (
+                  <Image
+                    src={user.avatar}
+                    alt={user?.firstName ?? "Account"}
+                    width={32}
+                    height={32}
+                    className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                  />
+                ) : (
+                  <span className="w-8 h-8 rounded-full bg-brand/20 text-brand flex items-center justify-center text-xs font-bold flex-shrink-0">
+                    {user?.firstName?.[0]}
+                    {user?.lastName?.[0]}
+                  </span>
+                )}
+                <span className="hidden sm:block text-sm font-medium text-white/90">
+                  Dashboard
+                </span>
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/auth/login"
+                  className="text-sm text-white/70 hover:text-white transition-colors hidden sm:block"
+                >
+                  Login
+                </Link>
+                <Link
+                  href="/auth/signup"
+                  className="bg-brand hover:bg-red-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors"
+                >
+                  Get Started
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </nav>
@@ -328,42 +384,83 @@ export default function LandingPage() {
                     </div>
                   ))}
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs text-white/50 mb-1.5">
-                      Box Type (optional)
-                    </label>
-                    <select
-                      value={boxDimensionId}
-                      onChange={(e) => setBoxDimensionId(e.target.value)}
-                      className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-3 py-2.5 text-sm focus:border-brand/60 transition-all [&>option]:bg-gray-900 [&>option]:text-white"
-                    >
-                      <option value="">No box — enter weight</option>
-                      {dimensions.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.displayName} (max {d.weightKgLimit}kg · {d.bestFor}
-                          )
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  {boxDimensionId ? (
+                <div className="flex items-center justify-between border-2 border-white/15 rounded-xl px-3 py-2.5 bg-white/5">
+                  <label className="block text-xs text-white/70 font-medium">
+                    Package Size
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUseCustomDimension((v) => !v);
+                      setBoxDimensionId("");
+                    }}
+                    className="text-[11px] text-brand hover:text-red-400 font-bold transition-colors underline underline-offset-2"
+                  >
+                    {useCustomDimension
+                      ? "Use a predefined box instead"
+                      : "Enter custom dimensions instead"}
+                  </button>
+                </div>
+
+                {!useCustomDimension && (
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs text-white/50 mb-1.5">
-                        Number of Boxes
+                        Box Type (optional)
                       </label>
-                      <input
-                        type="number"
-                        step="1"
-                        min="1"
-                        value={boxQuantity}
-                        onChange={(e) => setBoxQuantity(e.target.value)}
-                        placeholder="e.g. 1"
-                        required
-                        className="w-full bg-white/10 border border-white/20 text-white placeholder-white/30 rounded-xl px-3 py-2.5 text-sm focus:border-brand/60 transition-all"
-                      />
+                      <select
+                        value={boxDimensionId}
+                        onChange={(e) => setBoxDimensionId(e.target.value)}
+                        className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-3 py-2.5 text-sm focus:border-brand/60 transition-all [&>option]:bg-gray-900 [&>option]:text-white"
+                      >
+                        <option value="">No box — enter weight</option>
+                        {dimensions.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.displayName} (max {d.weightKgLimit}kg ·{" "}
+                            {d.bestFor})
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                  ) : (
+                    {boxDimensionId ? (
+                      <div>
+                        <label className="block text-xs text-white/50 mb-1.5">
+                          Number of Boxes
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          min="1"
+                          value={boxQuantity}
+                          onChange={(e) => setBoxQuantity(e.target.value)}
+                          placeholder="e.g. 1"
+                          required
+                          className="w-full bg-white/10 border border-white/20 text-white placeholder-white/30 rounded-xl px-3 py-2.5 text-sm focus:border-brand/60 transition-all"
+                        />
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="block text-xs text-white/50 mb-1.5">
+                          Weight (kg)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0.1"
+                          value={weight}
+                          onChange={(e) => setWeight(e.target.value)}
+                          placeholder="e.g. 5"
+                          required
+                          className="w-full bg-white/10 border border-white/20 text-white placeholder-white/30 rounded-xl px-3 py-2.5 text-sm focus:border-brand/60 transition-all"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Custom dimensions — hidden until the user toggles this on */}
+                {useCustomDimension && (
+                  <div className="grid grid-cols-2 gap-3 border-2 border-brand/40 bg-brand/10 rounded-xl p-3">
                     <div>
                       <label className="block text-xs text-white/50 mb-1.5">
                         Weight (kg)
@@ -372,15 +469,60 @@ export default function LandingPage() {
                         type="number"
                         step="0.1"
                         min="0.1"
-                        value={weight}
-                        onChange={(e) => setWeight(e.target.value)}
+                        value={customWeight}
+                        onChange={(e) => setCustomWeight(e.target.value)}
                         placeholder="e.g. 5"
                         required
                         className="w-full bg-white/10 border border-white/20 text-white placeholder-white/30 rounded-xl px-3 py-2.5 text-sm focus:border-brand/60 transition-all"
                       />
                     </div>
-                  )}
-                </div>
+                    <div>
+                      <label className="block text-xs text-white/50 mb-1.5">
+                        Length (cm)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        value={customLength}
+                        onChange={(e) => setCustomLength(e.target.value)}
+                        placeholder="e.g. 40"
+                        required
+                        className="w-full bg-white/10 border border-white/20 text-white placeholder-white/30 rounded-xl px-3 py-2.5 text-sm focus:border-brand/60 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-white/50 mb-1.5">
+                        Width (cm)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        value={customWidth}
+                        onChange={(e) => setCustomWidth(e.target.value)}
+                        placeholder="e.g. 30"
+                        required
+                        className="w-full bg-white/10 border border-white/20 text-white placeholder-white/30 rounded-xl px-3 py-2.5 text-sm focus:border-brand/60 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-white/50 mb-1.5">
+                        Height (cm)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        value={customHeight}
+                        onChange={(e) => setCustomHeight(e.target.value)}
+                        placeholder="e.g. 20"
+                        required
+                        className="w-full bg-white/10 border border-white/20 text-white placeholder-white/30 rounded-xl px-3 py-2.5 text-sm focus:border-brand/60 transition-all"
+                      />
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs text-white/50 mb-1.5">
@@ -430,24 +572,35 @@ export default function LandingPage() {
                       </p>
                     )}
                     {/* Gap 2: show pricing mode badge for enterprise/promo users */}
-                    {quoteResult.pricingMode && quoteResult.pricingMode !== "STANDARD" && (
-                      <span className={`inline-block mt-2 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
-                        quoteResult.pricingMode === "CONTRACT"
-                          ? "bg-green-500/20 text-green-400"
-                          : "bg-yellow-500/20 text-yellow-400"
-                      }`}>
-                        {quoteResult.pricingMode === "CONTRACT" ? "Enterprise Rate Applied" : "Promo Rate Applied"}
-                      </span>
-                    )}
+                    {quoteResult.pricingMode &&
+                      quoteResult.pricingMode !== "STANDARD" && (
+                        <span
+                          className={`inline-block mt-2 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
+                            quoteResult.pricingMode === "CONTRACT"
+                              ? "bg-green-500/20 text-green-400"
+                              : "bg-yellow-500/20 text-yellow-400"
+                          }`}
+                        >
+                          {quoteResult.pricingMode === "CONTRACT"
+                            ? "Enterprise Rate Applied"
+                            : "Promo Rate Applied"}
+                        </span>
+                      )}
                   </div>
 
                   {/* Gap 1: always show Base Price line item, then surcharges */}
                   <div className="space-y-1 mb-3">
                     {/* Base price — derived from breakdown or pricing struct */}
-                    {(quoteResult.breakdown?.finalBasePrice != null || quoteResult.pricing?.basePriceNaira != null) && (
+                    {(quoteResult.breakdown?.finalBasePrice != null ||
+                      quoteResult.pricing?.basePriceNaira != null) && (
                       <div className="flex justify-between text-xs text-white/60 py-1 border-b border-white/10">
                         <span>Base Price</span>
-                        <span>{fmt(quoteResult.pricing?.basePriceNaira ?? quoteResult.breakdown?.finalBasePrice)}</span>
+                        <span>
+                          {fmt(
+                            quoteResult.pricing?.basePriceNaira ??
+                              quoteResult.breakdown?.finalBasePrice,
+                          )}
+                        </span>
                       </div>
                     )}
                     {/* Surcharge line items from DB (FUEL, VAT, etc.) */}
@@ -463,18 +616,60 @@ export default function LandingPage() {
                     {/* Applied discount if any */}
                     {quoteResult.appliedDiscount && (
                       <div className="flex justify-between text-xs text-green-400 py-1">
-                        <span>{quoteResult.appliedDiscount.label ?? "Discount"}</span>
-                        <span>-{fmt(quoteResult.appliedDiscount.discountAmount ?? quoteResult.appliedDiscount.amount)}</span>
+                        <span>
+                          {quoteResult.appliedDiscount.label ?? "Discount"}
+                        </span>
+                        <span>
+                          -
+                          {fmt(
+                            quoteResult.appliedDiscount.discountAmount ??
+                              quoteResult.appliedDiscount.amount,
+                          )}
+                        </span>
                       </div>
                     )}
                   </div>
 
-                  <Link
-                    href="/auth/login"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const isCustom = useCustomDimension && !boxDimensionId;
+                      saveShipmentDraft({
+                        fromCity,
+                        toCity,
+                        serviceType,
+                        boxSize: isCustom
+                          ? undefined
+                          : boxDimensionId || undefined,
+                        weight: boxDimensionId
+                          ? undefined
+                          : isCustom
+                            ? parseFloat(customWeight) || undefined
+                            : parseFloat(weight) || undefined,
+                        length: isCustom
+                          ? parseFloat(customLength) || undefined
+                          : undefined,
+                        width: isCustom
+                          ? parseFloat(customWidth) || undefined
+                          : undefined,
+                        height: isCustom
+                          ? parseFloat(customHeight) || undefined
+                          : undefined,
+                        cartons: boxDimensionId
+                          ? parseInt(boxQuantity || "1", 10)
+                          : undefined,
+                        isCustomDimension: isCustom,
+                      });
+                      if (isAuthenticated) {
+                        router.push("/dashboard/shipments?openCreate=1");
+                      } else {
+                        setAuthModalOpen(true);
+                      }
+                    }}
                     className="mt-4 w-full inline-flex items-center justify-center gap-2 bg-brand hover:bg-red-700 text-white py-2.5 rounded-xl text-sm font-bold transition-all"
                   >
                     Book This Shipment <ChevronRight className="w-4 h-4" />
-                  </Link>
+                  </button>
                 </div>
               )}
             </div>
@@ -764,6 +959,8 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
+
+      <LandingAuthModal isOpen={authModalOpen} setIsOpen={setAuthModalOpen} />
     </div>
   );
 }

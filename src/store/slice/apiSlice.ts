@@ -20,7 +20,12 @@ import {
   IUpdateEmployee,
 } from "./types";
 import { RootState } from "../store";
-import { authTokenChange, logoutUser, setUserData, setMfaVerified } from "./authSlice";
+import {
+  authTokenChange,
+  logoutUser,
+  setUserData,
+  setMfaVerified,
+} from "./authSlice";
 import { StaffResponseData } from "./types/staff.types";
 import { errorToast, successToast } from "@/lib/toast/toast";
 import {
@@ -110,6 +115,31 @@ export const baseQueryWithReauth: BaseQueryFn<
       store.dispatch(logoutUser());
     }
   }
+
+  // ─── Gap 5: 2FA gate — catch MFA codes from ANY endpoint (e.g. invoice ───
+  // download/email links reachable from shipment details, sidebar, payment
+  // callback, etc.) not just the dedicated Invoices page, and route the
+  // user to the right step instead of silently failing.
+  if (result.error && result.error.status === 403) {
+    const code = (result.error.data as any)?.code;
+    if (
+      code === "MFA_SETUP_REQUIRED" ||
+      code === "MFA_REQUIRED" ||
+      code === "MFA_EXPIRED"
+    ) {
+      if (typeof window !== "undefined") {
+        const destination =
+          code === "MFA_SETUP_REQUIRED"
+            ? "/dashboard/settings?tab=twofa"
+            : "/auth/login";
+        // Avoid redirect loops if we're already heading there
+        if (!window.location.pathname.startsWith(destination.split("?")[0])) {
+          window.location.href = destination;
+        }
+      }
+    }
+  }
+
   return result;
 };
 
@@ -458,7 +488,10 @@ export const apiSlice = createApi({
         weightKg: number;
         tons: number;
         cartons: number;
-        boxDimensionId: string;
+        boxDimensionId?: string;
+        customLength?: number;
+        customWidth?: number;
+        customHeight?: number;
         serviceType?: string;
         termsAccepted?: boolean;
       }
@@ -1507,11 +1540,14 @@ export const apiSlice = createApi({
       providesTags: ["Ticket"],
     }),
     // useGetClaimsQuery — admin: all claims
-    GetClaims: builder.query<unknown, { status?: string; type?: string } | void>({
+    GetClaims: builder.query<
+      unknown,
+      { status?: string; type?: string } | void
+    >({
       query: (params) => {
         const q = new URLSearchParams();
         if (params?.status) q.append("status", params.status);
-        if (params?.type)   q.append("type",   params.type);
+        if (params?.type) q.append("type", params.type);
         const qs = q.toString();
         return `/claims${qs ? `?${qs}` : ""}`;
       },
@@ -1530,7 +1566,12 @@ export const apiSlice = createApi({
     // useReviewClaimMutation — admin: approve/reject/mark paid
     ReviewClaim: builder.mutation<
       unknown,
-      { id: string; status: string; reviewNote?: string; approvedAmount?: number }
+      {
+        id: string;
+        status: string;
+        reviewNote?: string;
+        approvedAmount?: number;
+      }
     >({
       query: ({ id, ...body }) => ({
         url: `/claims/${id}/review`,

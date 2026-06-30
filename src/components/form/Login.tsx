@@ -16,8 +16,15 @@ import {
   useVerifyLogin2FAMutation,
 } from "@/store/slice/apiSlice";
 import { useState } from "react";
+import { consumePostAuthRedirect } from "@/lib/shipmentDraft";
 
-export function LoginForm() {
+export function LoginForm({
+  onSignupClick,
+  defaultRedirect = "/dashboard",
+}: {
+  onSignupClick?: () => void;
+  defaultRedirect?: string;
+} = {}) {
   const router = useRouter();
   const [serverError, setServerError] = useState("");
 
@@ -54,7 +61,11 @@ export function LoginForm() {
       // onQueryStarted in apiSlice already dispatches token + user to Redux
       // Just redirect — token is already in store
       if (result?.data?.accessToken) {
-        router.push("/dashboard");
+        // If the user arrived here with a quote drafted on the landing page
+        // (or quote modal), send them back to finish it instead of the
+        // default dashboard landing page.
+        const resumeTo = consumePostAuthRedirect();
+        router.push(resumeTo || defaultRedirect);
       }
     } catch (err: any) {
       setServerError(classifyAuthError(err));
@@ -70,7 +81,8 @@ export function LoginForm() {
         otp,
       }).unwrap();
       if (result?.data?.accessToken) {
-        router.push("/dashboard");
+        const resumeTo = consumePostAuthRedirect();
+        router.push(resumeTo || defaultRedirect);
       }
     } catch (err: any) {
       setServerError(classifyAuthError(err));
@@ -176,9 +188,19 @@ export function LoginForm() {
 
       <p className="text-center text-sm text-black mt-5">
         Don&apos;t have an account yet?{" "}
-        <Link href="/auth/signup" className="text-link">
-          Sign Up
-        </Link>
+        {onSignupClick ? (
+          <button
+            type="button"
+            onClick={onSignupClick}
+            className="text-link font-semibold"
+          >
+            Sign Up
+          </button>
+        ) : (
+          <Link href="/auth/signup" className="text-link">
+            Sign Up
+          </Link>
+        )}
       </p>
     </>
   );

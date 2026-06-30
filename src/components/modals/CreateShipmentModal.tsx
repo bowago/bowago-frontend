@@ -419,6 +419,7 @@ export default function CreateShipmentModal({
   const [step, setStep] = useState<Step>(1);
   const [createdShipmentData, setCreatedShipmentData] =
     useState<ShipmentReviewData | null>(null);
+  const [useCustomDimension, setUseCustomDimension] = useState(false);
 
   const {
     register,
@@ -442,20 +443,30 @@ export default function CreateShipmentModal({
     },
   });
 
-  // When opened from the quote flow, prefill origin/destination cities
+  // When opened from the quote flow (or resumed from a pre-auth draft),
+  // prefill every field that was already entered so the user never has to
+  // retype anything.
   useEffect(() => {
-    if (isOpen && initialValue?.fromCity) {
-      setValue("originCity", initialValue.fromCity);
-    }
-    if (isOpen && initialValue?.toCity) {
-      setValue("destinationCity", initialValue.toCity);
-    }
+    if (!isOpen || !initialValue) return;
+    if (initialValue.fromCity) setValue("originCity", initialValue.fromCity);
+    if (initialValue.toCity) setValue("destinationCity", initialValue.toCity);
+    if (initialValue.serviceType)
+      setValue("serviceType", initialValue.serviceType);
+    if (initialValue.boxSize) setValue("boxSize", initialValue.boxSize);
+    if (initialValue.weight != null) setValue("weight", initialValue.weight);
+    if (initialValue.length != null) setValue("length", initialValue.length);
+    if (initialValue.width != null) setValue("width", initialValue.width);
+    if (initialValue.height != null) setValue("height", initialValue.height);
+    if (initialValue.cartons != null) setValue("cartons", initialValue.cartons);
+    if (initialValue.tons != null) setValue("tons", initialValue.tons);
+    if (initialValue.isCustomDimension) setUseCustomDimension(true);
   }, [isOpen, initialValue]);
 
   const handleClose = () => {
     reset();
     setStep(1);
     setCreatedShipmentData(null);
+    setUseCustomDimension(false);
     setIsOpen(false);
   };
 
@@ -913,68 +924,139 @@ export default function CreateShipmentModal({
                 </div>
 
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">
-                    Dimension
-                  </p>
-                  <div className="mb-3">
-                    <Controller
-                      control={control}
-                      name="boxSize"
-                      render={({ field }) => (
-                        <SelectInput
-                          label="Select Box"
-                          disabled={isLoadingBox}
-                          options={dimensions.map((item) => ({
-                            value: item.id,
-                            label: `${item.displayName} (Max ${item.weightKgLimit}kg • ${(item.weightKgLimit / 1000).toFixed(3)}t • ${item.bestFor})`,
-                          }))}
-                          value={field.value as string}
-                          onValueChange={(val) => {
-                            field.onChange(val);
-                            const selected = dimensions.find(
-                              (d) => d.id === val,
-                            );
-                            if (selected) {
-                              setValue("width", selected.widthCm);
-                              setValue("height", selected.heightCm);
-                              setValue("length", selected.lengthCm);
-                              setValue("weight", selected.weightKgLimit);
-                              setValue("tons", selected.weightKgLimit / 1000);
-                            }
-                          }}
-                          error={errors.boxSize?.message}
-                        />
-                      )}
-                    />
+                  <div className="flex items-center justify-between mb-3 border-2 border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50/50">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">
+                      Dimension
+                    </p>
+                    <div className="flex items-center gap-1 bg-white border border-gray-300 rounded-lg p-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setUseCustomDimension(false)}
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                          !useCustomDimension
+                            ? "bg-gray-900 text-white shadow-sm"
+                            : "text-gray-500"
+                        }`}
+                      >
+                        Predefined Box
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUseCustomDimension(true);
+                          setValue("boxSize", "");
+                        }}
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                          useCustomDimension
+                            ? "bg-brand text-white shadow-sm"
+                            : "text-gray-500"
+                        }`}
+                      >
+                        Custom Size
+                      </button>
+                    </div>
                   </div>
+
+                  {!useCustomDimension && (
+                    <div className="mb-3">
+                      <Controller
+                        control={control}
+                        name="boxSize"
+                        render={({ field }) => (
+                          <SelectInput
+                            label="Select Box"
+                            disabled={isLoadingBox}
+                            options={dimensions.map((item) => ({
+                              value: item.id,
+                              label: `${item.displayName} (Max ${item.weightKgLimit}kg • ${(item.weightKgLimit / 1000).toFixed(3)}t • ${item.bestFor})`,
+                            }))}
+                            value={field.value as string}
+                            onValueChange={(val) => {
+                              field.onChange(val);
+                              const selected = dimensions.find(
+                                (d) => d.id === val,
+                              );
+                              if (selected) {
+                                setValue("width", selected.widthCm);
+                                setValue("height", selected.heightCm);
+                                setValue("length", selected.lengthCm);
+                                setValue("weight", selected.weightKgLimit);
+                                setValue("tons", selected.weightKgLimit / 1000);
+                              }
+                            }}
+                            error={errors.boxSize?.message}
+                          />
+                        )}
+                      />
+                    </div>
+                  )}
+
+                  {useCustomDimension && (
+                    <p className="text-[11px] text-gray-400 mb-3 border-2 border-brand/30 bg-brand/5 rounded-lg px-3 py-2">
+                      Enter the exact weight and dimensions of your package
+                      below.
+                    </p>
+                  )}
 
                   <div className="grid grid-cols-2 gap-3">
                     <Input
-                      label={`Weight / kg (Max ${maxWeight})`}
+                      label={
+                        !useCustomDimension && selectedBox
+                          ? `Weight / kg (Max ${maxWeight})`
+                          : "Weight / kg"
+                      }
                       type="number"
                       leftIcon={<Package size={14} />}
-                      max={maxWeight}
+                      max={
+                        !useCustomDimension && selectedBox
+                          ? maxWeight
+                          : undefined
+                      }
                       {...register("weight", { valueAsNumber: true })}
                       error={errors.weight?.message}
                     />
                     <Input
-                      label={`Length / cm (Max ${maxLength})`}
+                      label={
+                        !useCustomDimension && selectedBox
+                          ? `Length / cm (Max ${maxLength})`
+                          : "Length / cm"
+                      }
                       type="number"
-                      max={maxLength}
+                      max={
+                        !useCustomDimension && selectedBox
+                          ? maxLength
+                          : undefined
+                      }
                       {...register("length", { valueAsNumber: true })}
                       error={errors.length?.message}
                     />
                     <Input
-                      label={`Width / cm (Max ${maxWidth})`}
+                      label={
+                        !useCustomDimension && selectedBox
+                          ? `Width / cm (Max ${maxWidth})`
+                          : "Width / cm"
+                      }
                       type="number"
-                      max={maxWidth}
+                      max={
+                        !useCustomDimension && selectedBox
+                          ? maxWidth
+                          : undefined
+                      }
                       {...register("width", { valueAsNumber: true })}
                       error={errors.width?.message}
                     />
                     <Input
-                      label={`Height / cm (Max ${maxHeight})`}
+                      label={
+                        !useCustomDimension && selectedBox
+                          ? `Height / cm (Max ${maxHeight})`
+                          : "Height / cm"
+                      }
                       type="number"
-                      max={maxHeight}
+                      max={
+                        !useCustomDimension && selectedBox
+                          ? maxHeight
+                          : undefined
+                      }
                       {...register("height", { valueAsNumber: true })}
                       error={errors.height?.message}
                     />
@@ -987,9 +1069,15 @@ export default function CreateShipmentModal({
                       error={errors.cartons?.message}
                     />
                     <Input
-                      label={`Tons (Max ${maxTons})`}
+                      label={
+                        !useCustomDimension && selectedBox
+                          ? `Tons (Max ${maxTons})`
+                          : "Tons"
+                      }
                       type="number"
-                      max={maxTons}
+                      max={
+                        !useCustomDimension && selectedBox ? maxTons : undefined
+                      }
                       {...register("tons", { valueAsNumber: true })}
                       error={errors.tons?.message}
                     />

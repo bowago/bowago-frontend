@@ -5,10 +5,7 @@ import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { User, Mail, Building2, Phone, Lock } from "lucide-react";
 import { useState } from "react";
-import {
-  SignupFormData,
-  signupSchema,
-} from "@/lib/validation";
+import { SignupFormData, signupSchema } from "@/lib/validation";
 import { AlertBanner, AuthCardHeader } from "../layout/authLayout";
 import { Input } from "../ui/input";
 import { Button, SocialLogin } from "../ui/button";
@@ -137,9 +134,19 @@ export function SignupForm({ onSuccess, onLogin }: SignupFormProps) {
 
       <p className="text-center text-sm text-gray-600 font-medium mt-4">
         Already have an account?{" "}
-        <Link href="/auth/login" className="text-link">
-          Login
-        </Link>
+        {onLogin ? (
+          <button
+            type="button"
+            onClick={onLogin}
+            className="text-link font-semibold"
+          >
+            Login
+          </button>
+        ) : (
+          <Link href="/auth/login" className="text-link">
+            Login
+          </Link>
+        )}
       </p>
     </>
   );

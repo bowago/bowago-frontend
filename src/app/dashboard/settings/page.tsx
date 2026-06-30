@@ -1,17 +1,25 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PersonalInformationForm } from "@/components/form/PersonalInformationForm";
 import { CompanyInformationForm } from "@/components/form/CompanyInformationForm";
 import { ChangePasswordForm } from "@/components/form/ChangePasswordForm";
 import PaymentMethodForm from "@/components/form/PaymentMethodForm";
 import TwoFASetupSection from "@/components/form/TwoFASetupSection";
-import { User, Building2, Lock, CreditCard, Shield, Trash2, AlertTriangle } from "lucide-react";
+import {
+  User,
+  Building2,
+  Lock,
+  CreditCard,
+  Shield,
+  Trash2,
+  AlertTriangle,
+} from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 import { useDeleteAccountMutation } from "@/store/slice/apiSlice";
 import { useDispatch } from "react-redux";
 import { logoutUser } from "@/store/slice/authSlice";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const TABS = [
   { id: "personal", label: "Personal Info", icon: User },
@@ -30,14 +38,21 @@ function DeleteAccountSection() {
   const [deleteAccount, { isLoading }] = useDeleteAccountMutation();
 
   const handleDelete = async () => {
-    if (!password) { setError("Enter your current password to confirm."); return; }
+    if (!password) {
+      setError("Enter your current password to confirm.");
+      return;
+    }
     setError("");
     try {
       await deleteAccount({ password }).unwrap();
       dispatch(logoutUser());
       router.push("/auth/signup");
     } catch (e: any) {
-      setError(e.error?.data?.message || e.data?.message || "Failed to delete account. Check your password.");
+      setError(
+        e.error?.data?.message ||
+          e.data?.message ||
+          "Failed to delete account. Check your password.",
+      );
     }
   };
 
@@ -49,9 +64,12 @@ function DeleteAccountSection() {
             <AlertTriangle className="w-4 h-4 text-red-600" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-semibold text-gray-900">Delete Account</p>
+            <p className="text-sm font-semibold text-gray-900">
+              Delete Account
+            </p>
             <p className="text-xs text-gray-500 mt-1">
-              Permanently delete your account and all associated data. This cannot be undone.
+              Permanently delete your account and all associated data. This
+              cannot be undone.
             </p>
             <button
               onClick={() => setConfirm(true)}
@@ -69,10 +87,12 @@ function DeleteAccountSection() {
     <div className="border-t border-red-100 pt-8 mt-8">
       <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-3">
         <p className="text-sm font-semibold text-red-800 flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4" /> This action is permanent and cannot be reversed.
+          <AlertTriangle className="w-4 h-4" /> This action is permanent and
+          cannot be reversed.
         </p>
         <p className="text-xs text-red-700">
-          All your shipment history, saved cards, and account data will be permanently deleted.
+          All your shipment history, saved cards, and account data will be
+          permanently deleted.
         </p>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -89,7 +109,11 @@ function DeleteAccountSection() {
         {error && <p className="text-xs text-red-600">{error}</p>}
         <div className="flex gap-3">
           <button
-            onClick={() => { setConfirm(false); setPassword(""); setError(""); }}
+            onClick={() => {
+              setConfirm(false);
+              setPassword("");
+              setError("");
+            }}
             className="flex-1 px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50"
           >
             Cancel
@@ -99,7 +123,13 @@ function DeleteAccountSection() {
             disabled={isLoading}
             className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {isLoading ? "Deleting..." : <><Trash2 className="w-3.5 h-3.5" /> Permanently Delete</>}
+            {isLoading ? (
+              "Deleting..."
+            ) : (
+              <>
+                <Trash2 className="w-3.5 h-3.5" /> Permanently Delete
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -111,6 +141,14 @@ export default function SettingsPage() {
   const [active, setActive] = useState("personal");
   const user = useSelector((s: RootState) => s.auth.user);
   const isCustomer = user?.role === "CUSTOMER";
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab && TABS.some((t) => t.id === tab)) {
+      setActive(tab);
+    }
+  }, [searchParams]);
 
   return (
     <div className="pb-10 max-w-4xl">
