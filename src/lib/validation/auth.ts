@@ -252,7 +252,8 @@ export const contractRateSchema = yup.object({
   discountPercent: yup
     .number()
     .typeError("Discount must be a number")
-    .min(0)
+    .min(0, "Discount cannot be negative")
+    .max(100, "Discount cannot exceed 100%")
     .max(100)
     .when("pricingType", {
       is: "discount",
@@ -263,19 +264,19 @@ export const contractRateSchema = yup.object({
   // ✅ Conditional
   fixedPricePerKgByZone: yup
     .object({
-      "1": yup.number().typeError("Required").min(0),
-      "2": yup.number().typeError("Required").min(0),
-      "3": yup.number().typeError("Required").min(0),
-      "4": yup.number().typeError("Required").min(0),
+      "1": yup.number().typeError("Required").min(0, "Price cannot be negative"),
+      "2": yup.number().typeError("Required").min(0, "Price cannot be negative"),
+      "3": yup.number().typeError("Required").min(0, "Price cannot be negative"),
+      "4": yup.number().typeError("Required").min(0, "Price cannot be negative"),
     })
     .when("pricingType", {
       is: "fixed",
       then: (schema) =>
         schema.shape({
-          "1": yup.number().required("Required"),
-          "2": yup.number().required("Required"),
-          "3": yup.number().required("Required"),
-          "4": yup.number().required("Required"),
+          "1": yup.number().required("Required").min(0, "Price cannot be negative"),
+          "2": yup.number().required("Required").min(0, "Price cannot be negative"),
+          "3": yup.number().required("Required").min(0, "Price cannot be negative"),
+          "4": yup.number().required("Required").min(0, "Price cannot be negative"),
         }),
       otherwise: (schema) => schema.nullable().notRequired(),
     }),
@@ -285,16 +286,24 @@ export const contractRateSchema = yup.object({
   // String (YYYY-MM-DD) from HTML date inputs — using yup.date() would
   // infer the type as Date and cause a type mismatch with the string value
   // returned by <input type="date">. String + regex keeps the type as string.
+  // validFrom blank  → contract is active from the day it is created.
+  // validUntil blank → no expiry; contract runs indefinitely.
   validFrom: yup
     .string()
-    .matches(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date")
-    .required("Valid from is required"),
+    .nullable()
+    .notRequired()
+    .test("valid-date", "Enter a valid date (YYYY-MM-DD)", (val) =>
+      !val || /^\d{4}-\d{2}-\d{2}$/.test(val),
+    ),
 
   validUntil: yup
     .string()
-    .matches(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date")
-    .required("Valid until is required")
-    .test("after-start", "Must be after start date", function (val) {
+    .nullable()
+    .notRequired()
+    .test("valid-date", "Enter a valid date (YYYY-MM-DD)", (val) =>
+      !val || /^\d{4}-\d{2}-\d{2}$/.test(val),
+    )
+    .test("after-start", "Must be after the start date", function (val) {
       const { validFrom } = this.parent;
       if (!validFrom || !val) return true;
       return val >= validFrom;

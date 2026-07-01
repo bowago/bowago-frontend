@@ -18,6 +18,7 @@ import {
   useGeneratePersistedQuoteMutation,
   useGetDeliverySLAQuery,
   useGetZoneByRouteQuery,
+  useGetAppSettingsQuery,
 } from "@/store/slice/apiSlice";
 
 // ─── Validation Schema ────────────────────────────────────────────────────────
@@ -31,12 +32,12 @@ const createShipmentSchema = yup.object({
   destinationCity: yup.string().required("Destination city is required"),
   pickupDate: yup.date().required("Pickup date is required"),
   boxSize: yup.string().nullable(),
-  weight: yup.number().min(0).typeError("Must be a number").nullable(),
-  length: yup.number().min(0).typeError("Must be a number").nullable(),
-  width: yup.number().min(0).typeError("Must be a number").nullable(),
-  height: yup.number().min(0).typeError("Must be a number").nullable(),
-  cartons: yup.number().min(0).typeError("Must be a number").nullable(),
-  tons: yup.number().min(0).typeError("Must be a number").nullable(),
+  weight: yup.number().min(0, "Weight cannot be negative").typeError("Must be a number").nullable(),
+  length: yup.number().min(0, "Length cannot be negative").typeError("Must be a number").nullable(),
+  width: yup.number().min(0, "Width cannot be negative").typeError("Must be a number").nullable(),
+  height: yup.number().min(0, "Height cannot be negative").typeError("Must be a number").nullable(),
+  cartons: yup.number().min(0, "Cartons cannot be negative").typeError("Must be a number").nullable(),
+  tons: yup.number().min(0, "Tons cannot be negative").typeError("Must be a number").nullable(),
   isFragile: yup.boolean().default(false),
   hasInsurance: yup.boolean().default(false),
   insuranceValue: yup
@@ -231,7 +232,7 @@ function StepIndicator({ current }: { current: Step }) {
 
 // ─── Review Summary ───────────────────────────────────────────────────────────
 
-function ReviewStep({ data }: { data: ShipmentReviewData }) {
+function ReviewStep({ data, insuranceRatePercent }: { data: ShipmentReviewData; insuranceRatePercent: number }) {
   const shipment = data.shipment;
   const quote = data.quote;
 
@@ -343,7 +344,7 @@ function ReviewStep({ data }: { data: ShipmentReviewData }) {
         {(quote as any)?.insurancePremiumKobo > 0 && (
           <div className="flex justify-between items-center py-[5px] border-b border-gray-100">
             <span className="text-xs text-gray-500">
-              Insurance (2.5% of declared value)
+              Insurance ({insuranceRatePercent}% of declared value)
             </span>
             <span className="text-xs font-medium text-gray-800">
               ₦
@@ -413,6 +414,18 @@ export default function CreateShipmentModal({
   const [generatePersistedQuote] = useGeneratePersistedQuoteMutation();
   const { data: slaData } = useGetDeliverySLAQuery();
   const slas: any[] = slaData?.data?.slas ?? [];
+
+  // Live insurance rate from Business Rules settings (default 2.5%).
+  // Falls back to 2.5 if the settings haven't loaded yet.
+  const { data: insuranceSettingsData } = useGetAppSettingsQuery({});
+  const insuranceSettings: Record<string, { value: string }> =
+    (insuranceSettingsData as any)?.data?.settings ?? {};
+  const insuranceRatePercent = parseFloat(
+    insuranceSettings["insurance.rate_percent"]?.value ?? "2.5",
+  );
+  const insuranceMinPremiumNaira = parseFloat(
+    insuranceSettings["insurance.min_premium_naira"]?.value ?? "100",
+  );
   const [persistedQuoteId, setPersistedQuoteId] = useState<string | null>(null);
   const { data: citiesData, isLoading } = useGetCitiesQuery({});
 
@@ -1013,6 +1026,7 @@ export default function CreateShipmentModal({
                           ? maxWeight
                           : undefined
                       }
+                      min={0}
                       {...register("weight", { valueAsNumber: true })}
                       error={errors.weight?.message}
                     />
@@ -1028,6 +1042,7 @@ export default function CreateShipmentModal({
                           ? maxLength
                           : undefined
                       }
+                      min={0}
                       {...register("length", { valueAsNumber: true })}
                       error={errors.length?.message}
                     />
@@ -1043,6 +1058,7 @@ export default function CreateShipmentModal({
                           ? maxWidth
                           : undefined
                       }
+                      min={0}
                       {...register("width", { valueAsNumber: true })}
                       error={errors.width?.message}
                     />
@@ -1058,6 +1074,7 @@ export default function CreateShipmentModal({
                           ? maxHeight
                           : undefined
                       }
+                      min={0}
                       {...register("height", { valueAsNumber: true })}
                       error={errors.height?.message}
                     />
@@ -1066,6 +1083,7 @@ export default function CreateShipmentModal({
                     <Input
                       label="Cartons"
                       type="number"
+                      min={0}
                       {...register("cartons", { valueAsNumber: true })}
                       error={errors.cartons?.message}
                     />
@@ -1079,6 +1097,7 @@ export default function CreateShipmentModal({
                       max={
                         !useCustomDimension && selectedBox ? maxTons : undefined
                       }
+                      min={0}
                       {...register("tons", { valueAsNumber: true })}
                       error={errors.tons?.message}
                     />
@@ -1120,7 +1139,7 @@ export default function CreateShipmentModal({
                       {(getValues("insuranceValue") ?? 0) > 0 && (
                         <div className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
                           <span className="text-xs text-blue-600">
-                            Insurance premium (2.5% of declared value)
+                            Insurance premium ({insuranceRatePercent}% of declared value)
                           </span>
                           <span className="text-xs font-semibold text-blue-700">
                             ₦
@@ -1135,7 +1154,7 @@ export default function CreateShipmentModal({
                       )}
                       <p className="text-[11px] text-gray-400">
                         Enter the total value of your goods. The insurance
-                        premium is calculated automatically at 2.5% (min ₦100).
+                        premium is calculated automatically at {insuranceRatePercent}% (min ₦{insuranceMinPremiumNaira.toLocaleString()}).
                       </p>
                     </div>
                   )}
@@ -1314,7 +1333,7 @@ export default function CreateShipmentModal({
 
             {/* ── STEP 3 ── */}
             {step === 3 && createdShipmentData && (
-              <ReviewStep data={createdShipmentData} />
+              <ReviewStep data={createdShipmentData} insuranceRatePercent={insuranceRatePercent} />
             )}
           </form>
 

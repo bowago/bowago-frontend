@@ -56,6 +56,7 @@ export default function AddPromoRateModal({
       maxUsageCount: initialValue?.maxUsageCount ?? 0,
       validFrom: initialValue?.validFrom ?? "",
       validUntil: initialValue?.validUntil ?? "",
+      isActive: initialValue?.isActive ?? true,
     },
   });
 
@@ -93,9 +94,9 @@ export default function AddPromoRateModal({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" />
 
-        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl w-full max-w-2xl p-6 z-50 shadow-xl">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
+        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl w-full max-w-2xl z-50 shadow-xl flex flex-col max-h-[90vh]">
+          {/* Fixed header */}
+          <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100 shrink-0">
             <Dialog.Title className="text-xl font-semibold">
               {isEdit ? "Edit" : "Create"} Promo Rate
             </Dialog.Title>
@@ -107,7 +108,8 @@ export default function AddPromoRateModal({
             </Dialog.Close>
           </div>
 
-          {/* FORM */}
+          {/* Scrollable body */}
+          <div className="overflow-y-auto flex-1 px-6 py-5">
           <form onSubmit={handleSubmit(onSubmit)}>
             <div className="grid grid-cols-2 gap-4">
               {/* CODE */}
@@ -242,6 +244,8 @@ export default function AddPromoRateModal({
                 <Input
                   label="Discount (%)"
                   type="number"
+                  min={0}
+                  max={100}
                   leftIcon={<Percent size={14} />}
                   {...register("discountPercent", {
                     valueAsNumber: true,
@@ -254,6 +258,7 @@ export default function AddPromoRateModal({
                 <Input
                   label="Flat Discount (₦)"
                   type="number"
+                  min={0}
                   leftIcon={<Banknote size={14} />}
                   {...register("flatDiscount", {
                     valueAsNumber: true,
@@ -266,6 +271,7 @@ export default function AddPromoRateModal({
               <Input
                 label="Min Weight (kg)"
                 type="number"
+                min={0}
                 {...register("minWeightKg", {
                   valueAsNumber: true,
                 })}
@@ -275,6 +281,7 @@ export default function AddPromoRateModal({
               <Input
                 label="Max Usage Count"
                 type="number"
+                min={0}
                 {...register("maxUsageCount", {
                   valueAsNumber: true,
                 })}
@@ -282,21 +289,42 @@ export default function AddPromoRateModal({
               />
 
               {/* DATES */}
-              <Input
-                label="Valid From"
-                type="date"
-                leftIcon={<Calendar size={14} />}
-                {...register("validFrom")}
-                error={errors.validFrom?.message as string}
-              />
+              <div>
+                <Input
+                  label="Valid From (optional)"
+                  type="date"
+                  leftIcon={<Calendar size={14} />}
+                  {...register("validFrom")}
+                  error={errors.validFrom?.message as string}
+                />
+                <p className="text-xs text-gray-400 mt-1">Leave blank — promo is active from today.</p>
+              </div>
 
-              <Input
-                label="Valid Until"
-                type="date"
-                leftIcon={<Calendar size={14} />}
-                {...register("validUntil")}
-                error={errors.validUntil?.message as string}
-              />
+              <div>
+                <Input
+                  label="Valid Until (optional)"
+                  type="date"
+                  leftIcon={<Calendar size={14} />}
+                  {...register("validUntil")}
+                  error={errors.validUntil?.message as string}
+                />
+                <p className="text-xs text-gray-400 mt-1">Leave blank — promo never expires.</p>
+              </div>
+
+              {/* ACTIVE STATUS — shown in edit mode */}
+              {isEdit && (
+                <div className="col-span-2">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      {...register("isActive")}
+                      className="w-4 h-4 accent-gray-900 cursor-pointer"
+                    />
+                    <span className="text-sm text-gray-700">Active</span>
+                    <span className="text-xs text-gray-400">(uncheck to deactivate this promo)</span>
+                  </label>
+                </div>
+              )}
             </div>
 
             {/* ACTION */}
@@ -306,6 +334,7 @@ export default function AddPromoRateModal({
               </Button>
             </div>
           </form>
+          </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

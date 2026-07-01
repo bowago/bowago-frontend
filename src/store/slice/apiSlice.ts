@@ -155,7 +155,10 @@ export const apiSlice = createApi({
     "Shipment",
     "Surcharge",
     "SurchargeAuditLog",
+    "PriceBandAuditLog",
     "Ticket",
+    "PriceAdjustment",
+    "AppSettings",
     "Claim",
     "FAQ",
     "FailedWebhook",
@@ -168,6 +171,7 @@ export const apiSlice = createApi({
     "OrgInvite",
     "CannedResponse",
     "AddressChange",
+    "Loyalty",
   ],
   baseQuery: baseQueryWithReauth,
   endpoints: (builder) => ({
@@ -704,7 +708,7 @@ export const apiSlice = createApi({
           errorToast(errorM.error?.data?.message || "Unexpected errror");
         }
       },
-      invalidatesTags: ["StandardRate"],
+      invalidatesTags: ["ContractRate"],
     }),
     // useAddPromoRateMutation
     AddPromoRate: builder.mutation<unknown, any>({
@@ -1531,7 +1535,202 @@ export const apiSlice = createApi({
       providesTags: ["SurchargeAuditLog"],
     }),
 
-    // useGetContractRateQuery
+    // useGetPriceBandAuditLogQuery — PRD: Pricing Version Control / rate history timeline.
+    // Reuses the same audit-log endpoint (mounted under /surcharges/audit-log)
+    // since priceAuditLog rows are shared across entity types — just filtered
+    // to entityType=PriceBand here.
+    GetPriceBandAuditLog: builder.query<unknown, { page?: number } | void>({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        searchParams.append("entityType", "PriceBand");
+        if (params?.page) searchParams.append("page", String(params.page));
+        return `/surcharges/audit-log?${searchParams.toString()}`;
+      },
+      providesTags: ["PriceBandAuditLog"],
+    }),
+
+    // useRollbackPriceBandMutation — POST /pricing/rollback/:auditLogId
+    // Reverts a price band to the `previousValue` snapshot captured in that
+    // audit log entry, and itself logs a new audit entry for the rollback.
+    RollbackPriceBand: builder.mutation<unknown, { auditLogId: string }>({
+      query: ({ auditLogId }) => ({
+        url: `/pricing/rollback/${auditLogId}`,
+        method: "POST",
+      }),
+      async onQueryStarted(_args, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast("Price band rolled back successfully");
+        } catch (error) {
+          const errorM = error as CustomError;
+          errorToast(errorM.error?.data?.message || "Failed to roll back price band");
+        }
+      },
+      invalidatesTags: ["PriceBandAuditLog", "Surcharge"],
+    }),
+
+    // ─── Price Adjustments (Sprint 6: Post-Booking Price Shock Prevention) ────
+
+    // useGetShipmentAdjustmentsQuery
+    GetShipmentAdjustments: builder.query<any, string>({
+      query: (shipmentId) => `/price-adjustments/shipment/${shipmentId}`,
+      providesTags: ["PriceAdjustment"],
+    }),
+
+    // useCreatePriceAdjustmentMutation — Dispatcher creates discrepancy adjustment
+    CreatePriceAdjustment: builder.mutation<any, {
+      shipmentId: string;
+      adjustedPrice: number;
+      reason: string;
+      actualWeightKg?: number;
+      proofImageUrls?: string[];
+    }>({
+      query: (body) => ({ url: "/price-adjustments", method: "POST", body }),
+      async onQueryStarted(_a, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast("Price adjustment created. Customer notified.");
+        } catch (error) {
+          const e = error as CustomError;
+          errorToast(e.error?.data?.message || "Failed to create price adjustment");
+        }
+      },
+      invalidatesTags: ["PriceAdjustment", "Shipment"],
+    }),
+
+    // useAcknowledgePriceAdjustmentMutation — Customer: pay the difference
+    AcknowledgePriceAdjustment: builder.mutation<any, string>({
+      query: (id) => ({ url: `/price-adjustments/${id}/acknowledge`, method: "POST" }),
+      invalidatesTags: ["PriceAdjustment"],
+    }),
+
+    // useDowngradePriceAdjustmentMutation — Customer: switch to lower tier
+    DowngradePriceAdjustment: builder.mutation<any, { id: string; newServiceType: string }>({
+      query: ({ id, newServiceType }) => ({
+        url: `/price-adjustments/${id}/downgrade`,
+        method: "POST",
+        body: { newServiceType },
+      }),
+      async onQueryStarted(_a, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast("Downgrade processed successfully.");
+        } catch (error) {
+          const e = error as CustomError;
+          errorToast(e.error?.data?.message || "Failed to downgrade shipment");
+        }
+      },
+      invalidatesTags: ["PriceAdjustment", "Shipment"],
+    }),
+
+    // useCancelPriceAdjustmentMutation — Customer: cancel with refund
+    CancelPriceAdjustment: builder.mutation<any, string>({
+      query: (id) => ({ url: `/price-adjustments/${id}/cancel`, method: "POST" }),
+      async onQueryStarted(_a, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast("Shipment cancelled. Refund initiated.");
+        } catch (error) {
+          const e = error as CustomError;
+          errorToast(e.error?.data?.message || "Failed to cancel shipment");
+        }
+      },
+      invalidatesTags: ["PriceAdjustment", "Shipment"],
+    }),
+
+    // useContactSupportForAdjustmentMutation — Customer: open a PRICING_DISPUTE ticket
+    ContactSupportForAdjustment: builder.mutation<any, { id: string; message?: string }>({
+      query: ({ id, message }) => ({
+        url: `/price-adjustments/${id}/contact-support`,
+        method: "POST",
+        body: { message },
+      }),
+      async onQueryStarted(_a, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast("Support ticket opened. A Finance agent will contact you.");
+        } catch (error) {
+          const e = error as CustomError;
+          errorToast(e.error?.data?.message || "Failed to open support ticket");
+        }
+      },
+      invalidatesTags: ["Ticket"],
+    }),
+
+    // useExtendAdjustmentDeadlineMutation — Admin/Support: extend customer response window
+    ExtendAdjustmentDeadline: builder.mutation<any, { id: string; hours: number; note?: string }>({
+      query: ({ id, ...body }) => ({
+        url: `/price-adjustments/${id}/extend`,
+        method: "POST",
+        body,
+      }),
+      async onQueryStarted(_a, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast("Response deadline extended.");
+        } catch (error) {
+          const e = error as CustomError;
+          errorToast(e.error?.data?.message || "Failed to extend deadline");
+        }
+      },
+      invalidatesTags: ["PriceAdjustment"],
+    }),
+
+    // ─── App Settings — Business Rules (Super Admin) ──────────────────────────
+
+    // useGetAppSettingsQuery — GET /admin/settings?group=...
+    GetAppSettings: builder.query<any, { group?: string } | void>({
+      query: (params) => {
+        const qs = params?.group ? `?group=${params.group}` : "";
+        return `/admin/settings${qs}`;
+      },
+      providesTags: ["AppSettings"],
+    }),
+
+    // useUpdateAppSettingMutation — POST /admin/settings
+    UpdateAppSetting: builder.mutation<any, { key: string; value: string | number | boolean; type?: string; group?: string }>({
+      query: (body) => ({ url: "/admin/settings", method: "POST", body }),
+      async onQueryStarted(_a, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Setting saved");
+        } catch (error) {
+          const e = error as CustomError;
+          errorToast(e.error?.data?.message || "Failed to save setting");
+        }
+      },
+      invalidatesTags: ["AppSettings"],
+    }),
+
+    // ─── Loyalty (Customer Portal) ────────────────────────────────────────────
+
+    GetMyLoyalty: builder.query<any, void>({
+      query: () => "/loyalty/me",
+      providesTags: ["Loyalty"],
+    }),
+
+    PreviewRedemption: builder.mutation<any, { pointsToRedeem: number; shipmentPriceNaira: number }>({
+      query: (body) => ({ url: "/loyalty/preview-redemption", method: "POST", body }),
+    }),
+
+    RedeemPoints: builder.mutation<any, { shipmentId: string; pointsToRedeem: number }>({
+      query: (body) => ({ url: "/loyalty/redeem", method: "POST", body }),
+      async onQueryStarted(_a, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast("Points redeemed! Discount applied.");
+        } catch (error) {
+          const e = error as CustomError;
+          errorToast(e.error?.data?.message || "Failed to redeem points");
+        }
+      },
+      invalidatesTags: ["Loyalty", "Shipment"],
+    }),
+
+    GetReorderPrefill: builder.query<any, string>({
+      query: (shipmentId) => `/reorder/${shipmentId}/prefill`,
+    }),
+
     GetContractRate: builder.query<
       any,
       {
@@ -2522,12 +2721,19 @@ export const apiSlice = createApi({
       async onQueryStarted(_, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
+          const responseData = (data as any)?.data;
+
+          // If 2FA is required, no tokens are issued yet.
+          // The SocialLogin component fires onRequires2FA → Login form
+          // switches to OTP step → user completes /auth/login-2fa.
+          if (responseData?.requires2FA) return;
+
           const userToken = {
-            accessToken: (data as any)?.data?.accessToken,
-            refreshToken: (data as any)?.data?.refreshToken,
+            accessToken: responseData?.accessToken,
+            refreshToken: responseData?.refreshToken,
           };
           dispatch(authTokenChange(userToken));
-          dispatch(setUserData((data as any).data.user));
+          dispatch(setUserData(responseData?.user));
         } catch (error) {
           const errorM = error as CustomError;
           errorToast(errorM.error?.data?.message || "Google sign-in failed");
@@ -2906,6 +3112,21 @@ export const {
   useEditSurchargeMutation,
   useGetSurchargesQuery,
   useGetSurchargeAuditLogQuery,
+  useGetPriceBandAuditLogQuery,
+  useRollbackPriceBandMutation,
+  useGetShipmentAdjustmentsQuery,
+  useCreatePriceAdjustmentMutation,
+  useAcknowledgePriceAdjustmentMutation,
+  useDowngradePriceAdjustmentMutation,
+  useCancelPriceAdjustmentMutation,
+  useContactSupportForAdjustmentMutation,
+  useExtendAdjustmentDeadlineMutation,
+  useGetAppSettingsQuery,
+  useUpdateAppSettingMutation,
+  useGetMyLoyaltyQuery,
+  usePreviewRedemptionMutation,
+  useRedeemPointsMutation,
+  useGetReorderPrefillQuery,
   useGetRateOverviewQuery,
   useGetDeliverySLAQuery,
   useUpdateDeliverySLAMutation,

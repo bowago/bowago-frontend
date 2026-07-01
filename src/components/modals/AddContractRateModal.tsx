@@ -140,33 +140,41 @@ export default function AddContractRateModal({
     return (
       <form onSubmit={handleSubmit(onSubmit)}>
         <div className="grid grid-cols-2 gap-3 mt-6">
-          {/* User */}
-          <Controller
-            control={control}
-            name="userId"
-            render={({ field }) => (
-              <SelectInput
-                label="Select user"
-                disabled={isLoadingUsers || isEditMode}
-                placeholder={isLoadingUsers ? "...loading" : "Select user"}
-                options={
-                  usersData?.data?.users?.map(
-                    (item: {
-                      firstName: string;
-                      id: string;
-                      lastName: string;
-                    }) => ({
-                      label: `${item.lastName} ${item.firstName}`,
-                      value: item.id,
-                    }),
-                  ) || []
-                }
-                value={field.value}
-                onValueChange={field.onChange}
-                error={errors.userId?.message}
-              />
-            )}
-          />
+          {/* User / Enterprise — assign to master to cover whole org */}
+          <div className="col-span-2">
+            <p className="text-xs text-gray-500 mb-1.5 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+              💡 Assign to a <strong>Master</strong> user to apply this rate to their entire enterprise team.
+              Assigning to an individual user only affects that one person.
+            </p>
+            <Controller
+              control={control}
+              name="userId"
+              render={({ field }) => (
+                <SelectInput
+                  label="Select Enterprise User / Master Account"
+                  disabled={isLoadingUsers || isEditMode}
+                  placeholder={isLoadingUsers ? "...loading" : "Select user"}
+                  options={
+                    usersData?.data?.users?.map(
+                      (item: {
+                        firstName: string;
+                        id: string;
+                        lastName: string;
+                        adminSubRole?: string;
+                        role?: string;
+                      }) => ({
+                        label: `${item.lastName} ${item.firstName}${item.adminSubRole === "ROLE_MASTER" ? " — Master (Org)" : ""}`,
+                        value: item.id,
+                      }),
+                    ) || []
+                  }
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  error={errors.userId?.message}
+                />
+              )}
+            />
+          </div>
 
           {/* Service Type */}
           <div className="col-span-2">
@@ -257,25 +265,34 @@ export default function AddContractRateModal({
             <Input
               label="Discount (%)"
               type="number"
+              min={0}
+              max={100}
               {...register("discountPercent", { valueAsNumber: true })}
               error={errors.discountPercent?.message}
             />
           )}
 
           {/* Dates */}
-          <Input
-            type="date"
-            label="Valid From"
-            {...register("validFrom")}
-            error={errors.validFrom?.message}
-          />
+          {/* Dates */}
+          <div>
+            <Input
+              type="date"
+              label="Valid From (optional)"
+              {...register("validFrom")}
+              error={errors.validFrom?.message}
+            />
+            <p className="text-xs text-gray-400 mt-1">Leave blank — contract is active from today.</p>
+          </div>
 
-          <Input
-            type="date"
-            label="Valid Until"
-            {...register("validUntil")}
-            error={errors.validUntil?.message}
-          />
+          <div>
+            <Input
+              type="date"
+              label="Valid Until (optional)"
+              {...register("validUntil")}
+              error={errors.validUntil?.message}
+            />
+            <p className="text-xs text-gray-400 mt-1">Leave blank — contract never expires.</p>
+          </div>
 
           {/* Zone Pricing */}
           {pricingType === "fixed" && (
@@ -289,6 +306,7 @@ export default function AddContractRateModal({
                   <Input
                     key={zone}
                     type="number"
+                    min={0}
                     label={`Zone ${zone}`}
                     {...register(`fixedPricePerKgByZone.${zone}` as const, {
                       valueAsNumber: true,
@@ -308,6 +326,20 @@ export default function AddContractRateModal({
               error={errors.notes?.message}
             />
           </div>
+
+          {/* Active Status */}
+          <div className="col-span-2">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                {...register("isActive")}
+                defaultChecked
+                className="w-4 h-4 accent-gray-900 cursor-pointer"
+              />
+              <span className="text-sm text-gray-700">Active</span>
+              <span className="text-xs text-gray-400">(uncheck to deactivate without deleting)</span>
+            </label>
+          </div>
         </div>
 
         <div className="flex justify-end mt-5">
@@ -324,18 +356,21 @@ export default function AddContractRateModal({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" />
 
-        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6">
-          <div className="flex justify-between items-center">
+        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-white rounded-2xl shadow-xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+          {/* Fixed header */}
+          <div className="flex justify-between items-center px-6 pt-6 pb-4 border-b border-gray-100 shrink-0">
             <Dialog.Title className="text-lg font-semibold">
               {isEditMode ? "Edit Contract Rate" : "Create Contract Rate"}
             </Dialog.Title>
-
             <Dialog.Close asChild>
               <button className="text-gray-400 hover:text-gray-600">✕</button>
             </Dialog.Close>
           </div>
 
-          <ContractForm />
+          {/* Scrollable body */}
+          <div className="overflow-y-auto flex-1 px-6 pb-6">
+            <ContractForm />
+          </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

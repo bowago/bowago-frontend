@@ -1,10 +1,8 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog/dialog";
-import {
-  useDeletePromoRateMutation,
-  useEditPromoRateMutation,
-} from "@/store/slice/apiSlice";
+import { useDeletePromoRateMutation } from "@/store/slice/apiSlice";
+import AddPromoRateModal from "@/components/modals/AddPromoRateModal";
 import { ColumnDef } from "@tanstack/react-table";
 import { useState } from "react";
 
@@ -26,10 +24,8 @@ export type PromoRate = {
 };
 
 export const PromoRateColumns: ColumnDef<PromoRate>[] = [
-  {
-    header: "S/N",
-    cell: ({ row }) => <div>{row.index + 1}</div>,
-  },
+  { header: "S/N", cell: ({ row }) => <div>{row.index + 1}</div> },
+
   {
     accessorKey: "code",
     header: "Code",
@@ -39,11 +35,13 @@ export const PromoRateColumns: ColumnDef<PromoRate>[] = [
       </span>
     ),
   },
+
   {
     accessorKey: "label",
     header: "Label",
     cell: ({ row }) => <span>{row.getValue<string>("label") || "—"}</span>,
   },
+
   {
     accessorKey: "serviceType",
     header: "Service",
@@ -52,6 +50,7 @@ export const PromoRateColumns: ColumnDef<PromoRate>[] = [
       return <span className="capitalize text-sm">{v ? v.toLowerCase() : "All"}</span>;
     },
   },
+
   {
     accessorKey: "zone",
     header: "Zone",
@@ -60,6 +59,7 @@ export const PromoRateColumns: ColumnDef<PromoRate>[] = [
       return <div>{z !== null && z !== undefined ? `Zone ${z}` : "All"}</div>;
     },
   },
+
   {
     id: "discount",
     header: "Discount",
@@ -72,13 +72,13 @@ export const PromoRateColumns: ColumnDef<PromoRate>[] = [
       return "—";
     },
   },
+
   {
     id: "usage",
     header: "Usage",
     cell: ({ row }) => {
       const { usageCount, maxUsageCount } = row.original;
-      if (maxUsageCount == null)
-        return <div className="text-xs">{usageCount} / ∞</div>;
+      if (maxUsageCount == null) return <div className="text-xs">{usageCount} / ∞</div>;
       return (
         <div className="text-xs">
           <div>{usageCount} / {maxUsageCount}</div>
@@ -92,6 +92,7 @@ export const PromoRateColumns: ColumnDef<PromoRate>[] = [
       );
     },
   },
+
   {
     id: "validity",
     header: "Validity",
@@ -107,6 +108,7 @@ export const PromoRateColumns: ColumnDef<PromoRate>[] = [
       );
     },
   },
+
   {
     accessorKey: "isActive",
     header: "Status",
@@ -119,28 +121,39 @@ export const PromoRateColumns: ColumnDef<PromoRate>[] = [
       );
     },
   },
+
   {
     id: "action",
     header: "Action",
     cell: ({ row }) => {
       const [isDeleteModal, setIsDeleteModal] = useState(false);
       const [isEditModal, setIsEditModal] = useState(false);
-      const [editData, setEditData] = useState({
-        isActive: row.original.isActive,
-        validUntil: row.original.validUntil ?? "",
-      });
-
       const [handleDelete, { isLoading: deleting }] = useDeletePromoRateMutation();
-      const [handleEdit, { isLoading: editing }] = useEditPromoRateMutation();
 
       const onDelete = async () => {
-        await handleDelete({ id: row.original.id });
-        setIsDeleteModal(false);
+        try {
+          await handleDelete({ id: row.original.id }).unwrap();
+          setIsDeleteModal(false);
+        } catch {
+          // error toast shown by mutation
+        }
       };
 
-      const onEdit = async () => {
-        await handleEdit({ id: row.original.id, ...editData });
-        setIsEditModal(false);
+      // Map the row data to the shape AddPromoRateModal expects as initialValue
+      const editInitialValue = {
+        id:              row.original.id,
+        code:            row.original.code,
+        label:           row.original.label ?? "",
+        description:     row.original.description ?? "",
+        discountPercent: row.original.discountPercent ?? 0,
+        flatDiscount:    row.original.flatDiscount ?? 0,
+        serviceType:     row.original.serviceType ?? "STANDARD",
+        zone:            row.original.zone ?? 0,
+        minWeightKg:     row.original.minWeightKg ?? 0,
+        maxUsageCount:   row.original.maxUsageCount ?? 0,
+        isActive:        row.original.isActive,
+        validFrom:       row.original.validFrom?.slice(0, 10) ?? "",
+        validUntil:      row.original.validUntil?.slice(0, 10) ?? "",
       };
 
       return (
@@ -158,37 +171,15 @@ export const PromoRateColumns: ColumnDef<PromoRate>[] = [
             Delete
           </button>
 
-          {/* Edit Modal */}
-          <Dialog open={isEditModal} onOpenChange={setIsEditModal}>
-            <DialogContent>
-              <div className="p-6 space-y-4">
-                <h2 className="text-lg font-semibold">Edit Promo Rate — {row.original.code}</h2>
-                <label className="flex items-center gap-3 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={editData.isActive}
-                    onChange={(e) => setEditData((p) => ({ ...p, isActive: e.target.checked }))}
-                    className="w-4 h-4"
-                  />
-                  Active
-                </label>
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Valid Until</label>
-                  <input
-                    type="date"
-                    value={editData.validUntil ? editData.validUntil.slice(0, 10) : ""}
-                    onChange={(e) => setEditData((p) => ({ ...p, validUntil: e.target.value }))}
-                    className="border rounded-md p-2 text-sm w-full"
-                  />
-                </div>
-                <Button onClick={onEdit} isLoading={editing} className="w-full">
-                  Save Changes
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+          {/* Full edit modal — all fields editable */}
+          <AddPromoRateModal
+            isOpen={isEditModal}
+            setIsOpen={setIsEditModal}
+            initialValue={editInitialValue as any}
+            isEdit
+          />
 
-          {/* Delete Modal */}
+          {/* Delete confirmation */}
           <Dialog open={isDeleteModal} onOpenChange={setIsDeleteModal}>
             <DialogContent>
               <div className="text-center p-6">
@@ -197,8 +188,12 @@ export const PromoRateColumns: ColumnDef<PromoRate>[] = [
                   Delete <span className="font-mono font-bold">{row.original.code}</span>? This cannot be undone.
                 </p>
                 <div className="flex gap-3 mt-4">
-                  <Button  className="flex-1" onClick={() => setIsDeleteModal(false)}>Cancel</Button>
-                  <Button onClick={onDelete} isLoading={deleting} className="flex-1 bg-red-600">Delete</Button>
+                  <Button variant="secondary" className="flex-1" onClick={() => setIsDeleteModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={onDelete} isLoading={deleting} className="flex-1 bg-red-600 hover:bg-red-700">
+                    Delete
+                  </Button>
                 </div>
               </div>
             </DialogContent>

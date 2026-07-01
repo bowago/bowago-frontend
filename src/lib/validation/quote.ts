@@ -310,12 +310,12 @@ export const promoRateSchema = yup
 
     discountPercent: yup
       .number()
-      .min(0)
-      .max(100)
+      .min(0, "Discount cannot be negative")
+      .max(100, "Discount cannot exceed 100%")
       .typeError("Must be a number")
       .nullable(),
 
-    flatDiscount: yup.number().min(0).typeError("Must be a number").nullable(),
+    flatDiscount: yup.number().min(0, "Flat discount cannot be negative").typeError("Must be a number").nullable(),
 
     discountType: yup
       .string()
@@ -329,20 +329,30 @@ export const promoRateSchema = yup
 
     zone: yup.number().min(0).max(4).required(),
 
-    minWeightKg: yup.number().min(0).required(),
+    minWeightKg: yup.number().min(0, "Weight cannot be negative").required(),
 
-    maxUsageCount: yup.number().min(0).required(),
+    maxUsageCount: yup.number().min(0, "Usage count cannot be negative").required(),
 
+    isActive: yup.boolean().default(true),
+
+    // validFrom blank  → promo active from creation date.
+    // validUntil blank → promo never expires.
     validFrom: yup
       .string()
-      .matches(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date")
-      .required("Valid from is required"),
+      .nullable()
+      .notRequired()
+      .test("valid-date", "Enter a valid date (YYYY-MM-DD)", (val) =>
+        !val || /^\d{4}-\d{2}-\d{2}$/.test(val),
+      ),
 
     validUntil: yup
       .string()
-      .matches(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date")
-      .required("Valid until is required")
-      .test("after-start", "Must be after start date", function (val) {
+      .nullable()
+      .notRequired()
+      .test("valid-date", "Enter a valid date (YYYY-MM-DD)", (val) =>
+        !val || /^\d{4}-\d{2}-\d{2}$/.test(val),
+      )
+      .test("after-start", "Must be after the start date", function (val) {
         const { validFrom } = this.parent;
         if (!validFrom || !val) return true;
         return val >= validFrom;

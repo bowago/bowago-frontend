@@ -11,7 +11,7 @@ import {
   HelpCircle, Settings, LogOut, ChevronDown, ChevronRight, Layers,
   Shield, Users, Receipt, AlertCircle, Percent, ClipboardList, Tag,
   MapPin, Box, BookOpen, X, BarChart2, MessageSquare, Wallet,
-  Building2, UserCheck,
+  Building2, UserCheck, Award, History,
 } from "lucide-react";
 
 const ICON_CLS = "w-4 h-4 flex-shrink-0";
@@ -64,6 +64,7 @@ const menuList: MenuItem[] = [
       { label: "Zones",        href: "/dashboard/rate/zones",  roles: ["ADMIN"], subRoles: RATE_MANAGERS, icon: <Map className={ICON_CLS} /> },
       { label: "Cities",       href: "/dashboard/rate/cities", roles: ["ADMIN"], subRoles: RATE_MANAGERS, icon: <MapPin className={ICON_CLS} /> },
       { label: "Boxes",        href: "/dashboard/rate/boxes",  roles: ["ADMIN"], subRoles: RATE_MANAGERS, icon: <Box className={ICON_CLS} /> },
+      { label: "Price History", href: "/dashboard/rate/price-history", roles: ["ADMIN"], subRoles: RATE_MANAGERS, icon: <ClipboardList className={ICON_CLS} /> },
       { label: "Audit Trail",  href: "/dashboard/rate/audit",  roles: ["ADMIN"], subRoles: RATE_MANAGERS, icon: <ClipboardList className={ICON_CLS} /> },
     ],
   },
@@ -79,6 +80,22 @@ const menuList: MenuItem[] = [
       { label: "All Surcharges",  href: "/dashboard/surcharges",           roles: ["ADMIN"], subRoles: RATE_MANAGERS, icon: <Tag className={ICON_CLS} /> },
       { label: "Surcharge Audit", href: "/dashboard/surcharges/audit-log", roles: ["ADMIN"], subRoles: SUPER,         icon: <ClipboardList className={ICON_CLS} /> },
     ],
+  },
+
+  // ── Customer Portal — Order History ──────────────────────────────────────
+  {
+    label: "Order History",
+    href: "/dashboard/orders",
+    roles: ["CUSTOMER"],
+    icon: <History className={ICON_CLS} />,
+  },
+
+  // ── Customer Portal — Loyalty Rewards ────────────────────────────────────
+  {
+    label: "Rewards",
+    href: "/dashboard/loyalty",
+    roles: ["CUSTOMER"],
+    icon: <Award className={ICON_CLS} />,
   },
 
   // ── Shipments (all operational roles + customer) ───────────────────────────
@@ -136,7 +153,7 @@ const menuList: MenuItem[] = [
     children: [
       { label: "All Tickets",      href: "/dashboard/tickets",                 roles: ["ADMIN"], subRoles: TICKET_ROLES,  icon: <Ticket className={ICON_CLS} /> },
       { label: "Claims",           href: "/dashboard/tickets/claims/admin",    roles: ["ADMIN"], subRoles: TICKET_ROLES,  icon: <AlertCircle className={ICON_CLS} /> },
-      { label: "Agent KPI",        href: "/dashboard/support/kpi",             roles: ["ADMIN"], subRoles: SUPER,         icon: <BarChart2 className={ICON_CLS} /> },
+      { label: "Agent KPI",        href: "/dashboard/support/kpi",             roles: ["ADMIN"], subRoles: [...SUPER, "ROLE_AGENT", "ROLE_ADMIN"], icon: <BarChart2 className={ICON_CLS} /> },
       { label: "Canned Responses", href: "/dashboard/support/canned-responses",roles: ["ADMIN"], subRoles: TICKET_ROLES,  icon: <MessageSquare className={ICON_CLS} /> },
     ],
   },
@@ -197,6 +214,13 @@ const otherMenuList: MenuItem[] = [
     href: "/dashboard/settings",
     roles: ["ADMIN", "CUSTOMER"],
     icon: <Settings className={ICON_CLS} />,
+  },
+  {
+    label: "Business Rules",
+    href: "/dashboard/settings/business-rules",
+    roles: ["ADMIN"],
+    subRoles: ["SUPER_ADMIN", "LOGISTICS_MANAGER"],
+    icon: <ClipboardList className={ICON_CLS} />,
   },
 ];
 

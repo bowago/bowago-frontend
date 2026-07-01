@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { StoreProvider } from "@/store/storeProvider";
-import { cn } from "@/lib/utils";
-import "./globals.css";
+import "././globals.css";
 import { UserChat } from "@/components/ui/Chat";
 import { ToastProvider } from "@/components/ui/toast/ToastProvider";
 import { ToastBridge } from "@/components/ui/toast/ToastBridge";
@@ -25,7 +24,6 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* Preconnect for performance */}
         <link rel="icon" type="image/png" href="/favicon.png" />
         <link rel="shortcut icon" type="image/png" href="/favicon.png" />
         <link rel="apple-touch-icon" href="/favicon.png" />
@@ -36,7 +34,6 @@ export default function RootLayout({
           href="https://fonts.gstatic.com"
           crossOrigin="anonymous"
         />
-        {/* Load fonts via standard HTML — not next/font — so build never fails */}
         <link
           href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Roboto:wght@300;400;500;700&display=swap"
           rel="stylesheet"

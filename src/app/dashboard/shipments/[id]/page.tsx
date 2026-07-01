@@ -3,7 +3,7 @@ import ShipmentDetailView from "@/components/layout/ShippingDetailsView";
 import { documentColumns } from "@/components/table/columns/document-columns";
 import { AppTable } from "@/components/table/Table";
 import { Tabs, TabsList, TabsContent, TabsTrigger } from "@/components/ui/tabs/tabs";
-import { Filter, MoveLeft, Loader2, CreditCard, Download } from "lucide-react";
+import { Filter, MoveLeft, Loader2, CreditCard, Download, AlertTriangle, Wrench } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { useState } from "react";
 import {
@@ -12,9 +12,13 @@ import {
   useInitiateShipmentPaymentMutation,
   useInitPendingPaymentMutation,
   useDownloadInvoiceMutation,
+  useGetShipmentAdjustmentsQuery,
 } from "@/store/slice/apiSlice";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
+import { Dialog, DialogContent } from "@/components/ui/dialog/dialog";
+import PriceAdjustmentResponseModal from "@/components/modals/PriceAdjustmentResponseModal";
+import CreatePriceAdjustmentForm from "@/components/form/CreatePriceAdjustmentForm";
 
 const STATUS_OPTIONS = [
   "PENDING", "CONFIRMED", "PICKED_UP", "IN_TRANSIT",
@@ -43,8 +47,13 @@ export default function ShipmentDetails() {
   const router = useRouter();
   const params = useParams();
   const id = params?.id as string;
-  const user = useSelector((s: RootState) => s.auth.user);
+  const user = useSelector((s: RootState) => s.auth.user) as any;
   const isAdmin = user?.role === "ADMIN";
+  const subRole = user?.adminSubRole ?? user?.subRole ?? "";
+  const isDispatcher = isAdmin && ["SUPER_ADMIN", "LOGISTICS_MANAGER", "ROLE_ADMIN", "ROLE_DISPATCHER"].includes(subRole);
+
+  const [adjustmentModalOpen, setAdjustmentModalOpen] = useState(false);
+  const [createAdjustmentOpen, setCreateAdjustmentOpen] = useState(false);
 
   const { data, isLoading, isError } = useGetUserShipmentsByIdQuery(
     { id },
@@ -59,6 +68,11 @@ export default function ShipmentDetails() {
   const [initiatePayment, { isLoading: payingNow }] = useInitiateShipmentPaymentMutation();
   const [initPendingPayment, { isLoading: preparingInvoice }] = useInitPendingPaymentMutation();
   const [downloadInvoice, { isLoading: downloadingInvoice }] = useDownloadInvoiceMutation();
+
+  const shipment = (data as any)?.data?.shipment ?? (data as any)?.data;
+  const { data: adjData } = useGetShipmentAdjustmentsQuery(id, { skip: !id });
+  const adjustments: any[] = (adjData as any)?.data?.adjustments ?? [];
+  const pendingAdjustment = adjustments.find((a) => a.status === "PENDING");
 
   const handlePayNow = async () => {
     const callbackUrl = `${window.location.origin}/dashboard/payment/callback`;
@@ -122,6 +136,28 @@ export default function ShipmentDetails() {
 
   return (
     <div className="space-y-6">
+      {/* ── Price Adjustment Alert Banner ─────────────────────────────────── */}
+      {pendingAdjustment && (
+        <div className="bg-orange-50 border border-orange-300 rounded-xl p-4 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-orange-800">Price adjustment required</p>
+            <p className="text-xs text-orange-700 mt-0.5">
+              A weight discrepancy was found at the hub. This shipment is paused until you respond.
+              Additional charge: <strong>₦{pendingAdjustment.difference.toLocaleString()}</strong>
+            </p>
+          </div>
+          {!isAdmin && (
+            <button
+              onClick={() => setAdjustmentModalOpen(true)}
+              className="flex-shrink-0 text-xs font-medium bg-orange-600 text-white rounded-lg px-3 py-1.5 hover:bg-orange-700 transition-colors"
+            >
+              Respond
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="flex items-center gap-3 justify-between flex-wrap">
         <div className="flex items-center gap-3">
           <button onClick={() => router.back()}>
@@ -356,6 +392,35 @@ export default function ShipmentDetails() {
           )}
         </div>
       </Tabs>
+
+      {/* Customer: respond to pending price adjustment */}
+      {pendingAdjustment && !isAdmin && (
+        <Dialog open={adjustmentModalOpen} onOpenChange={setAdjustmentModalOpen}>
+          <DialogContent size="lg">
+            <PriceAdjustmentResponseModal
+              adjustment={pendingAdjustment}
+              shipmentServiceType={shipment.serviceType}
+              trackingNumber={shipment.trackingNumber}
+              onClose={() => setAdjustmentModalOpen(false)}
+              onResolved={() => setAdjustmentModalOpen(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Dispatcher: create a weight discrepancy adjustment */}
+      {isDispatcher && (
+        <Dialog open={createAdjustmentOpen} onOpenChange={setCreateAdjustmentOpen}>
+          <DialogContent size="lg">
+            <CreatePriceAdjustmentForm
+              shipmentId={id}
+              trackingNumber={shipment.trackingNumber}
+              originalPrice={shipment.quotedPrice}
+              onClose={() => setCreateAdjustmentOpen(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

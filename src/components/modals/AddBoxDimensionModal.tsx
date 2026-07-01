@@ -124,6 +124,7 @@ export default function AddBoxDimensionModal({
           <Input
             label="Length"
             type="number"
+            min={0}
             {...register("lengthCm", { valueAsNumber: true })}
             error={errors.lengthCm?.message}
             rightElement={<span className="text-xs text-gray-400">cm</span>}
@@ -132,6 +133,7 @@ export default function AddBoxDimensionModal({
           <Input
             label="Width"
             type="number"
+            min={0}
             {...register("widthCm", { valueAsNumber: true })}
             error={errors.widthCm?.message}
             rightElement={<span className="text-xs text-gray-400">cm</span>}
@@ -140,6 +142,7 @@ export default function AddBoxDimensionModal({
           <Input
             label="Height"
             type="number"
+            min={0}
             {...register("heightCm", { valueAsNumber: true })}
             error={errors.heightCm?.message}
             rightElement={<span className="text-xs text-gray-400">cm</span>}
@@ -149,6 +152,7 @@ export default function AddBoxDimensionModal({
           <Input
             label="Weight Limit"
             type="number"
+            min={0}
             {...register("weightKgLimit", { valueAsNumber: true })}
             error={errors.weightKgLimit?.message}
             rightElement={<span className="text-xs text-gray-400">kg</span>}

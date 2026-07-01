@@ -2,7 +2,18 @@
 import Sidebar from "@/components/layout/sidebar";
 import { QuickActionDropdown } from "@/components/ui/button/quick-action-button";
 import { useAppSelector } from "@/hooks/useStore";
-import { Bell, HelpCircle, Menu, Check, CheckCheck } from "lucide-react";
+import {
+  Bell,
+  HelpCircle,
+  Menu,
+  Check,
+  CheckCheck,
+  CreditCard,
+  Package,
+  Bell as BellIcon,
+  Ticket,
+  Info,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState, useRef } from "react";
 import {
@@ -34,12 +45,14 @@ function NotificationBell() {
   const notifications: any[] = notifData?.data?.notifications ?? [];
 
   const [markRead] = useMarkNotificationReadMutation();
-  const [markAllRead, { isLoading: markingAll }] = useMarkAllNotificationsReadMutation();
+  const [markAllRead, { isLoading: markingAll }] =
+    useMarkAllNotificationsReadMutation();
 
   // Close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -58,12 +71,12 @@ function NotificationBell() {
     await markAllRead();
   };
 
-  const typeIcon: Record<string, string> = {
-    PAYMENT: "💳",
-    SHIPMENT_UPDATE: "📦",
-    SYSTEM: "🔔",
-    SUPPORT: "🎫",
-    DEFAULT: "🔔",
+  const NotifIcon: Record<string, React.ElementType> = {
+    PAYMENT: CreditCard,
+    SHIPMENT_UPDATE: Package,
+    SYSTEM: BellIcon,
+    SUPPORT: Ticket,
+    DEFAULT: Info,
   };
 
   return (
@@ -115,14 +128,21 @@ function NotificationBell() {
                     n.isRead ? "bg-white" : "bg-red-50 hover:bg-red-100"
                   }`}
                 >
-                  <span className="text-lg flex-shrink-0 mt-0.5">
-                    {typeIcon[n.type] ?? typeIcon.DEFAULT}
-                  </span>
+                  <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    {(() => {
+                      const I = NotifIcon[n.type] ?? NotifIcon.DEFAULT;
+                      return <I className="w-4 h-4 text-gray-500" />;
+                    })()}
+                  </div>
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm ${n.isRead ? "text-gray-700" : "text-gray-900 font-medium"}`}>
+                    <p
+                      className={`text-sm ${n.isRead ? "text-gray-700" : "text-gray-900 font-medium"}`}
+                    >
                       {n.title}
                     </p>
-                    <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.body}</p>
+                    <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
+                      {n.body}
+                    </p>
                     <p className="text-[10px] text-gray-400 mt-1">
                       {new Date(n.createdAt).toLocaleString()}
                     </p>
@@ -138,7 +158,10 @@ function NotificationBell() {
           {/* Footer */}
           {notifications.length > 0 && (
             <div className="px-4 py-2.5 border-t border-gray-100 text-center">
-              <a href="/dashboard/notifications" className="text-xs text-brand font-medium hover:underline">
+              <a
+                href="/dashboard/notifications"
+                className="text-xs text-brand font-medium hover:underline"
+              >
                 View all notifications
               </a>
             </div>
@@ -158,15 +181,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!token) { router.push("/auth/login"); }
-    else { setReady(true); }
+    if (!token) {
+      router.push("/auth/login");
+    } else {
+      setReady(true);
+    }
   }, [router, token]);
 
   if (!ready) return null;
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
-      <Sidebar mobileVisible={sidebarOpen} closeModal={() => setSidebarOpen(false)} />
+      <Sidebar
+        mobileVisible={sidebarOpen}
+        closeModal={() => setSidebarOpen(false)}
+      />
 
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <header className="h-16 flex-shrink-0 bg-white border-b border-gray-100 flex items-center justify-between px-4 md:px-6 shadow-sm">

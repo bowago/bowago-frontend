@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 import StatCard from "@/components/cards/StatCard";
@@ -8,6 +9,7 @@ import ShipmentCard from "@/components/cards/ShipmentCard";
 import ServiceDistribution from "@/components/charts/ServiceDistribution";
 import ShipmentTrend from "@/components/charts/ShipmentTrend";
 import TopRoutes from "@/components/List/TopRoute";
+import { LoyaltyDashboardCard } from "@/components/layout/LoyaltyView";
 import {
   ChevronDown,
   Clock,
@@ -311,11 +313,16 @@ export default function Page() {
     const delivered = myShipments.filter(
       (s: any) => s.status === "DELIVERED",
     ).length;
+    const inTransit = myShipments.filter(
+      (s: any) => ["IN_TRANSIT", "OUT_FOR_DELIVERY", "PICKED_UP"].includes(s.status),
+    ).length;
+
     return (
       <div className="pb-10">
         <div className="text-dashboard-heading">Dashboard</div>
         <main className="flex-1 overflow-auto mt-4">
-          <div className="grid grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
+          {/* Stats row */}
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
             <StatCard
               icon={<PackagePlus className="w-6 h-6 text-orange-500" />}
               iconBg="bg-orange-50"
@@ -326,17 +333,26 @@ export default function Page() {
               delay={0}
             />
             <StatCard
+              icon={<Truck className="w-6 h-6 text-blue-500" />}
+              iconBg="bg-blue-50"
+              value={String(inTransit)}
+              label="In Transit"
+              trend={0}
+              trendPositive
+              delay={60}
+            />
+            <StatCard
               icon={<Package className="w-6 h-6 text-purple-500" />}
               iconBg="bg-purple-50"
               value={String(pending)}
-              label="Pending"
+              label="Pending Payment"
               trend={0}
               trendPositive
               delay={80}
             />
             <StatCard
-              icon={<Clock className="w-6 h-6 text-blue-400" />}
-              iconBg="bg-blue-50"
+              icon={<Clock className="w-6 h-6 text-green-500" />}
+              iconBg="bg-green-50"
               value={String(delivered)}
               label="Delivered"
               trend={0}
@@ -344,7 +360,28 @@ export default function Page() {
               delay={160}
             />
           </div>
-          <ActiveShipmentsSection items={activeShipments} />
+
+          {/* Two-column layout: active shipments + loyalty */}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+            <div className="xl:col-span-2">
+              <ActiveShipmentsSection items={activeShipments} />
+              <div className="mt-4 text-right">
+                <Link href="/dashboard/orders" className="text-sm text-brand hover:underline">
+                  View full order history →
+                </Link>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-gray-600 mb-3">Loyalty Rewards</h3>
+              <LoyaltyDashboardCard />
+              <Link
+                href="/dashboard/loyalty"
+                className="flex items-center justify-center gap-1.5 mt-3 text-xs text-brand hover:underline"
+              >
+                View rewards & history →
+              </Link>
+            </div>
+          </div>
         </main>
       </div>
     );

@@ -142,8 +142,13 @@ export const ContractRateColumns: ColumnDef<ContractRate>[] = [
       const [isEditModal, setIsEditModal] = useState(false);
       const [handleDeleteRate, { isLoading }] = useDeleteContractRateMutation();
 
-      const onDelete = () => {
-        handleDeleteRate({ id: row.original.id });
+      const onDelete = async () => {
+        try {
+          await handleDeleteRate({ id: row.original.id }).unwrap();
+          setIsDeleteModal(false);
+        } catch {
+          // error toast already shown by the mutation
+        }
       };
 
       return (
@@ -173,16 +178,25 @@ export const ContractRateColumns: ColumnDef<ContractRate>[] = [
               <div className="text-center p-6">
                 <h2 className="text-lg font-semibold">Delete Contract Rate</h2>
                 <p className="text-gray-500 mt-2">
-                  Are you sure you want to delete this rate?
+                  Are you sure you want to delete this rate? This cannot be undone.
                 </p>
 
-                <Button
-                  onClick={onDelete}
-                  isLoading={isLoading}
-                  className="mt-4 w-full"
-                >
-                  Proceed
-                </Button>
+                <div className="flex gap-3 mt-4">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setIsDeleteModal(false)}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={onDelete}
+                    isLoading={isLoading}
+                    className="flex-1 bg-red-600 hover:bg-red-700"
+                  >
+                    Delete
+                  </Button>
+                </div>
               </div>
             </DialogContent>
           </Dialog>

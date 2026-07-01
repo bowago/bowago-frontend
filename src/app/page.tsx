@@ -772,9 +772,17 @@ export default function LandingPage() {
               >
                 <div className="flex gap-0.5 mb-4">
                   {Array.from({ length: t.rating }).map((_, i) => (
-                    <span key={i} className="text-yellow-400 text-sm">
-                      ★
-                    </span>
+                    <svg
+                      key={i}
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      className="text-yellow-400"
+                    >
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                    </svg>
                   ))}
                 </div>
                 <p className="text-white/70 text-sm leading-relaxed mb-5">
@@ -810,7 +818,19 @@ export default function LandingPage() {
                   className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5"
                 >
                   <div className="w-6 h-6 rounded-full bg-brand/20 flex items-center justify-center">
-                    <span className="text-brand text-xs">✓</span>
+                    <span className="text-brand text-xs" aria-hidden="true">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                      >
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </span>
                   </div>
                   <div>
                     <p className="text-white/80 text-xs font-semibold">

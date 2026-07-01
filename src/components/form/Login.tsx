@@ -184,7 +184,10 @@ export function LoginForm({
         </Button>
       </form>
 
-      <SocialLogin label="Login with" />
+      <SocialLogin
+        label="Login with"
+        onRequires2FA={(email) => setPending2FAEmail(email)}
+      />
 
       <p className="text-center text-sm text-black mt-5">
         Don&apos;t have an account yet?{" "}

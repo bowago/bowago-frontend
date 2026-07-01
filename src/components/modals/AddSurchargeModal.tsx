@@ -52,7 +52,8 @@ export const addSurchargeSchema = yup.object({
       then: (schema) =>
         schema
           .required("Rate percent is required")
-          .min(0, "Cannot be negative"),
+          .min(0, "Cannot be negative")
+          .max(100, "Cannot exceed 100%"),
       otherwise: (schema) => schema.notRequired(),
     }),
 
@@ -278,6 +279,8 @@ export default function AddSurchargeModal({
                 <Input
                   label="Rate Percent (%)"
                   type="number"
+                  min={0}
+                  max={100}
                   step="0.1"
                   {...register("ratePercent", { valueAsNumber: true })}
                   error={errors.ratePercent?.message}
@@ -288,6 +291,7 @@ export default function AddSurchargeModal({
                 <Input
                   label="Flat Amount (₦)"
                   type="number"
+                  min={0}
                   {...register("flatAmount", { valueAsNumber: true })}
                   error={errors.flatAmount?.message}
                 />

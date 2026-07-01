@@ -9,6 +9,9 @@ import { consumePostAuthRedirect } from "@/lib/shipmentDraft";
 
 interface SocialLoginProps {
   label?: string;
+  /** Called when Google login succeeds but 2FA is required.
+   *  Receives the user's email so the parent can show the OTP step. */
+  onRequires2FA?: (email: string) => void;
 }
 
 declare global {
@@ -25,7 +28,10 @@ declare global {
   }
 }
 
-export function SocialLogin({ label = "Login with" }: SocialLoginProps) {
+export function SocialLogin({
+  label = "Login with",
+  onRequires2FA,
+}: SocialLoginProps) {
   const router = useRouter();
   const [googleAuth] = useGoogleAuthMutation();
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
@@ -39,7 +45,21 @@ export function SocialLogin({ label = "Login with" }: SocialLoginProps) {
           const result = await googleAuth({
             idToken: response.credential,
           }).unwrap();
-          if ((result as any)?.data?.accessToken) {
+
+          const data = (result as any)?.data;
+
+          // 2FA enabled — pass the email up to the parent login form so it
+          // can switch to the OTP step. Tokens are NOT issued yet; the user
+          // must complete /auth/login-2fa before they get access.
+          if (data?.requires2FA) {
+            if (onRequires2FA && data.email) {
+              onRequires2FA(data.email);
+            }
+            return;
+          }
+
+          // Normal Google sign-in — tokens already dispatched by onQueryStarted
+          if (data?.accessToken) {
             const resumeTo = consumePostAuthRedirect();
             router.push(resumeTo || "/dashboard");
           }

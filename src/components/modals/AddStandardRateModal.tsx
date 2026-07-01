@@ -157,6 +157,7 @@ export default function AddStandardRateModal({
               <Input
                 label="Price per Kg"
                 type="number"
+                min={0}
                 {...register("pricePerKg", { valueAsNumber: true })}
                 error={errors.pricePerKg?.message as string}
                 rightElement={<span className="text-xs">₦</span>}
@@ -166,6 +167,7 @@ export default function AddStandardRateModal({
               <Input
                 label="Base Price"
                 type="number"
+                min={0}
                 {...register("basePrice", { valueAsNumber: true })}
                 error={errors.basePrice?.message as string}
                 rightElement={<span className="text-xs">₦</span>}
@@ -175,6 +177,7 @@ export default function AddStandardRateModal({
               <Input
                 label="Min Kg"
                 type="number"
+                min={0}
                 {...register("minKg", { valueAsNumber: true })}
                 error={errors.minKg?.message as string}
                 rightElement={<span className="text-xs">kg</span>}
@@ -183,6 +186,7 @@ export default function AddStandardRateModal({
               <Input
                 label="Max Kg"
                 type="number"
+                min={0}
                 {...register("maxKg", { valueAsNumber: true })}
                 error={errors.maxKg?.message as string}
                 rightElement={<span className="text-xs">kg</span>}
@@ -192,6 +196,7 @@ export default function AddStandardRateModal({
               <Input
                 label="Min Tons"
                 type="number"
+                min={0}
                 step="0.01"
                 {...register("minTons", { valueAsNumber: true })}
                 error={errors.minTons?.message as string}
@@ -201,6 +206,7 @@ export default function AddStandardRateModal({
               <Input
                 label="Max Tons"
                 type="number"
+                min={0}
                 step="0.01"
                 {...register("maxTons", { valueAsNumber: true })}
                 error={errors.maxTons?.message as string}
@@ -211,6 +217,7 @@ export default function AddStandardRateModal({
               <Input
                 label="Min Cartons"
                 type="number"
+                min={0}
                 {...register("minCartons", { valueAsNumber: true })}
                 error={errors.minCartons?.message as string}
               />
@@ -218,6 +225,7 @@ export default function AddStandardRateModal({
               <Input
                 label="Max Cartons"
                 type="number"
+                min={0}
                 {...register("maxCartons", { valueAsNumber: true })}
                 error={errors.maxCartons?.message as string}
               />
