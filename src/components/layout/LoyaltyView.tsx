@@ -83,6 +83,7 @@ export function LoyaltyDashboardCard() {
 
   return (
     <div className={`rounded-2xl border ${tier.border} ${tier.bg} p-5`}>
+      {/* Tier Info */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           {(() => {
