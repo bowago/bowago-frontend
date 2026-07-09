@@ -61,40 +61,21 @@ export default function CancelShipmentModal({
     if (!v) reset();
   };
 
-  const DeleteForm = () => {
-    const {
-      register,
-      handleSubmit,
-      formState: { errors },
-    } = deleteShipmentForm;
+  // Hoisted to top level — a nested `const DeleteForm = () => {...}` here
+  // would get redefined as a new component type on every re-render (e.g. the
+  // instant isLoading flips on submit), causing React to unmount/remount the
+  // form mid-click and silently drop the submit.
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = deleteShipmentForm;
 
-    const onSubmit = (data: { reason: string }) => {
-      // normalize categoryId
-      handleCancelShipment({ id: id, reason: data.reason })
-        .unwrap()
-        .then(() => reset());
-      // TODO: replace with actual mutation
-    };
-
-    return (
-      <form className="mt-10" onSubmit={handleSubmit(onSubmit)}>
-        <TextArea
-          label="Reason for cancelling"
-          {...register("reason")}
-          error={errors.reason?.message}
-        />
-
-        <div className="flex justify-end mt-5">
-          <Button
-            isLoading={isLoading}
-            type="submit"
-            className="px-5 py-2 text-xs"
-          >
-            Cancel
-          </Button>
-        </div>
-      </form>
-    );
+  const onSubmit = (data: { reason: string }) => {
+    handleCancelShipment({ id: id, reason: data.reason })
+      .unwrap()
+      .then(() => reset())
+      .catch(() => {});
   };
 
   return (
@@ -144,7 +125,23 @@ export default function CancelShipmentModal({
                 </div>
               </div>
             ) : (
-              <DeleteForm />
+              <form className="mt-10" onSubmit={handleSubmit(onSubmit)}>
+                <TextArea
+                  label="Reason for cancelling"
+                  {...register("reason")}
+                  error={errors.reason?.message}
+                />
+
+                <div className="flex justify-end mt-5">
+                  <Button
+                    isLoading={isLoading}
+                    type="submit"
+                    className="px-5 py-2 text-xs"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
             )}
           </Dialog.Content>
         </Dialog.Portal>

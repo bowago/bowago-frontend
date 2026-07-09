@@ -16,109 +16,77 @@ import {
   FileText,
   Frame,
   Droplets,
+  Loader2,
 } from "lucide-react";
 import PublicHeader from "@/components/layout/PublicHeader";
+import { useGetPackagingGuidesQuery, useGetPolicyQuery } from "@/store/slice/apiSlice";
 
-const GUIDELINES = [
-  {
-    title: "Choose the Right Box",
-    icon: Box,
-    accent: "#3B82F6",
-    items: [
-      "Use a new, sturdy corrugated cardboard box.",
-      "The box should be 2–3 inches larger than your item on all sides for cushioning.",
-      "Never reuse damaged, wet, or weakened boxes.",
-      "Use BowaGO standard boxes for guaranteed handling compatibility.",
-    ],
-  },
-  {
-    title: "Cushioning & Protection",
-    icon: Shield,
-    accent: "#10B981",
-    items: [
-      "Wrap individual items in at least 5 cm of bubble wrap.",
-      "Fill all empty space with foam peanuts, air pillows, or crumpled paper.",
-      "Fragile items: double-box with 7 cm cushioning between boxes.",
-      "Items must not shift when the sealed box is shaken.",
-      "Electronics: use anti-static bubble wrap and original packaging where possible.",
-    ],
-  },
-  {
-    title: "Sealing Your Package",
-    icon: CheckCircle,
-    accent: "#F59E0B",
-    items: [
-      "Use the H-tape method: tape all seams including edges and corners.",
-      "Use pressure-sensitive tape at least 5 cm wide.",
-      "Never use string, rope, masking tape, or thin cellophane tape.",
-      "Apply at least 3 strips of tape over the opening seam.",
-    ],
-  },
-  {
-    title: "Labelling",
-    icon: Package,
-    accent: "#8B5CF6",
-    items: [
-      "Place the shipping label on the largest flat surface of the box.",
-      "Never place labels over seams, tape, or corners.",
-      "Include a secondary label inside in case the outer one is damaged.",
-      "Remove or cover all old labels and barcodes from reused boxes.",
-    ],
-  },
-];
+// Icon lookup — the API only returns category + title, not an icon, so we
+// keep a small title→icon map for known guide names and fall back to a
+// sensible per-category default for anything a business admin adds later.
+const TITLE_ICONS: Record<string, any> = {
+  "Choose the Right Box": Box,
+  "Cushioning & Protection": Shield,
+  "Sealing Your Package": CheckCircle,
+  Labelling: Package,
+  Electronics: Cpu,
+  Glassware: GlassWater,
+  Clothing: Shirt,
+  Documents: FileText,
+  Artwork: Frame,
+  Liquids: Droplets,
+};
+const CATEGORY_ICONS: Record<string, any> = {
+  GENERAL: Box,
+  FRAGILE: Shield,
+  ELECTRONICS: Cpu,
+  CLOTHING: Shirt,
+  DANGEROUS_GOODS: XCircle,
+};
+const CATEGORY_ACCENTS: Record<string, string> = {
+  GENERAL: "#3B82F6",
+  FRAGILE: "#06B6D4",
+  ELECTRONICS: "#3B82F6",
+  CLOTHING: "#8B5CF6",
+  DANGEROUS_GOODS: "#EF4444",
+};
 
-const SPECIAL = [
-  {
-    name: "Electronics",
-    icon: Cpu,
-    accent: "#3B82F6",
-    tip: "Anti-static wrap. 5 cm cushioning on all sides. Declare value for insurance. Mark 'FRAGILE – ELECTRONICS'.",
-  },
-  {
-    name: "Glassware",
-    icon: GlassWater,
-    accent: "#06B6D4",
-    tip: "Wrap each piece individually. Use cell dividers. Double-box with 7 cm cushioning. Mark 'FRAGILE – GLASS'.",
-  },
-  {
-    name: "Clothing",
-    icon: Shirt,
-    accent: "#8B5CF6",
-    tip: "Poly mailers for soft goods. Seal in plastic bag inside box to protect against moisture.",
-  },
-  {
-    name: "Documents",
-    icon: FileText,
-    accent: "#F59E0B",
-    tip: "Rigid cardboard envelopes. Never fold important documents. Mark 'DO NOT BEND'.",
-  },
-  {
-    name: "Artwork",
-    icon: Frame,
-    accent: "#EC4899",
-    tip: "Corner protectors on frames. Wrap in glassine paper before bubble wrap. Use art shipping box.",
-  },
-  {
-    name: "Liquids",
-    icon: Droplets,
-    accent: "#10B981",
-    tip: "Leak-proof primary container. Wrap in absorbent material. Seal in plastic bag. Mark 'THIS SIDE UP'.",
-  },
-];
+function iconFor(title: string, category: string) {
+  return TITLE_ICONS[title] || CATEGORY_ICONS[category] || Info;
+}
 
-const PROHIBITED = [
-  "Explosives, fireworks, and flammable substances",
-  "Illegal drugs and narcotics",
-  "Live animals (unless pre-approved with documentation)",
-  "Perishable foods without prior approval",
-  "Cash or negotiable instruments without declared value and insurance",
-  "Lithium batteries exceeding airline transport limits",
-  "Weapons, firearms, and ammunition without proper licensing",
-  "Human remains without proper documentation",
-  "Counterfeit or copyright-infringing materials",
-];
+/** Guide bodies are stored as either a markdown-style bullet list
+ * ("- item\n- item") or a single sentence. Split into an array either way
+ * so the render logic doesn't need to care which. */
+function bodyToItems(body: string): string[] {
+  const lines = body.split("\n").map((l) => l.replace(/^-\s*/, "").trim()).filter(Boolean);
+  return lines.length > 0 ? lines : [body];
+}
 
 export default function PackagingGuidePage() {
+  const { data, isLoading } = useGetPackagingGuidesQuery();
+  const { data: policyData } = useGetPolicyQuery({ key: "weight_discrepancy_policy" });
+
+  const grouped: Record<string, any[]> = (data as any)?.data?.grouped ?? {};
+  const dangerousGoods: any[] = (data as any)?.data?.dangerousGoods ?? [];
+  const weightPolicy = (policyData as any)?.data?.policy?.body;
+
+  // GENERAL category = the main step-by-step guidelines section
+  const GUIDELINES = (grouped.GENERAL ?? [])
+    .filter((g) => !g.isDangerous)
+    .map((g) => ({ title: g.title, items: bodyToItems(g.body), icon: iconFor(g.title, g.category), accent: CATEGORY_ACCENTS.GENERAL }));
+
+  // Everything else non-dangerous = special category tips
+  const SPECIAL = Object.entries(grouped)
+    .filter(([cat]) => cat !== "GENERAL" && cat !== "DANGEROUS_GOODS")
+    .flatMap(([cat, guides]) =>
+      (guides as any[])
+        .filter((g) => !g.isDangerous)
+        .map((g) => ({ name: g.title, tip: g.body, icon: iconFor(g.title, cat), accent: CATEGORY_ACCENTS[cat] || "#8B5CF6" })),
+    );
+
+  const PROHIBITED = dangerousGoods.map((g) => g.body || g.title);
+
   return (
     <div className="min-h-screen bg-black text-white overflow-x-hidden">
       {/* ── Background glow ── */}
@@ -160,128 +128,139 @@ export default function PackagingGuidePage() {
         </div>
       </section>
 
-      {/* ── Main guidelines ── */}
-      <section className="py-10 px-4">
-        <div className="max-w-3xl mx-auto space-y-5">
-          {GUIDELINES.map((g) => {
-            const Icon = g.icon;
-            return (
-              <div
-                key={g.title}
-                className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-6"
-              >
-                <div className="flex items-center gap-3 mb-4">
-                  <div
-                    className="w-9 h-9 rounded-xl flex items-center justify-center"
-                    style={{ background: g.accent + "22" }}
-                  >
-                    <Icon className="w-5 h-5" style={{ color: g.accent }} />
-                  </div>
-                  <h2 className="font-bold text-white text-lg">{g.title}</h2>
-                </div>
-                <ul className="space-y-2.5">
-                  {g.items.map((item, i) => (
-                    <li
-                      key={i}
-                      className="flex items-start gap-2.5 text-sm text-white/60"
-                    >
-                      <CheckCircle className="w-4 h-4 text-white/20 shrink-0 mt-0.5" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            );
-          })}
+      {isLoading && (
+        <div className="flex justify-center py-16">
+          <Loader2 className="w-6 h-6 text-white/30 animate-spin" />
         </div>
-      </section>
+      )}
+
+      {/* ── Main guidelines ── */}
+      {GUIDELINES.length > 0 && (
+        <section className="py-10 px-4">
+          <div className="max-w-3xl mx-auto space-y-5">
+            {GUIDELINES.map((g) => {
+              const Icon = g.icon;
+              return (
+                <div
+                  key={g.title}
+                  className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-6"
+                >
+                  <div className="flex items-center gap-3 mb-4">
+                    <div
+                      className="w-9 h-9 rounded-xl flex items-center justify-center"
+                      style={{ background: g.accent + "22" }}
+                    >
+                      <Icon className="w-5 h-5" style={{ color: g.accent }} />
+                    </div>
+                    <h2 className="font-bold text-white text-lg">{g.title}</h2>
+                  </div>
+                  <ul className="space-y-2.5">
+                    {g.items.map((item: string, i: number) => (
+                      <li
+                        key={i}
+                        className="flex items-start gap-2.5 text-sm text-white/60"
+                      >
+                        <CheckCircle className="w-4 h-4 text-white/20 shrink-0 mt-0.5" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* ── Special categories ── */}
-      <section className="py-10 px-4 bg-white/[0.02]">
-        <div className="max-w-3xl mx-auto">
-          <div className="flex items-center gap-2 mb-6">
-            <Info className="w-5 h-5 text-white/40" />
-            <h2 className="text-xl font-bold text-white">Special Categories</h2>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {SPECIAL.map((cat) => (
-              <div
-                key={cat.name}
-                className="border border-white/10 rounded-xl p-4 bg-white/5 hover:bg-white/8 transition-colors"
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <div
-                    className="w-7 h-7 rounded-lg flex items-center justify-center"
-                    style={{ background: cat.accent + "22" }}
-                  >
-                    <cat.icon
-                      className="w-4 h-4"
-                      style={{ color: cat.accent }}
-                    />
+      {SPECIAL.length > 0 && (
+        <section className="py-10 px-4 bg-white/[0.02]">
+          <div className="max-w-3xl mx-auto">
+            <div className="flex items-center gap-2 mb-6">
+              <Info className="w-5 h-5 text-white/40" />
+              <h2 className="text-xl font-bold text-white">Special Categories</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {SPECIAL.map((cat) => (
+                <div
+                  key={cat.name}
+                  className="border border-white/10 rounded-xl p-4 bg-white/5 hover:bg-white/8 transition-colors"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <div
+                      className="w-7 h-7 rounded-lg flex items-center justify-center"
+                      style={{ background: cat.accent + "22" }}
+                    >
+                      <cat.icon
+                        className="w-4 h-4"
+                        style={{ color: cat.accent }}
+                      />
+                    </div>
+                    <h3 className="font-semibold text-white text-sm">
+                      {cat.name}
+                    </h3>
                   </div>
-                  <h3 className="font-semibold text-white text-sm">
-                    {cat.name}
-                  </h3>
+                  <p className="text-xs text-white/40 leading-relaxed">
+                    {cat.tip}
+                  </p>
                 </div>
-                <p className="text-xs text-white/40 leading-relaxed">
-                  {cat.tip}
-                </p>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* ── Prohibited items ── */}
-      <section className="py-10 px-4">
-        <div className="max-w-3xl mx-auto">
-          <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-red-500/20 flex items-center justify-center">
-                <XCircle className="w-5 h-5 text-red-400" />
+      {PROHIBITED.length > 0 && (
+        <section className="py-10 px-4">
+          <div className="max-w-3xl mx-auto">
+            <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-9 h-9 rounded-xl bg-red-500/20 flex items-center justify-center">
+                  <XCircle className="w-5 h-5 text-red-400" />
+                </div>
+                <h2 className="font-bold text-white text-lg">Prohibited Items</h2>
               </div>
-              <h2 className="font-bold text-white text-lg">Prohibited Items</h2>
+              <p className="text-sm text-white/40 mb-4">
+                Shipping prohibited items will result in immediate cancellation,
+                seizure, and possible legal action.
+              </p>
+              <ul className="space-y-2">
+                {PROHIBITED.map((item: string, i: number) => (
+                  <li
+                    key={i}
+                    className="flex items-start gap-2.5 text-sm text-red-300/70"
+                  >
+                    <XCircle className="w-4 h-4 text-red-500/40 shrink-0 mt-0.5" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
             </div>
-            <p className="text-sm text-white/40 mb-4">
-              Shipping prohibited items will result in immediate cancellation,
-              seizure, and possible legal action.
-            </p>
-            <ul className="space-y-2">
-              {PROHIBITED.map((item, i) => (
-                <li
-                  key={i}
-                  className="flex items-start gap-2.5 text-sm text-red-300/70"
-                >
-                  <XCircle className="w-4 h-4 text-red-500/40 shrink-0 mt-0.5" />
-                  {item}
-                </li>
-              ))}
-            </ul>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* ── Weight policy ── */}
-      <section className="py-10 px-4 bg-white/[0.02]">
-        <div className="max-w-3xl mx-auto">
-          <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-6">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-9 h-9 rounded-xl bg-yellow-500/20 flex items-center justify-center">
-                <AlertTriangle className="w-5 h-5 text-yellow-400" />
+      {weightPolicy && (
+        <section className="py-10 px-4 bg-white/[0.02]">
+          <div className="max-w-3xl mx-auto">
+            <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-6">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-yellow-500/20 flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-yellow-400" />
+                </div>
+                <h2 className="font-bold text-white">
+                  Weight Discrepancy Policy
+                </h2>
               </div>
-              <h2 className="font-bold text-white">
-                Weight Discrepancy Policy
-              </h2>
+              <p className="text-sm text-white/50 leading-relaxed">
+                {weightPolicy}
+              </p>
             </div>
-            <p className="text-sm text-white/50 leading-relaxed">
-              If the actual weight or dimensions differ from what was declared
-              at booking, your shipment is placed on hold. You have 24 hours to
-              pay any additional charges before the shipment is automatically
-              cancelled.
-            </p>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* ── CTA ── */}
       <section className="py-16 px-4 text-center">

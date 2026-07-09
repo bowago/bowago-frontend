@@ -4,10 +4,10 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import { cn } from "@/utils/cn";
-import { Percent, FileText, Layers } from "lucide-react";
+import { FileText, Layers, Percent } from "lucide-react";
 import AddStandardRateModal from "./AddStandardRateModal";
 import ContractRateModal from "./AddContractRateModal";
-import AddPromoRateModal from "./AddPromoRateModal";
+import AddPromoCodeModal from "./AddPromoCodeModal";
 
 export type RateType = "standard" | "contract" | "promo";
 
@@ -21,9 +21,9 @@ export default function CreateRateModal({
   defaultRate: RateType;
 }) {
   const [selected, setSelected] = useState<RateType>(defaultRate);
-  const [isOpenAddPromoRateModal, setIsOpenAddPromoRateModal] = useState(false);
   const [isOpenStandardRateModal, setIsOpenStandardRateModal] = useState(false);
   const [isOpenContractRateModal, setIsOpenContractRateModal] = useState(false);
+  const [isOpenPromoCodeModal, setIsOpenPromoCodeModal] = useState(false);
 
   useEffect(() => {
     setSelected(defaultRate);
@@ -37,17 +37,14 @@ export default function CreateRateModal({
     setIsOpenContractRateModal(true);
     setIsOpen(false);
   };
-  const openPromoRateModal = () => {
-    setIsOpenAddPromoRateModal(true);
+  const openPromoCodeModal = () => {
+    setIsOpenPromoCodeModal(true);
     setIsOpen(false);
   };
   const handleContinue = () => {
     if (selected === "standard") openStandardRateModal();
     if (selected === "contract") openContractRateModal();
-    if (selected === "promo") openPromoRateModal();
-
-    console.log("Selected:", selected);
-    // 👉 route or open next modal
+    if (selected === "promo") openPromoCodeModal();
   };
 
   const options = [
@@ -65,8 +62,8 @@ export default function CreateRateModal({
     },
     {
       key: "promo",
-      title: "Promo Rate",
-      description: "Discounted rate used for promotions or campaigns",
+      title: "Promo Code",
+      description: "Discount code customers apply at checkout",
       icon: Percent,
     },
   ];
@@ -94,7 +91,6 @@ export default function CreateRateModal({
             {/* Options */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {options?.map((item) => {
-                console.log(selected, item.key);
                 const Icon = item.icon;
                 const isActive = selected === item.key;
 
@@ -157,9 +153,9 @@ export default function CreateRateModal({
         isOpen={isOpenContractRateModal}
         setIsOpen={setIsOpenContractRateModal}
       />
-      <AddPromoRateModal
-        isOpen={isOpenAddPromoRateModal}
-        setIsOpen={setIsOpenAddPromoRateModal}
+      <AddPromoCodeModal
+        isOpen={isOpenPromoCodeModal}
+        setIsOpen={setIsOpenPromoCodeModal}
       />
     </>
   );

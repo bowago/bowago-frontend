@@ -72,119 +72,20 @@ export default function AddZoneModal({
     if (!v) reset();
   };
 
-  const AddCityForm = () => {
-    const {
-      register,
-      handleSubmit,
-      control,
-      formState: { errors },
-    } = addCityForm;
+  // Hoisted to top level — see AddContractRateModal.tsx for why a nested
+  // form component here causes submit clicks to silently drop.
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { errors },
+  } = addCityForm;
 
-    const onSubmit = (data: AddZoneFormData) => {
-      handleAddZone(data)
-        .unwrap()
-        .then(() => reset());
-    };
-
-    return (
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <div className="grid grid-cols-2 gap-3 mb-3 mt-6">
-          {/* Origin */}
-          <div className=" col-span-2">
-            <Controller
-              control={control}
-              name="zone"
-              render={({ field }) => (
-                <SelectInput
-                  label="Zone"
-                  placeholder={"Select Zone"}
-                  options={[
-                    {
-                      label: "Zone 1",
-                      value: "1",
-                    },
-                    {
-                      label: "Zone 2",
-                      value: "2",
-                    },
-                    {
-                      label: "Zone 3",
-                      value: "3",
-                    },
-                    {
-                      label: "Zone 4",
-                      value: "4",
-                    },
-                  ]}
-                  value={field.value.toString()}
-                  onValueChange={field.onChange}
-                  error={errors.zone?.message}
-                />
-              )}
-            />
-          </div>
-
-          {/* Destination */}
-
-          <Controller
-            control={control}
-            name="fromCityId"
-            render={({ field }) => (
-              <SelectInput
-                label="From City"
-                disabled={citiesIsLoading}
-                placeholder={citiesIsLoading ? "...loading" : "Select Region"}
-                options={
-                  citiesData?.data?.cities &&
-                  citiesData?.data?.cities.map(
-                    (city: { name: string; state: string; id: string }) => ({
-                      label: `${city.name}${city.state && city.state !== "Unknown" ? ` (${city.state})` : ""}`,
-                      value: city.id,
-                    }),
-                  )
-                }
-                value={field.value}
-                onValueChange={field.onChange}
-                error={errors.fromCityId?.message}
-              />
-            )}
-          />
-          <Controller
-            control={control}
-            name="toCityId"
-            render={({ field }) => (
-              <SelectInput
-                label="To City"
-                disabled={citiesIsLoading}
-                placeholder={citiesIsLoading ? "...loading" : "Select Region"}
-                options={
-                  citiesData?.data?.cities &&
-                  citiesData?.data?.cities.map(
-                    (city: { name: string; state: string; id: string }) => ({
-                      label: `${city.name}${city.state && city.state !== "Unknown" ? ` (${city.state})` : ""}`,
-                      value: city.id,
-                    }),
-                  )
-                }
-                value={field.value}
-                onValueChange={field.onChange}
-                error={errors.toCityId?.message}
-              />
-            )}
-          />
-        </div>
-
-        <div className="flex justify-end gap-2 mt-5">
-          <Button
-            isLoading={isLoading}
-            type="submit"
-            className="px-5 py-2 text-xs font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-          >
-            Add New Zone
-          </Button>
-        </div>
-      </form>
-    );
+  const onSubmit = (data: AddZoneFormData) => {
+    handleAddZone(data)
+      .unwrap()
+      .then(() => reset())
+      .catch(() => {});
   };
 
   return (
@@ -220,7 +121,103 @@ export default function AddZoneModal({
               <span className="w-6" />
             </div>
 
-            <AddCityForm />
+            <form onSubmit={handleSubmit(onSubmit)}>
+              <div className="grid grid-cols-2 gap-3 mb-3 mt-6">
+                {/* Origin */}
+                <div className=" col-span-2">
+                  <Controller
+                    control={control}
+                    name="zone"
+                    render={({ field }) => (
+                      <SelectInput
+                        label="Zone"
+                        placeholder={"Select Zone"}
+                        options={[
+                          {
+                            label: "Zone 1",
+                            value: "1",
+                          },
+                          {
+                            label: "Zone 2",
+                            value: "2",
+                          },
+                          {
+                            label: "Zone 3",
+                            value: "3",
+                          },
+                          {
+                            label: "Zone 4",
+                            value: "4",
+                          },
+                        ]}
+                        value={field.value.toString()}
+                        onValueChange={field.onChange}
+                        error={errors.zone?.message}
+                      />
+                    )}
+                  />
+                </div>
+
+                {/* Destination */}
+
+                <Controller
+                  control={control}
+                  name="fromCityId"
+                  render={({ field }) => (
+                    <SelectInput
+                      label="From City"
+                      disabled={citiesIsLoading}
+                      placeholder={citiesIsLoading ? "...loading" : "Select Region"}
+                      options={
+                        citiesData?.data?.cities &&
+                        citiesData?.data?.cities.map(
+                          (city: { name: string; state: string; id: string }) => ({
+                            label: `${city.name}${city.state && city.state !== "Unknown" ? ` (${city.state})` : ""}`,
+                            value: city.id,
+                          }),
+                        )
+                      }
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      error={errors.fromCityId?.message}
+                    />
+                  )}
+                />
+                <Controller
+                  control={control}
+                  name="toCityId"
+                  render={({ field }) => (
+                    <SelectInput
+                      label="To City"
+                      disabled={citiesIsLoading}
+                      placeholder={citiesIsLoading ? "...loading" : "Select Region"}
+                      options={
+                        citiesData?.data?.cities &&
+                        citiesData?.data?.cities.map(
+                          (city: { name: string; state: string; id: string }) => ({
+                            label: `${city.name}${city.state && city.state !== "Unknown" ? ` (${city.state})` : ""}`,
+                            value: city.id,
+                          }),
+                        )
+                      }
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      error={errors.toCityId?.message}
+                    />
+                  )}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 mt-5">
+                <Button
+                  isLoading={isLoading}
+                  type="submit"
+                  className="px-5 py-2 text-xs font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Add New Zone
+                </Button>
+              </div>
+            </form>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>

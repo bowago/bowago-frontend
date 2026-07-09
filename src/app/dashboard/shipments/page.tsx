@@ -10,6 +10,7 @@ import CreateShipmentModal from "@/components/modals/CreateShipmentModal";
 import { Button } from "@/components/ui/button";
 import {
   useGetAdminShipmentsQuery,
+  useGetEnterpriseShipmentsQuery,
   useGetUserShipmentsQuery,
   UserShipmentQueryParams,
 } from "@/store/slice/apiSlice";
@@ -39,23 +40,25 @@ function getShipments(response: any): Shipment[] {
 
 // ── Org context banner ────────────────────────────────────────────────────────
 function OrgContextBanner({ user }: { user: any }) {
-  const subRole = user?.adminSubRole ?? "";
+  const enterpriseRole = user?.enterpriseRole ?? "";
   const ORG_ROLES = [
     "ROLE_DISPATCHER",
     "ROLE_FINANCE",
     "ROLE_MASTER",
+    "ROLE_AGENT",
     "ROLE_USER",
   ];
-  if (!ORG_ROLES.includes(subRole)) return null;
+  if (!ORG_ROLES.includes(enterpriseRole)) return null;
 
   const roleLabel: Record<string, string> = {
     ROLE_DISPATCHER: "Dispatcher",
     ROLE_FINANCE: "Finance",
     ROLE_MASTER: "Company Owner",
+    ROLE_AGENT: "Customer Service",
     ROLE_USER: "Viewer",
   };
 
-  const isMaster = subRole === "ROLE_MASTER";
+  const isMaster = enterpriseRole === "ROLE_MASTER";
 
   return (
     <div className="flex items-center gap-3 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 mb-4">
@@ -68,12 +71,12 @@ function OrgContextBanner({ user }: { user: any }) {
             (isMaster ? "Your Organisation" : "Company Shipments")}
         </p>
         <p className="text-xs text-blue-600 mt-0.5">
-          {roleLabel[subRole]} — you can see{" "}
+          {roleLabel[enterpriseRole]} — you can see{" "}
           {isMaster ? "all team" : "your org's"} shipments
         </p>
       </div>
       <span className="text-[10px] font-bold uppercase tracking-wide bg-blue-600 text-white px-2 py-0.5 rounded-full">
-        {roleLabel[subRole]}
+        {roleLabel[enterpriseRole]}
       </span>
     </div>
   );
@@ -84,10 +87,13 @@ function AdminShipmentsList({
   canCreate,
   canExport,
   isReadOnly,
+  scope,
 }: {
   canCreate: boolean;
   canExport: boolean;
   isReadOnly: boolean;
+  /** "internal" = platform-wide (BowaGo staff). "enterprise" = tenant-scoped only. */
+  scope: "internal" | "enterprise";
 }) {
   const [filters, setFilters] = useState({ status: "", search: "" });
   const [applied, setApplied] = useState(filters);
@@ -102,9 +108,20 @@ function AdminShipmentsList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shouldAutoOpen]);
 
-  const { data, isLoading, isError } = useGetAdminShipmentsQuery(
-    Object.fromEntries(Object.entries(applied).filter(([, v]) => Boolean(v))),
+  const appliedFilters = Object.fromEntries(
+    Object.entries(applied).filter(([, v]) => Boolean(v)),
   );
+  // Both hooks are always called (Rules of Hooks) — only the one matching
+  // `scope` actually fires, via `skip`. Internal admin sees platform-wide
+  // data; Enterprise sees only their own tenant's shipments.
+  const adminQuery = useGetAdminShipmentsQuery(appliedFilters as any, {
+    skip: scope !== "internal",
+  });
+  const enterpriseQuery = useGetEnterpriseShipmentsQuery(appliedFilters as any, {
+    skip: scope !== "enterprise",
+  });
+  const { data, isLoading, isError } =
+    scope === "enterprise" ? enterpriseQuery : adminQuery;
   const shipments = getShipments(data);
 
   const handleExport = () => {
@@ -337,40 +354,51 @@ function CustomerShipmentsList() {
 export default function ShipmentsPage() {
   const user = useSelector((s: RootState) => s.auth.user) as any;
   const role = user?.role;
-  const subRole = user?.adminSubRole ?? "";
+  const adminSubRole = user?.adminSubRole ?? "";
+  const enterpriseRole = user?.enterpriseRole ?? "";
 
   const isCustomer = role === "CUSTOMER";
+  const isEnterprise = role === "ENTERPRISE";
+  const isAdmin = role === "ADMIN";
 
-  // Capabilities per sub-role
-  const canCreate = [
-    "SUPER_ADMIN",
-    "LOGISTICS_MANAGER",
-    "ROLE_ADMIN",
-    "ROLE_DISPATCHER",
-    "ROLE_MASTER",
-  ].includes(subRole);
-  const canExport = ["SUPER_ADMIN", "LOGISTICS_MANAGER", "ROLE_ADMIN"].includes(subRole);
-  const isReadOnly = ["ROLE_FINANCE", "ROLE_AGENT"].includes(subRole);
+  // Internal admin staff who can even reach this page (requireLogisticsOrAbove)
+  // can always create/export — the backend already gated entry.
+  const adminCanCreate = isAdmin;
+  const adminCanExport = isAdmin;
 
-  // Page title personalised for org members
+  // Enterprise capabilities are keyed off enterpriseRole, never adminSubRole.
+  const enterpriseCanCreate = ["ROLE_MASTER", "ROLE_DISPATCHER"].includes(enterpriseRole);
+  const enterpriseCanExport = false; // CSV export is an internal-admin-only tool
+  const enterpriseIsReadOnly = ["ROLE_FINANCE", "ROLE_AGENT", "ROLE_USER"].includes(enterpriseRole);
+
+  // Page title personalised for Enterprise members
   const pageTitle = (() => {
-    if (subRole === "ROLE_MASTER") return "Organisation Shipments";
-    if (subRole === "ROLE_DISPATCHER") return "Team Shipments";
-    if (subRole === "ROLE_FINANCE") return "Shipments (Read-only)";
+    if (!isEnterprise) return "Shipments";
+    if (enterpriseRole === "ROLE_MASTER") return "Company Shipments";
+    if (enterpriseRole === "ROLE_DISPATCHER") return "Team Shipments";
+    if (enterpriseRole === "ROLE_FINANCE") return "Shipments (Read-only)";
     return "Shipments";
   })();
 
   return (
     <div className="space-y-4">
       <h1 className="dashboard-heading">{pageTitle}</h1>
-      {!isCustomer && <OrgContextBanner user={user} />}
-      {isCustomer ? (
-        <CustomerShipmentsList />
-      ) : (
+      {isEnterprise && <OrgContextBanner user={user} />}
+      {isCustomer && <CustomerShipmentsList />}
+      {isEnterprise && (
         <AdminShipmentsList
-          canCreate={canCreate}
-          canExport={canExport}
-          isReadOnly={isReadOnly}
+          canCreate={enterpriseCanCreate}
+          canExport={enterpriseCanExport}
+          isReadOnly={enterpriseIsReadOnly}
+          scope="enterprise"
+        />
+      )}
+      {isAdmin && (
+        <AdminShipmentsList
+          canCreate={adminCanCreate}
+          canExport={adminCanExport}
+          isReadOnly={false}
+          scope="internal"
         />
       )}
     </div>

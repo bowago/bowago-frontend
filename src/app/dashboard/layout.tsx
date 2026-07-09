@@ -14,7 +14,7 @@ import {
   Ticket,
   Info,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import React, { useEffect, useState, useRef } from "react";
 import {
   useGetUnreadNotificationCountQuery,
@@ -172,21 +172,108 @@ function NotificationBell() {
   );
 }
 
+// ─── Route guard: prevents direct-URL access across system boundaries ────────
+// The sidebar already hides these links per role, but a user can still type
+// a URL directly — this is the actual enforcement point on the frontend
+// (the backend independently enforces the same boundary on every API call).
+const INTERNAL_ADMIN_ONLY_PREFIXES = [
+  "/dashboard/rate",
+  "/dashboard/surcharges",
+  "/dashboard/address-changes",
+  "/dashboard/delay-alerts",
+  "/dashboard/faq/admin",
+  "/dashboard/payment/webhooks",
+  "/dashboard/settings/business-rules",
+  "/dashboard/settings/content",
+  "/dashboard/support",
+  "/dashboard/tickets/claims/admin",
+  "/dashboard/users",
+];
+const CUSTOMER_ONLY_PREFIXES = ["/dashboard/orders", "/dashboard/loyalty"];
+const ENTERPRISE_ONLY_PREFIXES = ["/dashboard/team"];
+
+// Pages restricted to SUPER_ADMIN / LOGISTICS_MANAGER inside the internal
+// admin world — hidden in the sidebar AND blocked here on direct URL access
+// (PRD: "Hidden pages cannot be accessed directly").
+const SUPER_ADMIN_ONLY_PREFIXES = [
+  "/dashboard/payment/webhooks",
+  "/dashboard/settings/business-rules",
+  "/dashboard/surcharges/audit-log",
+  "/dashboard/users/roles",
+];
+const SUPER_SUBROLES = ["SUPER_ADMIN", "LOGISTICS_MANAGER"];
+
+// Enterprise sub-role page gating — mirrors the sidebar's enterpriseRoles
+// visibility so a hidden link cannot be opened by typing the URL.
+//   • Company Users (team management) → ROLE_MASTER only
+//   • Invoices → finance-capable roles only (matches sidebar ENT_FINANCE)
+const ENTERPRISE_MASTER_ONLY_PREFIXES = ["/dashboard/team"];
+const ENTERPRISE_FINANCE_ROLES = ["ROLE_MASTER", "ROLE_FINANCE", "ROLE_USER"];
+
+function isBlockedForRole(
+  role: string | undefined,
+  pathname: string,
+  adminSubRole?: string | null,
+  enterpriseRole?: string | null,
+): boolean {
+  const isInternalOnly = INTERNAL_ADMIN_ONLY_PREFIXES.some((p) => pathname.startsWith(p));
+  const isCustomerOnly = CUSTOMER_ONLY_PREFIXES.some((p) => pathname.startsWith(p));
+  const isEnterpriseOnly = ENTERPRISE_ONLY_PREFIXES.some((p) => pathname.startsWith(p));
+
+  if (isInternalOnly && role !== "ADMIN") return true;
+  if (isCustomerOnly && role !== "CUSTOMER") return true;
+  if (isEnterpriseOnly && role !== "ENTERPRISE") return true;
+
+  // Internal admin: SUPER-only pages blocked for ROLE_ADMIN sub-role
+  if (
+    role === "ADMIN" &&
+    SUPER_ADMIN_ONLY_PREFIXES.some((p) => pathname.startsWith(p)) &&
+    !SUPER_SUBROLES.includes(adminSubRole ?? "")
+  ) {
+    return true;
+  }
+
+  // Enterprise tenant: sub-role gating
+  if (role === "ENTERPRISE") {
+    if (
+      ENTERPRISE_MASTER_ONLY_PREFIXES.some((p) => pathname.startsWith(p)) &&
+      enterpriseRole !== "ROLE_MASTER"
+    ) {
+      return true;
+    }
+    if (
+      pathname.startsWith("/dashboard/invoice") &&
+      !ENTERPRISE_FINANCE_ROLES.includes(enterpriseRole ?? "")
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 // ─── Dashboard layout ─────────────────────────────────────────────────────────
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const token = useAppSelector((s) => s.auth.accessToken);
   const userRole = useAppSelector((s) => s.auth.user?.role);
+  const adminSubRole = useAppSelector((s) => s.auth.user?.adminSubRole);
+  const enterpriseRole = useAppSelector((s) => s.auth.user?.enterpriseRole);
   const router = useRouter();
+  const pathname = usePathname();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (!token) {
       router.push("/auth/login");
-    } else {
-      setReady(true);
+      return;
     }
-  }, [router, token]);
+    if (isBlockedForRole(userRole, pathname, adminSubRole, enterpriseRole)) {
+      router.push("/dashboard");
+      return;
+    }
+    setReady(true);
+  }, [router, token, userRole, adminSubRole, enterpriseRole, pathname]);
 
   if (!ready) return null;
 

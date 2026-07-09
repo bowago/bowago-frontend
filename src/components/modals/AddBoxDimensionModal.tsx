@@ -76,110 +76,21 @@ export default function AddBoxDimensionModal({
     if (!v) reset();
   };
 
-  const AddBoxForm = () => {
-    const {
-      register,
-      handleSubmit,
-      formState: { errors },
-    } = addBoxDimensionForm;
+  // Hoisted to top level — see AddContractRateModal.tsx for why a nested
+  // `const AddBoxForm = () => {...}` here causes the form to unmount/remount
+  // (and the submit to appear to silently fail) the instant isLoading flips.
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = addBoxDimensionForm;
 
-    const onSubmit = (data: AddBoxDimensionFormData) => {
-      // normalize categoryId
-      data.categoryId = data.categoryId.toUpperCase().replace(/\s+/g, "");
-      handleAddBoxDimension(data)
-        .unwrap()
-        .then(() => reset());
-      // TODO: replace with actual mutation
-    };
-
-    return (
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <div className="grid grid-cols-2 gap-3 mt-6">
-          {/* Category ID */}
-          <div className="col-span-2">
-            <Input
-              label="Category ID"
-              placeholder="e.g. XXL-11"
-              {...register("categoryId")}
-              error={errors.categoryId?.message}
-              onChange={(e) => {
-                e.target.value = e.target.value
-                  .toUpperCase()
-                  .replace(/\s+/g, "");
-              }}
-            />
-          </div>
-
-          {/* Display Name */}
-          <div className="col-span-2">
-            <Input
-              label="Display Name"
-              placeholder="Extra Extra Large Box"
-              {...register("displayName")}
-              error={errors.displayName?.message}
-            />
-          </div>
-
-          {/* Dimensions */}
-          <Input
-            label="Length"
-            type="number"
-            min={0}
-            {...register("lengthCm", { valueAsNumber: true })}
-            error={errors.lengthCm?.message}
-            rightElement={<span className="text-xs text-gray-400">cm</span>}
-          />
-
-          <Input
-            label="Width"
-            type="number"
-            min={0}
-            {...register("widthCm", { valueAsNumber: true })}
-            error={errors.widthCm?.message}
-            rightElement={<span className="text-xs text-gray-400">cm</span>}
-          />
-
-          <Input
-            label="Height"
-            type="number"
-            min={0}
-            {...register("heightCm", { valueAsNumber: true })}
-            error={errors.heightCm?.message}
-            rightElement={<span className="text-xs text-gray-400">cm</span>}
-          />
-
-          {/* Weight */}
-          <Input
-            label="Weight Limit"
-            type="number"
-            min={0}
-            {...register("weightKgLimit", { valueAsNumber: true })}
-            error={errors.weightKgLimit?.message}
-            rightElement={<span className="text-xs text-gray-400">kg</span>}
-          />
-
-          {/* Best For */}
-          <div className="col-span-2">
-            <Input
-              label="Best For"
-              placeholder="e.g. Large Appliances"
-              {...register("bestFor")}
-              error={errors.bestFor?.message}
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end mt-5">
-          <Button
-            isLoading={isLoading}
-            type="submit"
-            className="px-5 py-2 text-xs"
-          >
-            Add Box
-          </Button>
-        </div>
-      </form>
-    );
+  const onSubmit = (data: AddBoxDimensionFormData) => {
+    data.categoryId = data.categoryId.toUpperCase().replace(/\s+/g, "");
+    handleAddBoxDimension(data)
+      .unwrap()
+      .then(() => reset())
+      .catch(() => {});
   };
 
   return (
@@ -215,7 +126,92 @@ export default function AddBoxDimensionModal({
               <span className="w-6" />
             </div>
 
-            <AddBoxForm />
+            <form onSubmit={handleSubmit(onSubmit)}>
+              <div className="grid grid-cols-2 gap-3 mt-6">
+                {/* Category ID */}
+                <div className="col-span-2">
+                  <Input
+                    label="Category ID"
+                    placeholder="e.g. XXL-11"
+                    {...register("categoryId")}
+                    error={errors.categoryId?.message}
+                    onChange={(e) => {
+                      e.target.value = e.target.value
+                        .toUpperCase()
+                        .replace(/\s+/g, "");
+                    }}
+                  />
+                </div>
+
+                {/* Display Name */}
+                <div className="col-span-2">
+                  <Input
+                    label="Display Name"
+                    placeholder="Extra Extra Large Box"
+                    {...register("displayName")}
+                    error={errors.displayName?.message}
+                  />
+                </div>
+
+                {/* Dimensions */}
+                <Input
+                  label="Length"
+                  type="number"
+                  min={0}
+                  {...register("lengthCm", { valueAsNumber: true })}
+                  error={errors.lengthCm?.message}
+                  rightElement={<span className="text-xs text-gray-400">cm</span>}
+                />
+
+                <Input
+                  label="Width"
+                  type="number"
+                  min={0}
+                  {...register("widthCm", { valueAsNumber: true })}
+                  error={errors.widthCm?.message}
+                  rightElement={<span className="text-xs text-gray-400">cm</span>}
+                />
+
+                <Input
+                  label="Height"
+                  type="number"
+                  min={0}
+                  {...register("heightCm", { valueAsNumber: true })}
+                  error={errors.heightCm?.message}
+                  rightElement={<span className="text-xs text-gray-400">cm</span>}
+                />
+
+                {/* Weight */}
+                <Input
+                  label="Weight Limit"
+                  type="number"
+                  min={0}
+                  {...register("weightKgLimit", { valueAsNumber: true })}
+                  error={errors.weightKgLimit?.message}
+                  rightElement={<span className="text-xs text-gray-400">kg</span>}
+                />
+
+                {/* Best For */}
+                <div className="col-span-2">
+                  <Input
+                    label="Best For"
+                    placeholder="e.g. Large Appliances"
+                    {...register("bestFor")}
+                    error={errors.bestFor?.message}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end mt-5">
+                <Button
+                  isLoading={isLoading}
+                  type="submit"
+                  className="px-5 py-2 text-xs"
+                >
+                  Add Box
+                </Button>
+              </div>
+            </form>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>

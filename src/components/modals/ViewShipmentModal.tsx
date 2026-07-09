@@ -322,9 +322,12 @@ export default function ViewShipmentModal({
     useAssignShipmentMutation();
   const currentUser = useSelector((s: RootState) => s.auth.user);
 
-  // Fetch dispatchers for the assign dropdown (only when assign panel is open)
+  // Fetch internal staff for the assign dropdown (only when assign panel is
+  // open). Internal shipment ops staff are ROLE_ADMIN (capability-based via
+  // canManageShipments) — ROLE_DISPATCHER is an Enterprise-tenant role and
+  // is never used for this internal assignment action.
   const { data: dispatchersData } = useGetUsersQuery(
-    { role: "ADMIN", adminSubRole: "ROLE_DISPATCHER" } as any,
+    { role: "ADMIN", adminSubRole: "ROLE_ADMIN" } as any,
     { skip: !showAssign },
   );
   const dispatchers: any[] = (dispatchersData as any)?.data?.users ?? [];

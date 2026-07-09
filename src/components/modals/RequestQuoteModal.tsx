@@ -24,6 +24,7 @@ interface QuoteFormData {
   lengthCm?: number;
   widthCm?: number;
   heightCm?: number;
+  promoCode?: string;
 }
 
 type QuoteCity = {
@@ -120,6 +121,7 @@ export default function CreateQuoteModal({
       lengthCm: undefined,
       widthCm: undefined,
       heightCm: undefined,
+      promoCode: "",
     },
   });
 
@@ -134,6 +136,29 @@ export default function CreateQuoteModal({
   } = form;
 
   const values = watch();
+
+  // Hoisted here (was previously called inside `Step1`/`Step2`, which were
+  // components defined INSIDE this component's render body — a React
+  // anti-pattern: every re-render redefines them as new component types,
+  // so React unmounts/remounts the currently-visible step. Combined with
+  // `watch()` above re-rendering on every keystroke, and isLoadingQuote
+  // flipping the instant Calculate is clicked, that's exactly the kind of
+  // thing that makes a submit click "do nothing" — the click can land on a
+  // DOM node that gets torn down mid-event. Hooks must also always be
+  // called unconditionally at the top level, not inside a component that
+  // only mounts on some steps — so these move up here regardless.
+  const { data: citiesRes, isLoading: citiesLoading } = useGetCitiesQuery({});
+  const cities = (citiesRes?.data?.cities ?? []) as CityOption[];
+
+  const { data: dimensionsRes, isLoading: dimensionsLoading } = useGetDimensionsQuery({});
+  const dimensions = (dimensionsRes?.data?.dimensions ?? []) as BoxDimension[];
+
+  const selectedBox = dimensions.find((item) => item.id === values.boxDimensionId);
+  const maxWeight = selectedBox?.weightKgLimit || 0;
+  const maxTons = maxWeight / 1000;
+  const cartonsCount = values.cartons || 1;
+  const totalWeight = selectedBox ? maxWeight * cartonsCount : 0;
+  const totalTons = selectedBox ? maxTons * cartonsCount : 0;
 
   const reset = () => {
     form.reset();
@@ -157,6 +182,7 @@ export default function CreateQuoteModal({
           customLength: data.lengthCm,
           customWidth: data.widthCm,
           customHeight: data.heightCm,
+          promoCode: data.promoCode ? data.promoCode.trim().toUpperCase() : undefined,
         }
       : {
           fromCity: data.fromCity,
@@ -165,6 +191,7 @@ export default function CreateQuoteModal({
           tons: data.tons,
           cartons: data.cartons,
           boxDimensionId: data.boxDimensionId,
+          promoCode: data.promoCode ? data.promoCode.trim().toUpperCase() : undefined,
         };
 
     handleCreateQuote({ ...payload, termsAccepted: true })
@@ -204,9 +231,9 @@ export default function CreateQuoteModal({
   };
 
   // ─────────────────────────────
-  // STEPPER
+  // STEPPER (plain JSX, not a nested component — see note above)
   // ─────────────────────────────
-  const Stepper = () => (
+  const stepperEl = (
     <div className="flex items-center justify-between mb-6">
       {["Route", "Package", "Review"].map((s, i) => {
         const active = step === i + 1;
@@ -232,87 +259,66 @@ export default function CreateQuoteModal({
   );
 
   // ─────────────────────────────
-  // STEP 1
+  // STEP 1 (plain JSX — data comes from the hoisted hooks above)
   // ─────────────────────────────
-  const Step1 = () => {
-    const { data, isLoading } = useGetCitiesQuery({});
-    const cities = (data?.data?.cities ?? []) as CityOption[];
+  const step1El = (
+    <div className="grid grid-cols-2 gap-4">
+      <Controller
+        control={control}
+        name="fromCity"
+        rules={{ required: "From city is required" }}
+        render={({ field }) => (
+          <SelectInput
+            label="From City"
+            disabled={citiesLoading}
+            options={
+              cities.map((item) => ({
+                label: item.name,
+                value: item.name,
+              })) || []
+            }
+            placeholder={citiesLoading ? "...loading cities" : "e.g Lagos"}
+            value={field.value}
+            onValueChange={field.onChange}
+            error={errors.fromCity?.message}
+          />
+        )}
+      />
 
-    return (
-      <div className="grid grid-cols-2 gap-4">
-        <Controller
-          control={control}
-          name="fromCity"
-          rules={{ required: "From city is required" }}
-          render={({ field }) => (
-            <SelectInput
-              label="From City"
-              disabled={isLoading}
-              options={
-                cities.map((item) => ({
-                  label: item.name,
-                  value: item.name,
-                })) || []
-              }
-              placeholder={isLoading ? "...loading cities" : "e.g Lagos"}
-              value={field.value}
-              onValueChange={field.onChange}
-              error={errors.fromCity?.message}
-            />
-          )}
-        />
+      <Controller
+        control={control}
+        name="toCity"
+        rules={{ required: "To city is required" }}
+        render={({ field }) => (
+          <SelectInput
+            label="To City"
+            disabled={citiesLoading}
+            options={
+              cities.map((item) => ({
+                label: item.name,
+                value: item.name,
+              })) || []
+            }
+            placeholder={citiesLoading ? "...loading cities" : "e.g Lagos"}
+            value={field.value}
+            onValueChange={field.onChange}
+            error={errors.toCity?.message}
+          />
+        )}
+      />
 
-        <Controller
-          control={control}
-          name="toCity"
-          rules={{ required: "To city is required" }}
-          render={({ field }) => (
-            <SelectInput
-              label="To City"
-              disabled={isLoading}
-              options={
-                cities.map((item) => ({
-                  label: item.name,
-                  value: item.name,
-                })) || []
-              }
-              placeholder={isLoading ? "...loading cities" : "e.g Lagos"}
-              value={field.value}
-              onValueChange={field.onChange}
-              error={errors.toCity?.message}
-            />
-          )}
-        />
-
-        <div className="col-span-2 flex justify-end">
-          <Button type="button" onClick={handleNextStep1}>
-            Continue
-          </Button>
-        </div>
+      <div className="col-span-2 flex justify-end">
+        <Button type="button" onClick={handleNextStep1}>
+          Continue
+        </Button>
       </div>
-    );
-  };
+    </div>
+  );
 
   // ─────────────────────────────
-  // STEP 2
+  // STEP 2 (plain JSX — data comes from the hoisted hooks above)
   // ─────────────────────────────
-  const Step2 = () => {
-    const { data, isLoading } = useGetDimensionsQuery({});
-    const dimensions = (data?.data?.dimensions ?? []) as BoxDimension[];
-
-    const selectedBox = dimensions.find(
-      (item) => item.id === values.boxDimensionId,
-    );
-
-    const maxWeight = selectedBox?.weightKgLimit || 0;
-    const maxTons = maxWeight / 1000;
-    const cartons = values.cartons || 1;
-
-    // Total weight = box limit × number of boxes
-    const totalWeight = selectedBox ? maxWeight * cartons : 0;
-    const totalTons = selectedBox ? maxTons * cartons : 0;
-
-    return (
+  const step2El = (
       <div className="flex flex-col gap-4">
         {/* PREDEFINED vs CUSTOM TOGGLE */}
         <div className="flex items-center justify-between border-2 border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50/50">
@@ -355,7 +361,7 @@ export default function CreateQuoteModal({
             render={({ field }) => (
               <SelectInput
                 label="Select Box"
-                disabled={isLoading}
+                disabled={dimensionsLoading}
                 options={
                   dimensions.map((item) => ({
                     value: item.id,
@@ -548,6 +554,17 @@ export default function CreateQuoteModal({
           />
         </div>
 
+        {/* PROMO CODE */}
+        <Input
+          label="Promo Code (optional)"
+          placeholder="e.g. LAUNCH20"
+          {...register("promoCode")}
+          error={errors.promoCode?.message}
+          onChange={(e) => {
+            e.target.value = e.target.value.toUpperCase().replace(/\s+/g, "");
+          }}
+        />
+
         {/* ACTION */}
         <div className="flex flex-col gap-3">
           {/* Sprint 7: Terms of Service consent */}
@@ -589,14 +606,12 @@ export default function CreateQuoteModal({
           </div>
         </div>
       </div>
-    );
-  };
+  );
 
   // ─────────────────────────────
-  // STEP 3
+  // STEP 3 (plain JSX — no longer a nested component)
   // ─────────────────────────────
-  const Step3 = ({ data }: { data?: CreateQuoteResponse }) => {
-    const quote = data?.data?.quote;
+  const quote = (data as CreateQuoteResponse)?.data?.quote;
     const currency = quote?.currency ?? "NGN";
     const formatMoney = (amount?: number | null) =>
       new Intl.NumberFormat("en-NG", {
@@ -618,7 +633,7 @@ export default function CreateQuoteModal({
         </div>
       ));
 
-    return (
+    const step3El = (
       <div className="flex flex-col gap-5">
         <div className="w-full rounded-2xl bg-gray-900 p-6 text-center">
           <p className="text-[10px] uppercase tracking-widest text-gray-400">
@@ -771,7 +786,6 @@ export default function CreateQuoteModal({
         </div>
       </div>
     );
-  };
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={handleClose}>
@@ -787,15 +801,15 @@ export default function CreateQuoteModal({
             </Dialog.Close>
           </div>
           <div className="shrink-0">
-            <Stepper />
+            {stepperEl}
           </div>
           <form
             onSubmit={handleSubmit(onSubmit)}
             className="flex-1 overflow-y-auto pr-1"
           >
-            {step === 1 && <Step1 />}
-            {step === 2 && <Step2 />}
-            {step === 3 && <Step3 data={data as CreateQuoteResponse} />}
+            {step === 1 && step1El}
+            {step === 2 && step2El}
+            {step === 3 && step3El}
           </form>
         </Dialog.Content>
       </Dialog.Portal>

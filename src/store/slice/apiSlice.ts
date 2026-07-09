@@ -151,7 +151,7 @@ export const apiSlice = createApi({
     "City",
     "StandardRate",
     "ContractRate",
-    "PromoRate",
+    "PromoCode",
     "Shipment",
     "Surcharge",
     "SurchargeAuditLog",
@@ -172,6 +172,8 @@ export const apiSlice = createApi({
     "CannedResponse",
     "AddressChange",
     "Loyalty",
+    "PackagingGuide",
+    "Policy",
   ],
   baseQuery: baseQueryWithReauth,
   endpoints: (builder) => ({
@@ -499,6 +501,7 @@ export const apiSlice = createApi({
         customHeight?: number;
         serviceType?: string;
         termsAccepted?: boolean;
+        promoCode?: string;
       }
     >({
       query: (formData) => ({
@@ -710,26 +713,6 @@ export const apiSlice = createApi({
       },
       invalidatesTags: ["ContractRate"],
     }),
-    // useAddPromoRateMutation
-    AddPromoRate: builder.mutation<unknown, any>({
-      query: (formData) => ({
-        url: "/promo-rates",
-        method: "POST",
-        body: formData,
-      }),
-      async onQueryStarted(args, { queryFulfilled }) {
-        try {
-          const { data } = await queryFulfilled;
-          if (data) {
-            successToast("Promo Rate Added Successfully");
-          }
-        } catch (error) {
-          const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
-        }
-      },
-      invalidatesTags: ["PromoRate"],
-    }),
 
     // useEditStandardRateMutation
     EditStandardRate: builder.mutation<
@@ -806,29 +789,6 @@ export const apiSlice = createApi({
       },
       invalidatesTags: ["ContractRate"],
     }),
-    // useEditPromoRateMutation
-    EditPromoRate: builder.mutation<unknown, any>({
-      query: (formData) => {
-        const { id, ...otherFormData } = formData;
-        return {
-          url: `/promo-rates/${id}`,
-          method: "PATCH",
-          body: otherFormData,
-        };
-      },
-      async onQueryStarted(args, { queryFulfilled }) {
-        try {
-          const { data } = await queryFulfilled;
-          if (data) {
-            successToast("Promo Rate Edited Successfully");
-          }
-        } catch (error) {
-          const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
-        }
-      },
-      invalidatesTags: ["PromoRate"],
-    }),
     // useEditSurchargeMutation
     EditSurcharge: builder.mutation<
       unknown,
@@ -884,7 +844,89 @@ export const apiSlice = createApi({
       },
       invalidatesTags: ["ContractRate"],
     }),
-    // useDeleteZoneMutation
+
+    // ── Promo Codes ────────────────────────────────────────────────────────
+    // useGetPromoCodesQuery — admin list, with search/isActive filter + pagination
+    GetPromoCodes: builder.query<
+      any,
+      { search?: string; isActive?: boolean; page?: number; limit?: number } | void
+    >({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        if (params?.search) searchParams.append("search", params.search);
+        if (params?.isActive !== undefined) searchParams.append("isActive", String(params.isActive));
+        if (params?.page) searchParams.append("page", String(params.page));
+        if (params?.limit) searchParams.append("limit", String(params.limit));
+        const qs = searchParams.toString();
+        return `/promo-codes${qs ? `?${qs}` : ""}`;
+      },
+      providesTags: ["PromoCode"],
+    }),
+
+    // useAddPromoCodeMutation
+    AddPromoCode: builder.mutation<unknown, any>({
+      query: (formData) => ({
+        url: "/promo-codes",
+        method: "POST",
+        body: formData,
+      }),
+      async onQueryStarted(args, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) {
+            successToast("Promo Code Added Successfully");
+          }
+        } catch (error) {
+          const errorM = error as CustomError;
+          errorToast(errorM.error?.data?.message || "Unexpected error");
+        }
+      },
+      invalidatesTags: ["PromoCode"],
+    }),
+
+    // useEditPromoCodeMutation
+    EditPromoCode: builder.mutation<unknown, any>({
+      query: (formData) => {
+        const { id, ...otherFormData } = formData;
+        return {
+          url: `/promo-codes/${id}`,
+          method: "PATCH",
+          body: otherFormData,
+        };
+      },
+      async onQueryStarted(args, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) {
+            successToast("Promo Code Updated Successfully");
+          }
+        } catch (error) {
+          const errorM = error as CustomError;
+          errorToast(errorM.error?.data?.message || "Unexpected error");
+        }
+      },
+      invalidatesTags: ["PromoCode"],
+    }),
+
+    // useDeletePromoCodeMutation — soft-deactivates (isActive: false)
+    DeletePromoCode: builder.mutation<unknown, { id: string }>({
+      query: ({ id }) => ({
+        url: `/promo-codes/${id}`,
+        method: "DELETE",
+      }),
+      async onQueryStarted(args, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) {
+            successToast("Promo Code Deactivated Successfully");
+          }
+        } catch (error) {
+          const errorM = error as CustomError;
+          errorToast(errorM.error?.data?.message || "Unexpected error");
+        }
+      },
+      invalidatesTags: ["PromoCode"],
+    }),
     DeleteZone: builder.mutation<unknown, { id: string }>({
       query: (formData) => ({
         url: `/pricing/zone-matrix/${formData?.id}`,
@@ -1754,28 +1796,6 @@ export const apiSlice = createApi({
       providesTags: ["ContractRate"],
     }),
 
-    // useGetPromoRateQuery
-    GetPromoRate: builder.query<
-      any,
-      {
-        isActive?: boolean;
-        serviceType?: string;
-        zone?: number | string;
-      } | void
-    >({
-      query: (params) => {
-        const searchParams = new URLSearchParams();
-        if (params?.isActive)
-          searchParams.append("isActive", params.isActive.toString());
-        if ((params as any)?.serviceType)
-          searchParams.append("serviceType", (params as any).serviceType);
-        if ((params as any)?.zone)
-          searchParams.append("zone", String((params as any).zone));
-        return `/promo-rates?${searchParams.toString()}`;
-      },
-      providesTags: ["PromoRate"],
-    }),
-
     // useGetStandardRateQuery
     GetStandardRate: builder.query<
       any,
@@ -2047,6 +2067,32 @@ export const apiSlice = createApi({
       },
       providesTags: ["Shipment"],
     }),
+    // useGetEnterpriseShipmentsQuery — tenant-scoped shipments for Enterprise users
+    GetEnterpriseShipments: builder.query<unknown, AdminShipmentQueryParams>({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+
+        if (params?.status) {
+          searchParams.append("status", params.status);
+        }
+
+        if (params?.search) {
+          searchParams.append("search", params.search);
+        }
+
+        if (params?.fromDate) {
+          searchParams.append("fromDate", params.fromDate);
+        }
+
+        if (params?.toDate) {
+          searchParams.append("toDate", params.toDate);
+        }
+
+        const queryString = searchParams.toString();
+        return `/shipments/enterprise${queryString ? `?${queryString}` : ""}`;
+      },
+      providesTags: ["Shipment"],
+    }),
     // useGetZoneByRouteQuery — looks up zone for a specific city pair (used in CreateShipmentModal)
     GetZoneByRoute: builder.query<any, { fromCity: string; toCity: string }>({
       query: ({ fromCity, toCity }) =>
@@ -2091,12 +2137,6 @@ export const apiSlice = createApi({
         return `/pricing/zone-matrix?${searchParams.toString()}`;
       },
       providesTags: ["Zone"], // Label this data as 'Post'
-    }),
-    // useGetAuditTrailQuery
-    GetAuditTrail: builder.query<any, any>({
-      query: () => {
-        return `/admin/activity-logs`;
-      },
     }),
     // useGetUsersQuery
     GetUsers: builder.query<any, { search?: string; role?: string; adminSubRole?: string } | void>({
@@ -2151,26 +2191,6 @@ export const apiSlice = createApi({
         }
       },
       invalidatesTags: ["Shipment"],
-    }),
-
-    // useDeletePromoRateMutation
-    DeletePromoRate: builder.mutation<unknown, { id: string }>({
-      query: ({ id }) => ({
-        url: `/promo-rates/${id}`,
-        method: "DELETE",
-      }),
-      async onQueryStarted(args, { queryFulfilled }) {
-        try {
-          const { data } = await queryFulfilled;
-          if (data) {
-            successToast("Promo Rate Deleted Successfully");
-          }
-        } catch (error) {
-          const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected error");
-        }
-      },
-      invalidatesTags: ["PromoRate"],
     }),
 
     // useUpdateShipmentStatusMutation — admin updates shipment status
@@ -2372,7 +2392,7 @@ export const apiSlice = createApi({
     // useGetPricingStatsQuery — already exists as GetRateOverview, but add canonical name
     GetPricingStats: builder.query<any, void>({
       query: () => "/pricing/stats",
-      providesTags: ["StandardRate", "ContractRate", "PromoRate"],
+      providesTags: ["StandardRate", "ContractRate"],
     }),
 
     // useEditBoxDimensionMutation — PATCH /pricing/dimensions/:id (Super Admin only)
@@ -2794,6 +2814,103 @@ export const apiSlice = createApi({
       providesTags: ["FAQ"],
     }),
 
+    // ── Packaging Guides ──────────────────────────────────────────────────
+    // useGetPackagingGuidesQuery — public, powers /packaging-guide page
+    GetPackagingGuides: builder.query<any, { category?: string } | void>({
+      query: (params) =>
+        params?.category ? `/policies/packaging-guides?category=${params.category}` : "/policies/packaging-guides",
+      providesTags: ["PackagingGuide"],
+    }),
+
+    // useCreatePackagingGuideMutation — business admin
+    CreatePackagingGuide: builder.mutation<
+      any,
+      { title: string; body: string; category: string; imageUrl?: string; sortOrder?: number; isDangerous?: boolean }
+    >({
+      query: (body) => ({ url: "/policies/packaging-guides", method: "POST", body }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Packaging guide created");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Failed to create packaging guide");
+        }
+      },
+      invalidatesTags: ["PackagingGuide"],
+    }),
+
+    // useUpdatePackagingGuideMutation — business admin
+    UpdatePackagingGuide: builder.mutation<
+      any,
+      { id: string; title?: string; body?: string; category?: string; imageUrl?: string; sortOrder?: number; isDangerous?: boolean; isActive?: boolean }
+    >({
+      query: ({ id, ...body }) => ({ url: `/policies/packaging-guides/${id}`, method: "PATCH", body }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Packaging guide updated");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Failed to update packaging guide");
+        }
+      },
+      invalidatesTags: ["PackagingGuide"],
+    }),
+
+    // useDeletePackagingGuideMutation — business admin
+    DeletePackagingGuide: builder.mutation<any, { id: string }>({
+      query: ({ id }) => ({ url: `/policies/packaging-guides/${id}`, method: "DELETE" }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Packaging guide deleted");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Failed to delete packaging guide");
+        }
+      },
+      invalidatesTags: ["PackagingGuide"],
+    }),
+
+    // ── Policy Content ────────────────────────────────────────────────────
+    // useListPoliciesQuery — public, key+title only (build a menu)
+    ListPolicies: builder.query<any, void>({
+      query: () => "/policies",
+      providesTags: ["Policy"],
+    }),
+
+    // useGetPolicyQuery — public, full policy body by key
+    GetPolicy: builder.query<any, { key: string }>({
+      query: ({ key }) => `/policies/${key}`,
+      providesTags: (_res, _err, arg) => [{ type: "Policy" as const, id: arg.key }],
+    }),
+
+    // useUpsertPolicyMutation — business admin: create or update by key
+    UpsertPolicy: builder.mutation<any, { key: string; title: string; body: string; isActive?: boolean }>({
+      query: (body) => ({ url: "/policies", method: "POST", body }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Policy saved");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Failed to save policy");
+        }
+      },
+      invalidatesTags: ["Policy"],
+    }),
+
+    // useDeletePolicyMutation — business admin: deactivate by key
+    DeletePolicy: builder.mutation<any, { key: string }>({
+      query: ({ key }) => ({ url: `/policies/${key}`, method: "DELETE" }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Policy deactivated");
+        } catch (e: any) {
+          errorToast(e.error?.data?.message || "Failed to deactivate policy");
+        }
+      },
+      invalidatesTags: ["Policy"],
+    }),
+
     // useToggleFeaturedFAQMutation — Super Admin: toggle isFeatured on a FAQ
     ToggleFeaturedFAQ: builder.mutation<any, { id: string }>({
       query: ({ id }) => ({
@@ -2886,7 +3003,7 @@ export const apiSlice = createApi({
       query: () => {
         return `/pricing/stats`;
       },
-      providesTags: ["StandardRate", "ContractRate", "PromoRate"],
+      providesTags: ["StandardRate", "ContractRate"],
     }),
 
     // ─── Sprint 6: Agent KPI Dashboard ───────────────────────────────────
@@ -3035,6 +3152,7 @@ export const {
   useGetUserShipmentsQuery,
   useGetUserShipmentsByIdQuery,
   useGetAdminShipmentsQuery,
+  useGetEnterpriseShipmentsQuery,
   useCreateTicketMutation,
   useCreateClaimMutation,
   useCreateFAQMutation,
@@ -3076,6 +3194,14 @@ export const {
   useReviewClaimMutation,
   useGetFAQQuery,
   useGetFeaturedFAQsQuery,
+  useGetPackagingGuidesQuery,
+  useCreatePackagingGuideMutation,
+  useUpdatePackagingGuideMutation,
+  useDeletePackagingGuideMutation,
+  useListPoliciesQuery,
+  useGetPolicyQuery,
+  useUpsertPolicyMutation,
+  useDeletePolicyMutation,
   useToggleFeaturedFAQMutation,
   useUpdateFAQMutation,
   useDeleteFAQMutation,
@@ -3098,10 +3224,10 @@ export const {
   useAddContractRateMutation,
   useEditContractRateMutation,
   useDeleteContractRateMutation,
-  useGetPromoRateQuery,
-  useAddPromoRateMutation,
-  useEditPromoRateMutation,
-  useGetAuditTrailQuery,
+  useGetPromoCodesQuery,
+  useAddPromoCodeMutation,
+  useEditPromoCodeMutation,
+  useDeletePromoCodeMutation,
   useCreateQuoteMutation,
   useGeneratePersistedQuoteMutation,
   useDeleteZoneMutation,
@@ -3133,7 +3259,6 @@ export const {
   useGetAdminDashboardQuery,
   useGetAdminInvoicesQuery,
   useVerifyPaymentMutation,
-  useDeletePromoRateMutation,
   useUpdateShipmentStatusMutation,
   useGetPricingStatsQuery,
   useGetCapabilitiesQuery,

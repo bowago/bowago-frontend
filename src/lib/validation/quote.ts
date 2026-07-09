@@ -228,7 +228,8 @@ export const createClaimSchema = yup.object({
   description: yup
     .string()
     .trim()
-    .min(10, "Description must be at least 10 characters")
+    .min(20, "Description must be at least 20 characters")
+    .max(1000, "Description must be at most 1000 characters")
     .required("Description is required"),
 
   declaredValue: yup
@@ -240,7 +241,16 @@ export const createClaimSchema = yup.object({
   claimAmount: yup
     .number()
     .typeError("Claim amount must be a number")
-    .min(0, "Claim amount cannot be negative")
+    .moreThan(0, "Claim amount must be greater than zero")
+    .test(
+      "lte-declared",
+      "Claim amount cannot exceed the declared value",
+      function (value) {
+        const declared = Number(this.parent.declaredValue);
+        if (!value || !Number.isFinite(declared)) return true;
+        return value <= declared;
+      },
+    )
     .required("Claim amount is required"),
 
   bankName: yup.string().default(""),
@@ -296,7 +306,17 @@ export const createFAQSchema = yup.object({
 
 export type CreateFAQFormData = yup.InferType<typeof createFAQSchema>;
 
-export const promoRateSchema = yup
+export type AddZoneFormData = yup.InferType<typeof addZoneSchema>;
+export type AddBoxDimensionFormData = yup.InferType<
+  typeof addBoxDimensionSchema
+>;
+export type AddCitiesFormData = yup.InferType<typeof addCitiesSchema>;
+export type ServiceFormData = yup.InferType<typeof serviceSchema>;
+export type RouteFormData = yup.InferType<typeof routeSchema>;
+export type CargoFormData = yup.InferType<typeof cargoSchema>;
+
+// ── Promo Code (customer-facing coupon, e.g. LAUNCH20) ─────────────────────
+export const promoCodeSchema = yup
   .object({
     code: yup
       .string()
@@ -304,18 +324,22 @@ export const promoRateSchema = yup
       .matches(/^\S+$/, "No spaces allowed")
       .required("Code is required"),
 
-    label: yup.string().required("Label is required"),
-
     description: yup.string().nullable(),
 
     discountPercent: yup
       .number()
+      .transform((value, originalValue) => (originalValue === "" || originalValue == null ? null : value))
       .min(0, "Discount cannot be negative")
       .max(100, "Discount cannot exceed 100%")
       .typeError("Must be a number")
       .nullable(),
 
-    flatDiscount: yup.number().min(0, "Flat discount cannot be negative").typeError("Must be a number").nullable(),
+    flatDiscount: yup
+      .number()
+      .transform((value, originalValue) => (originalValue === "" || originalValue == null ? null : value))
+      .min(0, "Flat discount cannot be negative")
+      .typeError("Must be a number")
+      .nullable(),
 
     discountType: yup
       .string()
@@ -324,14 +348,24 @@ export const promoRateSchema = yup
 
     serviceType: yup
       .string()
+      .transform((value, originalValue) => (originalValue === "" ? null : value))
       .oneOf(["STANDARD", "EXPRESS", "ECONOMY"])
-      .required("Service type is required"),
+      .nullable()
+      .notRequired(),
 
-    zone: yup.number().min(0).max(4).required(),
+    minOrderAmount: yup
+      .number()
+      .transform((value, originalValue) => (originalValue === "" || originalValue == null ? null : value))
+      .min(0, "Minimum order cannot be negative")
+      .nullable()
+      .notRequired(),
 
-    minWeightKg: yup.number().min(0, "Weight cannot be negative").required(),
-
-    maxUsageCount: yup.number().min(0, "Usage count cannot be negative").required(),
+    maxUses: yup
+      .number()
+      .transform((value, originalValue) => (originalValue === "" || originalValue == null ? null : value))
+      .min(0, "Max uses cannot be negative")
+      .nullable()
+      .notRequired(),
 
     isActive: yup.boolean().default(true),
 
@@ -377,12 +411,4 @@ export const promoRateSchema = yup
       return (hasPercent && !hasFlat) || (!hasPercent && hasFlat);
     },
   );
-export type AddPromoRateSchemaFormData = yup.InferType<typeof promoRateSchema>;
-export type AddZoneFormData = yup.InferType<typeof addZoneSchema>;
-export type AddBoxDimensionFormData = yup.InferType<
-  typeof addBoxDimensionSchema
->;
-export type AddCitiesFormData = yup.InferType<typeof addCitiesSchema>;
-export type ServiceFormData = yup.InferType<typeof serviceSchema>;
-export type RouteFormData = yup.InferType<typeof routeSchema>;
-export type CargoFormData = yup.InferType<typeof cargoSchema>;
+export type PromoCodeFormData = yup.InferType<typeof promoCodeSchema>;

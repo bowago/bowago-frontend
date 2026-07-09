@@ -18,12 +18,12 @@ import {
   Route,
   Users,
   Wallet,
-  Ticket,
   Truck,
 } from "lucide-react";
 import {
   useGetAdminDashboardQuery,
   useGetAdminShipmentsQuery,
+  useGetEnterpriseShipmentsQuery,
   useGetUserShipmentsQuery,
   useGetInvoiceFinancialOverviewQuery,
   useGetAllTicketQuery,
@@ -62,6 +62,10 @@ function getShipmentList(data: any): ShipmentItem[] {
 }
 
 // ── Role helpers ───────────────────────────────────────────────────────────────
+// NOTE: ROLE_DISPATCHER / ROLE_FINANCE / ROLE_AGENT / ROLE_MASTER are
+// Enterprise-tenant roles (role === "ENTERPRISE"). They are never valid
+// values of adminSubRole — internal staff only ever have
+// SUPER_ADMIN | LOGISTICS_MANAGER | ROLE_ADMIN.
 const SUPER = ["SUPER_ADMIN", "LOGISTICS_MANAGER"];
 const isSuperRole = (s: string) => SUPER.includes(s);
 const isDispatcher = (s: string) => s === "ROLE_DISPATCHER";
@@ -77,36 +81,49 @@ export default function Page() {
 
   const user = useSelector((s: RootState) => s.auth.user) as any;
   const role = user?.role;
-  const subRole = user?.adminSubRole ?? "";
+  const adminSubRole = user?.adminSubRole ?? "";
+  const enterpriseRole = user?.enterpriseRole ?? "";
 
   const isCustomer = role === "CUSTOMER";
   const isAdmin = role === "ADMIN";
+  const isEnterprise = role === "ENTERPRISE";
   const showRevenue =
-    isAdmin && (isSuperRole(subRole) || subRole === "ROLE_ADMIN");
+    isAdmin && (isSuperRole(adminSubRole) || adminSubRole === "ROLE_ADMIN");
   const showCharts =
-    isAdmin &&
-    (isSuperRole(subRole) || subRole === "ROLE_ADMIN" || isDispatcher(subRole));
-  const showUsers = isAdmin && isSuperRole(subRole);
+    isAdmin && (isSuperRole(adminSubRole) || adminSubRole === "ROLE_ADMIN");
+  const showUsers = isAdmin && isSuperRole(adminSubRole);
 
   // ── Data fetching — skip what the role doesn't need ──────────────────────
   const { data: dashData, isLoading: dashLoading } = useGetAdminDashboardQuery(
     undefined,
-    { skip: !isAdmin || isAgent(subRole) },
+    { skip: !isAdmin },
   );
   const { data: shipmentsData } = useGetAdminShipmentsQuery(
     {
       status:
         "PENDING,CONFIRMED,AWAITING_PICKUP,PICKED_UP,IN_TRANSIT,OUT_FOR_DELIVERY",
     },
-    { skip: !isAdmin || isFinance(subRole) },
+    { skip: !isAdmin },
+  );
+  // Enterprise tenant equivalent of shipmentsData above — tenant-scoped, never
+  // platform-wide. Feeds the DISPATCHER/FINANCE/MASTER Enterprise views below.
+  const { data: enterpriseShipmentsData } = useGetEnterpriseShipmentsQuery(
+    {
+      status:
+        "PENDING,CONFIRMED,AWAITING_PICKUP,PICKED_UP,IN_TRANSIT,OUT_FOR_DELIVERY",
+    } as any,
+    { skip: !isEnterprise },
   );
   const { data: financeData } = useGetInvoiceFinancialOverviewQuery(undefined, {
-    skip: !isFinance(subRole),
+    skip: !(isEnterprise && isFinance(enterpriseRole)),
   });
+  // Internal support-ticket queue is exclusively an internal admin concern —
+  // Enterprise ROLE_AGENT never sees BowaGo's own ticket queue (PRD: Enterprise
+  // users never see platform administration).
   const { data: ticketData } = useGetAllTicketQuery({ status: "OPEN" } as any, {
-    skip: !isAgent(subRole),
+    skip: !isAdmin,
   });
-  const { data: myData } = useGetUserShipmentsQuery({}, { skip: isAdmin });
+  const { data: myData } = useGetUserShipmentsQuery({}, { skip: !isCustomer });
 
   const stats = (dashData as any)?.data;
   const finStats = (financeData as any)?.data?.summary;
@@ -118,25 +135,27 @@ export default function Page() {
 
   const activeShipments = isAdmin
     ? getShipmentList(shipmentsData)
-    : myShipments
-        .filter(
-          (s: any) =>
-            !["DELIVERED", "CANCELLED", "RETURNED"].includes(s.status),
-        )
-        .slice(0, 3);
+    : isEnterprise
+      ? getShipmentList(enterpriseShipmentsData)
+      : myShipments
+          .filter(
+            (s: any) =>
+              !["DELIVERED", "CANCELLED", "RETURNED"].includes(s.status),
+          )
+          .slice(0, 3);
 
   const openTickets =
     (ticketData as any)?.data?.tickets?.length ??
     (ticketData as any)?.meta?.total ??
     0;
 
-  // ── DISPATCHER view ───────────────────────────────────────────────────────
-  if (isDispatcher(subRole)) {
+  // ── DISPATCHER view (Enterprise tenant) ───────────────────────────────────
+  if (isEnterprise && isDispatcher(enterpriseRole)) {
     const total =
-      (shipmentsData as any)?.meta?.total ??
-      getShipmentList(shipmentsData).length ??
+      (enterpriseShipmentsData as any)?.meta?.total ??
+      getShipmentList(enterpriseShipmentsData).length ??
       0;
-    const active = getShipmentList(shipmentsData);
+    const active = getShipmentList(enterpriseShipmentsData);
     return (
       <div className="pb-10">
         <div className="text-dashboard-heading">Dashboard</div>
@@ -186,8 +205,8 @@ export default function Page() {
     );
   }
 
-  // ── FINANCE view ──────────────────────────────────────────────────────────
-  if (isFinance(subRole)) {
+  // ── FINANCE view (Enterprise tenant) ──────────────────────────────────────
+  if (isEnterprise && isFinance(enterpriseRole)) {
     return (
       <div className="pb-10">
         <div className="text-dashboard-heading">Dashboard</div>
@@ -235,45 +254,18 @@ export default function Page() {
     );
   }
 
-  // ── AGENT view ────────────────────────────────────────────────────────────
-  if (isAgent(subRole)) {
-    return (
-      <div className="pb-10">
-        <div className="text-dashboard-heading">Dashboard</div>
-        <main className="flex-1 overflow-auto mt-4">
-          <div className="grid grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
-            <StatCard
-              icon={<Ticket className="w-6 h-6 text-orange-500" />}
-              iconBg="bg-orange-50"
-              value={String(openTickets)}
-              label="Open Tickets"
-              trend={0}
-              trendPositive
-              delay={0}
-            />
-            <StatCard
-              icon={<Package className="w-6 h-6 text-blue-500" />}
-              iconBg="bg-blue-50"
-              value={String(stats?.shipments?.total ?? 0)}
-              label="Total Shipments"
-              trend={0}
-              trendPositive
-              delay={80}
-            />
-          </div>
-          <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 text-sm text-blue-700">
-            Head to <strong>Support → All Tickets</strong> to manage customer
-            tickets.
-          </div>
-        </main>
-      </div>
-    );
-  }
+  // NOTE: There is no separate "AGENT view" branch here. Internal ticket
+  // agents are ROLE_ADMIN staff (distinguished by capability flags, not a
+  // named sub-role) and fall through to the general admin view below, which
+  // already surfaces the open-ticket count. Enterprise ROLE_AGENT never sees
+  // BowaGo's internal ticket queue at all (PRD: Enterprise users never see
+  // platform administration), so they fall through to the generic Enterprise
+  // company view alongside ROLE_USER.
 
   // ── MASTER (enterprise owner) view ────────────────────────────────────────
-  if (isMaster(subRole)) {
-    const total = getShipmentList(shipmentsData).length;
-    const active = getShipmentList(shipmentsData);
+  if (isEnterprise && isMaster(enterpriseRole)) {
+    const total = getShipmentList(enterpriseShipmentsData).length;
+    const active = getShipmentList(enterpriseShipmentsData);
     return (
       <div className="pb-10">
         <div className="text-dashboard-heading">Dashboard</div>
@@ -382,6 +374,43 @@ export default function Page() {
               </Link>
             </div>
           </div>
+        </main>
+      </div>
+    );
+  }
+
+  // ── Generic Enterprise view (ROLE_USER / ROLE_AGENT, or any Enterprise
+  // member not covered by the specialised views above) ─────────────────────
+  // Never falls through to the internal admin dashboard below — Enterprise
+  // members only ever see their own tenant's shipment activity.
+  if (isEnterprise) {
+    const total = getShipmentList(enterpriseShipmentsData).length;
+    const active = getShipmentList(enterpriseShipmentsData);
+    return (
+      <div className="pb-10">
+        <div className="text-dashboard-heading">Dashboard</div>
+        <main className="flex-1 overflow-auto mt-4">
+          <div className="grid grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
+            <StatCard
+              icon={<PackagePlus className="w-6 h-6 text-orange-500" />}
+              iconBg="bg-orange-50"
+              value={String(total)}
+              label="Company Shipments"
+              trend={0}
+              trendPositive
+              delay={0}
+            />
+            <StatCard
+              icon={<Truck className="w-6 h-6 text-blue-500" />}
+              iconBg="bg-blue-50"
+              value={String(active.length)}
+              label="Active Shipments"
+              trend={0}
+              trendPositive
+              delay={80}
+            />
+          </div>
+          <ActiveShipmentsSection items={active} />
         </main>
       </div>
     );

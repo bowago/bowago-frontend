@@ -30,16 +30,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog/dialog";
 
-// Base roles available to all admins
+// Base roles available to all admins. This page (and its updateRole
+// mutation → setAdminRole) is Internal BowaGo Administration only — it can
+// never assign an Enterprise role. Enterprise team roles are managed via
+// /dashboard/team instead.
 const SUB_ROLES = [
   { value: "CUSTOMER", label: "Customer (no admin access)" },
   { value: "LOGISTICS_MANAGER", label: "Logistics Manager" },
   { value: "ROLE_ADMIN", label: "Custom Admin" },
-  { value: "ROLE_AGENT", label: "CS Agent" },
-  { value: "ROLE_MASTER", label: "Company Master" },
-  { value: "ROLE_DISPATCHER", label: "Dispatcher" },
-  { value: "ROLE_FINANCE", label: "Finance" },
-  { value: "ROLE_USER", label: "Company User" },
 ];
 
 // Only Super Admins can assign or see the SUPER_ADMIN role
@@ -49,10 +47,6 @@ const subRoleBadge: Record<string, string> = {
   SUPER_ADMIN: "bg-purple-100 text-purple-700",
   LOGISTICS_MANAGER: "bg-orange-100 text-orange-700",
   ROLE_ADMIN: "bg-yellow-100 text-yellow-700",
-  ROLE_AGENT: "bg-green-100 text-green-700",
-  ROLE_MASTER: "bg-indigo-100 text-indigo-700",
-  ROLE_DISPATCHER: "bg-cyan-100 text-cyan-700",
-  ROLE_FINANCE: "bg-pink-100 text-pink-700",
 };
 
 const shipmentStatusColor: Record<string, string> = {
@@ -366,8 +360,9 @@ export default function UserDetailPage() {
               {user.isActive ? "Suspend account" : "Activate account"}
             </button>
 
-            {/* Set role (super admin only, non-super-admin targets, not self) */}
+            {/* Set role (super admin only, non-super-admin targets, not self, not Enterprise) */}
             {isSuperAdmin &&
+              user.role !== "ENTERPRISE" &&
               user.adminSubRole !== "SUPER_ADMIN" &&
               user.id !== me?.id && (
                 <button

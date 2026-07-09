@@ -66,6 +66,14 @@ export const CreateClaimForm = ({ onSuccess }: CreateClaimFormProps) => {
   });
 
   const onSubmit = async (data: CreateClaimFormData) => {
+    // PRD Sprint 7: at least one evidence photo is required for every claim.
+    // Files live in local state (raw File objects), so this is enforced here
+    // rather than in the yup schema.
+    if (files.length === 0) {
+      setImageError("At least one evidence photo is required");
+      return;
+    }
+
     // Gap 2: build FormData so multer receives binary file parts
     const formData = new FormData();
     formData.append("shipmentId",    data.shipmentId);

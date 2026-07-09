@@ -20,15 +20,15 @@ import {
 import { Dialog, DialogContent } from "@/components/ui/dialog/dialog";
 import { Button } from "@/components/ui/button";
 
+// This dropdown is for Internal BowaGo Administration only — it calls
+// setAdminRole, which only ever accepts SUPER_ADMIN / LOGISTICS_MANAGER /
+// ROLE_ADMIN / CUSTOMER. Enterprise roles (ROLE_MASTER, ROLE_AGENT,
+// ROLE_DISPATCHER, ROLE_FINANCE, ROLE_USER) are assigned via team invites on
+// the Enterprise side (/dashboard/team), never here.
 const SUB_ROLES = [
   { value: "CUSTOMER", label: "Customer (no admin access)" },
   { value: "LOGISTICS_MANAGER", label: "Logistics Manager" },
   { value: "ROLE_ADMIN", label: "Custom Admin (ROLE_ADMIN)" },
-  { value: "ROLE_AGENT", label: "CS Agent" },
-  { value: "ROLE_MASTER", label: "Company Master" },
-  { value: "ROLE_DISPATCHER", label: "Dispatcher" },
-  { value: "ROLE_FINANCE", label: "Finance" },
-  { value: "ROLE_USER", label: "Company User" },
 ];
 
 // Super Admin role — only shown in dropdown when logged-in user is a Super Admin
@@ -37,16 +37,13 @@ const SUPER_ADMIN_ROLE = { value: "SUPER_ADMIN", label: "Super Admin (full acces
 const roleBadge: Record<string, string> = {
   ADMIN: "bg-red-100 text-red-700",
   CUSTOMER: "bg-blue-100 text-blue-700",
+  ENTERPRISE: "bg-indigo-100 text-indigo-700",
 };
 
 const subRoleBadge: Record<string, string> = {
   SUPER_ADMIN: "bg-purple-100 text-purple-700",
   LOGISTICS_MANAGER: "bg-orange-100 text-orange-700",
   ROLE_ADMIN: "bg-yellow-100 text-yellow-700",
-  ROLE_AGENT: "bg-green-100 text-green-700",
-  ROLE_MASTER: "bg-indigo-100 text-indigo-700",
-  ROLE_DISPATCHER: "bg-cyan-100 text-cyan-700",
-  ROLE_FINANCE: "bg-pink-100 text-pink-700",
 };
 
 type User = {
@@ -249,6 +246,7 @@ export default function UsersPage() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         {isSuperAdmin &&
+                          u.role !== "ENTERPRISE" &&
                           u.adminSubRole !== "SUPER_ADMIN" &&
                           u.id !== user?.id && (
                             <button

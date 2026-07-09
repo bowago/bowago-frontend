@@ -38,6 +38,7 @@ export const resetPasswordSchema = yup.object({
     .matches(/[a-z]/, "Password must contain at least one lowercase letter")
     .matches(/[A-Z]/, "Password must contain at least one uppercase letter")
     .matches(/[0-9]/, "Password must contain at least one number")
+    .matches(/[^A-Za-z0-9]/, "Password must contain at least one special character")
     .required("Password is required"),
   confirmPassword: yup
     .string()
@@ -48,10 +49,7 @@ export const resetPasswordSchema = yup.object({
 export const changePasswordSchema = yup.object({
   currentPassword: yup
     .string()
-    .min(8, "Password must be at least 8 characters")
-    .matches(/[A-Z]/, "Password must contain at least one uppercase letter")
-    .matches(/[0-9]/, "Password must contain at least one number")
-    .required()
+    .required("Current password is required")
     .label("Current Password"),
   newPassword: yup
     .string()
@@ -59,6 +57,7 @@ export const changePasswordSchema = yup.object({
     .matches(/[a-z]/, "Password must contain at least one lowercase letter")
     .matches(/[A-Z]/, "Password must contain at least one uppercase letter")
     .matches(/[0-9]/, "Password must contain at least one number")
+    .matches(/[^A-Za-z0-9]/, "Password must contain at least one special character")
     .required()
     .label("New Password"),
 });
@@ -83,6 +82,7 @@ export const signupSchema = yup.object({
     .matches(/[a-z]/, "Must contain at least one lowercase letter")
     .matches(/[A-Z]/, "Must contain at least one uppercase letter")
     .matches(/[0-9]/, "Must contain at least one number")
+    .matches(/[^A-Za-z0-9]/, "Must contain at least one special character")
     .required("Password is required"),
   confirmPassword: yup
     .string()

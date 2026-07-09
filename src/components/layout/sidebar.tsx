@@ -19,40 +19,41 @@ const ICON_CLS = "w-4 h-4 flex-shrink-0";
 interface MenuItem {
   label: string;
   href: string;
-  /** role = top-level ADMIN or CUSTOMER */
+  /** role = top-level ADMIN, ENTERPRISE, or CUSTOMER */
   roles: string[];
   /**
-   * subRoles: which adminSubRole values can see this item.
+   * subRoles: which adminSubRole values can see this item (ADMIN world only).
    * undefined = all admin subRoles.
-   * Empty array [] = only CUSTOMER (no admin sub-role check needed).
    */
   subRoles?: string[];
+  /**
+   * enterpriseRoles: which enterpriseRole values can see this item
+   * (ENTERPRISE world only). undefined = all Enterprise roles.
+   */
+  enterpriseRoles?: string[];
   icon: React.ReactNode;
   children?: MenuItem[];
 }
 
-// Sub-role groupings
-const ALL_ADMIN_SUBROLES = [
-  "SUPER_ADMIN","LOGISTICS_MANAGER","ROLE_ADMIN",
-  "ROLE_DISPATCHER","ROLE_FINANCE","ROLE_AGENT","ROLE_MASTER",
-];
+// Internal admin sub-role groupings — role === "ADMIN" only.
 const SUPER = ["SUPER_ADMIN","LOGISTICS_MANAGER"];
 const RATE_MANAGERS  = [...SUPER, "ROLE_ADMIN"];
-const OPS_ROLES      = [...SUPER, "ROLE_ADMIN", "ROLE_DISPATCHER", "ROLE_MASTER", "ROLE_USER"];
-const FINANCE_ROLES  = [...SUPER, "ROLE_ADMIN", "ROLE_FINANCE", "ROLE_USER"];
-const TICKET_ROLES   = [...SUPER, "ROLE_ADMIN", "ROLE_AGENT"];
-const TEAM_ROLES     = [...SUPER, "ROLE_MASTER"];
 
-const menuList: MenuItem[] = [
-  // ── Dashboard ──────────────────────────────────────────────────────────────
+// Enterprise tenant role groupings — role === "ENTERPRISE" only.
+const ENT_ALL        = ["ROLE_MASTER","ROLE_AGENT","ROLE_DISPATCHER","ROLE_FINANCE","ROLE_USER"];
+const ENT_OPS        = ["ROLE_MASTER","ROLE_DISPATCHER","ROLE_USER"];
+const ENT_FINANCE    = ["ROLE_MASTER","ROLE_FINANCE","ROLE_USER"];
+const ENT_TEAM       = ["ROLE_MASTER"];
+
+// ── Internal BowaGo Administration sidebar ──────────────────────────────────
+// Platform back-office. Never shows Enterprise tenant modules.
+const adminMenuList: MenuItem[] = [
   {
     label: "Dashboard",
     href: "/dashboard",
-    roles: ["ADMIN", "CUSTOMER"],
+    roles: ["ADMIN"],
     icon: <LayoutDashboard className={ICON_CLS} />,
   },
-
-  // ── Rate Management (super + role_admin only) ──────────────────────────────
   {
     label: "Rate Management",
     href: "/dashboard/rate",
@@ -65,11 +66,8 @@ const menuList: MenuItem[] = [
       { label: "Cities",       href: "/dashboard/rate/cities", roles: ["ADMIN"], subRoles: RATE_MANAGERS, icon: <MapPin className={ICON_CLS} /> },
       { label: "Boxes",        href: "/dashboard/rate/boxes",  roles: ["ADMIN"], subRoles: RATE_MANAGERS, icon: <Box className={ICON_CLS} /> },
       { label: "Price History", href: "/dashboard/rate/price-history", roles: ["ADMIN"], subRoles: RATE_MANAGERS, icon: <ClipboardList className={ICON_CLS} /> },
-      { label: "Audit Trail",  href: "/dashboard/rate/audit",  roles: ["ADMIN"], subRoles: RATE_MANAGERS, icon: <ClipboardList className={ICON_CLS} /> },
     ],
   },
-
-  // ── Surcharges (super + role_admin only) ──────────────────────────────────
   {
     label: "Surcharges",
     href: "/dashboard/surcharges",
@@ -81,42 +79,25 @@ const menuList: MenuItem[] = [
       { label: "Surcharge Audit", href: "/dashboard/surcharges/audit-log", roles: ["ADMIN"], subRoles: SUPER,         icon: <ClipboardList className={ICON_CLS} /> },
     ],
   },
-
-  // ── Customer Portal — Order History ──────────────────────────────────────
   {
-    label: "Order History",
-    href: "/dashboard/orders",
-    roles: ["CUSTOMER"],
-    icon: <History className={ICON_CLS} />,
+    label: "Promotions",
+    href: "/dashboard/rate/price-history",
+    roles: ["ADMIN"],
+    subRoles: RATE_MANAGERS,
+    icon: <Percent className={ICON_CLS} />,
   },
-
-  // ── Customer Portal — Loyalty Rewards ────────────────────────────────────
-  {
-    label: "Rewards",
-    href: "/dashboard/loyalty",
-    roles: ["CUSTOMER"],
-    icon: <Award className={ICON_CLS} />,
-  },
-
-  // ── Shipments (all operational roles + customer) ───────────────────────────
   {
     label: "Shipments",
     href: "/dashboard/shipments",
-    roles: ["CUSTOMER", "ADMIN"],
-    subRoles: OPS_ROLES,
+    roles: ["ADMIN"],
     icon: <Package className={ICON_CLS} />,
   },
-
-  // ── Invoice (finance + super + customer) ──────────────────────────────────
   {
     label: "Invoice",
     href: "/dashboard/invoice",
-    roles: ["CUSTOMER", "ADMIN"],
-    subRoles: FINANCE_ROLES,
+    roles: ["ADMIN"],
     icon: <Receipt className={ICON_CLS} />,
   },
-
-  // ── Failed Webhooks (super only) ──────────────────────────────────────────
   {
     label: "Failed Webhooks",
     href: "/dashboard/payment/webhooks",
@@ -124,50 +105,37 @@ const menuList: MenuItem[] = [
     subRoles: SUPER,
     icon: <AlertTriangle className={ICON_CLS} />,
   },
-
-  // ── Address Changes (Sprint 5 — dispatcher reviews; ops roles) ────────────
   {
     label: "Address Changes",
     href: "/dashboard/address-changes",
     roles: ["ADMIN"],
-    subRoles: OPS_ROLES,
     icon: <MapPin className={ICON_CLS} />,
   },
-
-  // ── Delay Alerts (Sprint 5 — dispatcher sends batch delay notices) ────────
   {
     label: "Delay Alerts",
     href: "/dashboard/delay-alerts",
     roles: ["ADMIN"],
-    subRoles: OPS_ROLES,
     icon: <AlertTriangle className={ICON_CLS} />,
   },
-
-  // ── Support (agents + super) ──────────────────────────────────────────────
   {
     label: "Support",
     href: "/dashboard/tickets",
     roles: ["ADMIN"],
-    subRoles: TICKET_ROLES,
     icon: <Ticket className={ICON_CLS} />,
     children: [
-      { label: "All Tickets",      href: "/dashboard/tickets",                 roles: ["ADMIN"], subRoles: TICKET_ROLES,  icon: <Ticket className={ICON_CLS} /> },
-      { label: "Claims",           href: "/dashboard/tickets/claims/admin",    roles: ["ADMIN"], subRoles: TICKET_ROLES,  icon: <AlertCircle className={ICON_CLS} /> },
-      { label: "Agent KPI",        href: "/dashboard/support/kpi",             roles: ["ADMIN"], subRoles: [...SUPER, "ROLE_AGENT", "ROLE_ADMIN"], icon: <BarChart2 className={ICON_CLS} /> },
-      { label: "Canned Responses", href: "/dashboard/support/canned-responses",roles: ["ADMIN"], subRoles: TICKET_ROLES,  icon: <MessageSquare className={ICON_CLS} /> },
+      { label: "All Tickets",      href: "/dashboard/tickets",                 roles: ["ADMIN"], icon: <Ticket className={ICON_CLS} /> },
+      { label: "Claims",           href: "/dashboard/tickets/claims/admin",    roles: ["ADMIN"], icon: <AlertCircle className={ICON_CLS} /> },
+      { label: "Agent KPI",        href: "/dashboard/support/kpi",             roles: ["ADMIN"], icon: <BarChart2 className={ICON_CLS} /> },
+      { label: "Canned Responses", href: "/dashboard/support/canned-responses",roles: ["ADMIN"], icon: <MessageSquare className={ICON_CLS} /> },
     ],
   },
-
-  // ── Team Management (master + super) ─────────────────────────────────────
   {
-    label: "Team",
-    href: "/dashboard/team",
+    label: "Enterprise Management",
+    href: "/dashboard/users",
     roles: ["ADMIN"],
-    subRoles: TEAM_ROLES,
-    icon: <UserCheck className={ICON_CLS} />,
+    subRoles: RATE_MANAGERS,
+    icon: <Building2 className={ICON_CLS} />,
   },
-
-  // ── Users (super + role_admin) ────────────────────────────────────────────
   {
     label: "Users",
     href: "/dashboard/users",
@@ -179,8 +147,12 @@ const menuList: MenuItem[] = [
       { label: "Custom Capabilities", href: "/dashboard/users/roles", roles: ["ADMIN"], subRoles: SUPER,         icon: <Shield className={ICON_CLS} /> },
     ],
   },
-
-  // ── Admin FAQ ─────────────────────────────────────────────────────────────
+  {
+    label: "Reports",
+    href: "/dashboard/rate/price-history",
+    roles: ["ADMIN"],
+    icon: <ClipboardList className={ICON_CLS} />,
+  },
   {
     label: "FAQ",
     href: "/dashboard/faq/admin",
@@ -188,8 +160,123 @@ const menuList: MenuItem[] = [
     subRoles: RATE_MANAGERS,
     icon: <BookOpen className={ICON_CLS} />,
   },
+];
 
-  // ── Customer-only items ───────────────────────────────────────────────────
+const adminOtherMenuList: MenuItem[] = [
+  {
+    label: "Settings",
+    href: "/dashboard/settings",
+    roles: ["ADMIN"],
+    icon: <Settings className={ICON_CLS} />,
+  },
+  {
+    label: "Business Rules (System Settings)",
+    href: "/dashboard/settings/business-rules",
+    roles: ["ADMIN"],
+    subRoles: SUPER,
+    icon: <ClipboardList className={ICON_CLS} />,
+  },
+  {
+    label: "Content Management",
+    href: "/dashboard/settings/content",
+    roles: ["ADMIN"],
+    subRoles: RATE_MANAGERS,
+    icon: <BookOpen className={ICON_CLS} />,
+  },
+];
+
+// ── Enterprise tenant sidebar ────────────────────────────────────────────────
+// BowaGo-as-a-Service. Never shows platform administration modules.
+const enterpriseMenuList: MenuItem[] = [
+  {
+    label: "Dashboard",
+    href: "/dashboard",
+    roles: ["ENTERPRISE"],
+    icon: <LayoutDashboard className={ICON_CLS} />,
+  },
+  {
+    label: "Get Quote",
+    href: "/dashboard/shipments",
+    roles: ["ENTERPRISE"],
+    enterpriseRoles: ENT_OPS,
+    icon: <FileText className={ICON_CLS} />,
+  },
+  {
+    label: "Shipments",
+    href: "/dashboard/shipments",
+    roles: ["ENTERPRISE"],
+    icon: <Package className={ICON_CLS} />,
+  },
+  {
+    label: "Invoices",
+    href: "/dashboard/invoice",
+    roles: ["ENTERPRISE"],
+    enterpriseRoles: ENT_FINANCE,
+    icon: <Receipt className={ICON_CLS} />,
+  },
+  {
+    label: "Tracking",
+    href: "/dashboard/shipments",
+    roles: ["ENTERPRISE"],
+    icon: <Map className={ICON_CLS} />,
+  },
+  {
+    label: "Company Users",
+    href: "/dashboard/team",
+    roles: ["ENTERPRISE"],
+    enterpriseRoles: ENT_TEAM,
+    icon: <UserCheck className={ICON_CLS} />,
+  },
+  {
+    label: "Notifications",
+    href: "/dashboard/notifications",
+    roles: ["ENTERPRISE"],
+    icon: <AlertTriangle className={ICON_CLS} />,
+  },
+];
+
+const enterpriseOtherMenuList: MenuItem[] = [
+  {
+    label: "Company Settings",
+    href: "/dashboard/settings",
+    roles: ["ENTERPRISE"],
+    enterpriseRoles: ENT_TEAM,
+    icon: <Settings className={ICON_CLS} />,
+  },
+];
+
+// ── Customer sidebar ─────────────────────────────────────────────────────────
+const customerMenuList: MenuItem[] = [
+  {
+    label: "Dashboard",
+    href: "/dashboard",
+    roles: ["CUSTOMER"],
+    icon: <LayoutDashboard className={ICON_CLS} />,
+  },
+  {
+    label: "Order History",
+    href: "/dashboard/orders",
+    roles: ["CUSTOMER"],
+    icon: <History className={ICON_CLS} />,
+  },
+  {
+    label: "Rewards",
+    href: "/dashboard/loyalty",
+    roles: ["CUSTOMER"],
+    icon: <Award className={ICON_CLS} />,
+  },
+  {
+    label: "Shipments",
+    href: "/dashboard/shipments",
+    roles: ["CUSTOMER"],
+    icon: <Package className={ICON_CLS} />,
+  },
+  {
+    label: "Invoice",
+    href: "/dashboard/invoice",
+    roles: ["CUSTOMER"],
+    icon: <Receipt className={ICON_CLS} />,
+  },
   {
     label: "My Support",
     href: "/dashboard/tickets",
@@ -208,23 +295,17 @@ const menuList: MenuItem[] = [
   },
 ];
 
-const otherMenuList: MenuItem[] = [
+const customerOtherMenuList: MenuItem[] = [
   {
     label: "Settings",
     href: "/dashboard/settings",
-    roles: ["ADMIN", "CUSTOMER"],
+    roles: ["CUSTOMER"],
     icon: <Settings className={ICON_CLS} />,
-  },
-  {
-    label: "Business Rules",
-    href: "/dashboard/settings/business-rules",
-    roles: ["ADMIN"],
-    subRoles: ["SUPER_ADMIN", "LOGISTICS_MANAGER"],
-    icon: <ClipboardList className={ICON_CLS} />,
   },
 ];
 
-// ── Role badge colours ────────────────────────────────────────────────────────
+// ── Role badge colours (covers both internal AdminSubRole and EnterpriseRole
+// values — display only, never used for access control) ─────────────────────
 const SUB_ROLE_BADGE: Record<string, string> = {
   SUPER_ADMIN:       "bg-purple-50 text-purple-600 border border-purple-200",
   LOGISTICS_MANAGER: "bg-orange-50 text-orange-600 border border-orange-200",
@@ -233,6 +314,7 @@ const SUB_ROLE_BADGE: Record<string, string> = {
   ROLE_MASTER:       "bg-indigo-50 text-indigo-600 border border-indigo-200",
   ROLE_DISPATCHER:   "bg-cyan-50 text-cyan-600 border border-cyan-200",
   ROLE_FINANCE:      "bg-pink-50 text-pink-600 border border-pink-200",
+  ROLE_USER:         "bg-gray-50 text-gray-600 border border-gray-200",
 };
 
 // ── Logout Modal ──────────────────────────────────────────────────────────────
@@ -271,6 +353,15 @@ export default function Sidebar({ mobileVisible, closeModal }: { mobileVisible: 
   const user      = useSelector((s: any) => s.auth.user);
   const userRole  = user?.role ?? "CUSTOMER";
   const subRole   = user?.adminSubRole ?? "";
+  const enterpriseRole = user?.enterpriseRole ?? "";
+
+  // Each system gets its own, completely separate nav — no shared fallthrough.
+  const { menuList, otherMenuList } =
+    userRole === "ADMIN"
+      ? { menuList: adminMenuList, otherMenuList: adminOtherMenuList }
+      : userRole === "ENTERPRISE"
+        ? { menuList: enterpriseMenuList, otherMenuList: enterpriseOtherMenuList }
+        : { menuList: customerMenuList, otherMenuList: customerOtherMenuList };
 
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [openMenus, setOpenMenus]   = useState<Record<string, boolean>>({});
@@ -284,7 +375,7 @@ export default function Sidebar({ mobileVisible, closeModal }: { mobileVisible: 
         setOpenMenus(prev => ({ ...prev, [item.label]: true }));
       }
     });
-  }, [pathname]);
+  }, [pathname, menuList]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -305,11 +396,10 @@ export default function Sidebar({ mobileVisible, closeModal }: { mobileVisible: 
   /** Returns true if this menu item is visible to the current user */
   const canSee = (item: MenuItem): boolean => {
     if (!item.roles.includes(userRole)) return false;
-    // Customer — no sub-role restriction needed
-    if (userRole === "CUSTOMER") return true;
-    // Admin — check subRoles whitelist if defined
-    if (item.subRoles) return item.subRoles.includes(subRole);
-    // No restriction defined → visible to all admins
+    if (userRole === "ADMIN" && item.subRoles) return item.subRoles.includes(subRole);
+    if (userRole === "ENTERPRISE" && item.enterpriseRoles) return item.enterpriseRoles.includes(enterpriseRole);
+    // No restriction defined → visible to everyone in this system (Customer
+    // always falls here — no sub-role concept for Customers)
     return true;
   };
 
@@ -428,7 +518,9 @@ export default function Sidebar({ mobileVisible, closeModal }: { mobileVisible: 
                 <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wide ${
                   user?.role === "ADMIN"
                     ? "bg-red-50 text-brand border border-brand/20"
-                    : "bg-blue-50 text-blue-600 border border-blue-200"
+                    : user?.role === "ENTERPRISE"
+                      ? "bg-indigo-50 text-indigo-600 border border-indigo-200"
+                      : "bg-blue-50 text-blue-600 border border-blue-200"
                 }`}>
                   {user?.role ?? "CUSTOMER"}
                 </span>
@@ -437,6 +529,13 @@ export default function Sidebar({ mobileVisible, closeModal }: { mobileVisible: 
                     SUB_ROLE_BADGE[user.adminSubRole] ?? "bg-gray-50 text-gray-600 border border-gray-200"
                   }`}>
                     {user.adminSubRole.replace(/_/g, " ").replace("ROLE ", "")}
+                  </span>
+                )}
+                {user?.role === "ENTERPRISE" && user?.enterpriseRole && (
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium capitalize ${
+                    SUB_ROLE_BADGE[user.enterpriseRole] ?? "bg-gray-50 text-gray-600 border border-gray-200"
+                  }`}>
+                    {user.enterpriseRole.replace(/_/g, " ").replace("ROLE ", "")}
                   </span>
                 )}
               </div>

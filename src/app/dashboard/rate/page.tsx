@@ -2,7 +2,7 @@
 import { useRouter } from "next/navigation";
 import AddActionCard from "@/components/cards/AddCard";
 import ContractRateManagementView from "@/components/layout/ContractRateManagementView";
-import PromoRateManagementView from "@/components/layout/PromoRateManagementView";
+import PromoCodeManagementView from "@/components/layout/PromoCodeManagementView";
 import StandardRateManagementView from "@/components/layout/StandardRateManagementView";
 import DeliverySLAManagementView from "@/components/layout/DeliverySLAManagementView";
 import CreateRateModal, { RateType } from "@/components/modals/CreateRateModal";
@@ -133,7 +133,7 @@ export default function ShipmentsPage() {
         <TabsList defaultChecked>
           <TabsTrigger value="standard">Standard Rate</TabsTrigger>
           <TabsTrigger value="contract">Contract Rate</TabsTrigger>
-          <TabsTrigger value="promo">Promo Rate</TabsTrigger>
+          <TabsTrigger value="promo">Promo Code</TabsTrigger>
           <TabsTrigger value="delivery-sla">Delivery SLA</TabsTrigger>
         </TabsList>
         <div className="mt-5">
@@ -144,7 +144,7 @@ export default function ShipmentsPage() {
             <ContractRateManagementView />
           </TabsContent>
           <TabsContent value="promo" className="w-full">
-            <PromoRateManagementView />
+            <PromoCodeManagementView />
           </TabsContent>
           <TabsContent value="delivery-sla" className="w-full">
             <DeliverySLAManagementView />

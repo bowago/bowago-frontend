@@ -75,15 +75,14 @@ export default function ShipmentDetails() {
   const id = params?.id as string;
   const user = useSelector((s: RootState) => s.auth.user) as any;
   const isAdmin = user?.role === "ADMIN";
-  const subRole = user?.adminSubRole ?? user?.subRole ?? "";
+  const adminSubRole = user?.adminSubRole ?? "";
+  // Shipment status updates (marking IN_TRANSIT, DELIVERED, etc.) are an
+  // internal BowaGo ops action (backend: requireShipmentOpsManagement).
+  // Enterprise ROLE_DISPATCHER manages their own shipments but does not
+  // perform platform-wide fulfilment status updates — that stays internal.
   const isDispatcher =
     isAdmin &&
-    [
-      "SUPER_ADMIN",
-      "LOGISTICS_MANAGER",
-      "ROLE_ADMIN",
-      "ROLE_DISPATCHER",
-    ].includes(subRole);
+    ["SUPER_ADMIN", "LOGISTICS_MANAGER", "ROLE_ADMIN"].includes(adminSubRole);
 
   const [adjustmentModalOpen, setAdjustmentModalOpen] = useState(false);
   const [createAdjustmentOpen, setCreateAdjustmentOpen] = useState(false);

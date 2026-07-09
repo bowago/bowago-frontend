@@ -65,6 +65,7 @@ export interface UserModel {
   avatarPublicId: string | null;
   role: "CUSTOMER" | "ADMIN" | string;
   adminSubRole: string | null;
+  enterpriseRole: string | null;  // Enterprise tenant role (ROLE_MASTER … ROLE_USER)
   masterId: string | null;        // org membership — set for invited team members
   authProvider: "EMAIL" | "GOOGLE" | "APPLE" | string;
   googleId: string | null;

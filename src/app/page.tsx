@@ -190,7 +190,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto relative">
           {/* Badge */}
           <div
-            className={`inline-flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-full text-sm text-white/70 mb-8 transition-all duration-700 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
+            className={`inline-flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-full text-sm text-white/70 mb-8 transition-[opacity,transform] duration-700 will-change-[opacity,transform] ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
           >
             <div className="w-2 h-2 rounded-full bg-brand animate-pulse" />
             Fast, Reliable Nigerian Logistics
@@ -199,14 +199,14 @@ export default function LandingPage() {
           {/* Headline */}
           <div className="max-w-3xl mb-8">
             <h1
-              className={`text-4xl md:text-6xl lg:text-7xl font-black leading-[1.05] tracking-tight mb-6 transition-all duration-700 delay-100 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
+              className={`text-4xl md:text-6xl lg:text-7xl font-black leading-[1.05] tracking-tight mb-6 transition-[opacity,transform] duration-700 will-change-[opacity,transform] delay-100 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
             >
               Ship Anywhere.
               <br />
               <span className="text-brand">Track Everything.</span>
             </h1>
             <p
-              className={`text-lg md:text-xl text-white/60 max-w-xl leading-relaxed transition-all duration-700 delay-200 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
+              className={`text-lg md:text-xl text-white/60 max-w-xl leading-relaxed transition-[opacity,transform] duration-700 will-change-[opacity,transform] delay-200 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
             >
               Express, standard, and economy shipping across Nigeria with
               transparent pricing and real-time tracking.
@@ -215,11 +215,11 @@ export default function LandingPage() {
 
           {/* CTA buttons */}
           <div
-            className={`flex flex-wrap gap-4 mb-16 transition-all duration-700 delay-300 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
+            className={`flex flex-wrap gap-4 mb-16 transition-[opacity,transform] duration-700 will-change-[opacity,transform] delay-300 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
           >
             <Link
               href="/auth/login"
-              className="inline-flex items-center gap-2 bg-brand hover:bg-red-700 text-white px-6 py-3.5 rounded-xl font-bold text-sm transition-all hover:scale-105"
+              className="inline-flex items-center gap-2 bg-brand hover:bg-red-700 text-white px-6 py-3.5 rounded-xl font-bold text-sm transition-all motion-safe:hover:scale-105"
             >
               Book a Shipment <ArrowRight className="w-4 h-4" />
             </Link>
@@ -233,7 +233,7 @@ export default function LandingPage() {
 
           {/* Stats row */}
           <div
-            className={`grid grid-cols-2 md:grid-cols-4 gap-4 transition-all duration-700 delay-400 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
+            className={`grid grid-cols-2 md:grid-cols-4 gap-4 transition-[opacity,transform] duration-700 will-change-[opacity,transform] delay-400 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
           >
             {stats.map((s, i) => (
               <div
@@ -253,7 +253,7 @@ export default function LandingPage() {
         <div className="flex justify-center mt-16">
           <a
             href="#quote"
-            className="flex flex-col items-center gap-2 text-white/30 hover:text-white/60 transition-colors animate-bounce"
+            className="flex flex-col items-center gap-2 text-white/30 hover:text-white/60 transition-colors motion-safe:animate-bounce"
           >
             <span className="text-xs tracking-wider uppercase">Scroll</span>
             <ArrowDown className="w-4 h-4" />
@@ -477,7 +477,7 @@ export default function LandingPage() {
                 <button
                   type="submit"
                   disabled={quoting}
-                  className="w-full bg-brand hover:bg-red-700 text-white py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-60 hover:scale-[1.02]"
+                  className="w-full bg-brand hover:bg-red-700 text-white py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-60 motion-safe:hover:scale-[1.02]"
                 >
                   {quoting ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -772,17 +772,9 @@ export default function LandingPage() {
               >
                 <div className="flex gap-0.5 mb-4">
                   {Array.from({ length: t.rating }).map((_, i) => (
-                    <svg
-                      key={i}
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                      className="text-yellow-400"
-                    >
-                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                    </svg>
+                    <span key={i} className="text-yellow-400 text-sm">
+                      ★
+                    </span>
                   ))}
                 </div>
                 <p className="text-white/70 text-sm leading-relaxed mb-5">
@@ -818,19 +810,7 @@ export default function LandingPage() {
                   className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5"
                 >
                   <div className="w-6 h-6 rounded-full bg-brand/20 flex items-center justify-center">
-                    <span className="text-brand text-xs" aria-hidden="true">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="12"
-                        height="12"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="3"
-                      >
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    </span>
+                    <span className="text-brand text-xs">✓</span>
                   </div>
                   <div>
                     <p className="text-white/80 text-xs font-semibold">
@@ -865,7 +845,7 @@ export default function LandingPage() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
               href="/auth/signup"
-              className="inline-flex items-center justify-center gap-2 bg-brand hover:bg-red-700 text-white px-8 py-4 rounded-xl font-bold text-base transition-all hover:scale-105"
+              className="inline-flex items-center justify-center gap-2 bg-brand hover:bg-red-700 text-white px-8 py-4 rounded-xl font-bold text-base transition-all motion-safe:hover:scale-105"
             >
               Create Free Account <ArrowRight className="w-5 h-5" />
             </Link>

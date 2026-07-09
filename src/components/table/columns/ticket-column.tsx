@@ -306,11 +306,13 @@ const AssignTicketForm = ({
 }) => {
   const [selected, setSelected] = useState("");
   const [updateTicket, { isLoading }] = useUpdateTicketMutation();
-  // Agents are admin users with the ROLE_AGENT sub-role (matches backend's
-  // auto-assignment logic in support.controller.js::autoAssignTicket)
+  // Internal ticket agents are ROLE_ADMIN staff (capability-based, matches
+  // backend's auto-assignment logic in support.controller.js::autoAssignTicket
+  // which checks the canManageTickets capability flag — there's no dedicated
+  // "list users by capability" endpoint, so this shows all ROLE_ADMIN staff).
   const { data, isLoading: loadingAgents } = useGetUsersQuery({
     role: "ADMIN",
-    adminSubRole: "ROLE_AGENT",
+    adminSubRole: "ROLE_ADMIN",
   });
   const agents: any[] = (data as any)?.data?.users ?? (data as any)?.users ?? [];
 

@@ -45,6 +45,7 @@ interface AgentKpi {
 
 interface KpiData {
   kpi: AgentKpi[];
+  isSelfScoped?: boolean;
   team: {
     totalTickets: number;
     totalResolved: number;
@@ -286,13 +287,12 @@ function PricingErrorMetric({ kpi }: { kpi: any }) {
 
 export default function AgentKpiPage() {
   const user = useSelector((s: RootState) => s.auth.user) as any;
-  const subRole = user?.adminSubRole ?? "";
-  const isAgent = subRole === "ROLE_AGENT";
+  const adminSubRole = user?.adminSubRole ?? "";
   const isSuperOrAdmin = [
     "SUPER_ADMIN",
     "LOGISTICS_MANAGER",
     "ROLE_ADMIN",
-  ].includes(subRole);
+  ].includes(adminSubRole);
 
   const [from, setFrom] = useState(() => {
     const d = new Date();
@@ -305,6 +305,9 @@ export default function AgentKpiPage() {
   const result: KpiData | undefined = (data as any)?.data;
   const team = result?.team;
   const kpi: AgentKpi[] = result?.kpi ?? [];
+  // Backend decides self-scoping based on capabilities (ROLE_ADMIN with
+  // canManageTickets but not canViewAnalytics) — the frontend just reflects it.
+  const isAgent = !!(result as any)?.isSelfScoped;
 
   const handleCsvExport = () => {
     const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";

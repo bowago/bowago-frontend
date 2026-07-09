@@ -85,60 +85,91 @@ export default function AddContractRateModal({
     if (!v) reset();
   };
 
-  const ContractForm = () => {
-    const {
-      register,
-      handleSubmit,
-      control,
-      watch,
-      setValue,
-      formState: { errors },
-    } = contractForm;
+  // NOTE: this used to be a `const ContractForm = () => {...}` component
+  // defined INSIDE this component's render body. That's a React anti-pattern:
+  // every time AddContractRateModal re-renders (which happens the instant you
+  // click Create, since isLoading flips synchronously), React sees a brand
+  // new function reference and treats it as a different component type —
+  // unmounting the whole form and mounting a fresh one mid-click. That's why
+  // clicking "Create" could appear to do nothing. Fixed by hoisting all of
+  // this to the top level, so the form JSX is stable across re-renders.
+  const {
+    register,
+    handleSubmit,
+    control,
+    watch,
+    setValue,
+    formState: { errors },
+  } = contractForm;
 
-    const pricingType = watch("pricingType");
-    const zones = ["1", "2", "3", "4"] as const;
+  const pricingType = watch("pricingType");
+  const zones = ["1", "2", "3", "4"] as const;
 
-    const onSubmit = (data: ContractRateFormData) => {
-      const payload: any = {
-        label: data.label,
-        serviceType: data.serviceType,
-        isActive: data.isActive,
-        validFrom: data.validFrom,
-        validUntil: data.validUntil,
-        notes: data.notes,
-      };
+  const onSubmit = (data: ContractRateFormData) => {
+    const payload: any = {
+      label: data.label,
+      serviceType: data.serviceType,
+      isActive: data.isActive,
+      validFrom: data.validFrom,
+      validUntil: data.validUntil,
+      notes: data.notes,
+    };
 
-      // Always send both pricing fields so switching pricing type on edit
-      // correctly clears the unused one (e.g. discount -> fixed should
-      // null out discountPercent).
-      if (data.pricingType === "discount") {
-        payload.discountPercent = data.discountPercent;
-        payload.fixedPricePerKgByZone = null;
-      } else {
-        payload.fixedPricePerKgByZone = data.fixedPricePerKgByZone;
-        payload.discountPercent = null;
-      }
+    // Always send both pricing fields so switching pricing type on edit
+    // correctly clears the unused one (e.g. discount -> fixed should
+    // null out discountPercent).
+    if (data.pricingType === "discount") {
+      payload.discountPercent = data.discountPercent;
+      payload.fixedPricePerKgByZone = null;
+    } else {
+      payload.fixedPricePerKgByZone = data.fixedPricePerKgByZone;
+      payload.discountPercent = null;
+    }
 
-      if (isEditMode && editingRate) {
-        handleEditContractRate({ id: editingRate.id, ...payload })
-          .unwrap()
-          .then(() => {
-            reset();
-            setIsOpen(false);
-          });
-        return;
-      }
-
-      handleAddContractRate({ userId: data.userId, ...payload })
+    if (isEditMode && editingRate) {
+      handleEditContractRate({ id: editingRate.id, ...payload })
         .unwrap()
         .then(() => {
           reset();
           setIsOpen(false);
+        })
+        .catch(() => {
+          // error toast already shown by the mutation's onQueryStarted —
+          // this just stops it from becoming an unhandled rejection.
         });
-    };
+      return;
+    }
 
-    return (
-      <form onSubmit={handleSubmit(onSubmit)}>
+    handleAddContractRate({ userId: data.userId, ...payload })
+      .unwrap()
+      .then(() => {
+        reset();
+        setIsOpen(false);
+      })
+      .catch(() => {
+        // error toast already shown by the mutation's onQueryStarted.
+      });
+  };
+
+  return (
+    <Dialog.Root open={isOpen} onOpenChange={handleOpenChange}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" />
+
+        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-white rounded-2xl shadow-xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+          {/* Fixed header */}
+          <div className="flex justify-between items-center px-6 pt-6 pb-4 border-b border-gray-100 shrink-0">
+            <Dialog.Title className="text-lg font-semibold">
+              {isEditMode ? "Edit Contract Rate" : "Create Contract Rate"}
+            </Dialog.Title>
+            <Dialog.Close asChild>
+              <button className="text-gray-400 hover:text-gray-600">✕</button>
+            </Dialog.Close>
+          </div>
+
+          {/* Scrollable body */}
+          <div className="overflow-y-auto flex-1 px-6 pb-6">
+            <form onSubmit={handleSubmit(onSubmit)}>
         <div className="grid grid-cols-2 gap-3 mt-6">
           {/* User / Enterprise — assign to master to cover whole org */}
           <div className="col-span-2">
@@ -160,10 +191,10 @@ export default function AddContractRateModal({
                         firstName: string;
                         id: string;
                         lastName: string;
-                        adminSubRole?: string;
+                        enterpriseRole?: string;
                         role?: string;
                       }) => ({
-                        label: `${item.lastName} ${item.firstName}${item.adminSubRole === "ROLE_MASTER" ? " — Master (Org)" : ""}`,
+                        label: `${item.lastName} ${item.firstName}${item.enterpriseRole === "ROLE_MASTER" ? " — Master (Org)" : ""}`,
                         value: item.id,
                       }),
                     ) || []
@@ -273,7 +304,6 @@ export default function AddContractRateModal({
           )}
 
           {/* Dates */}
-          {/* Dates */}
           <div>
             <Input
               type="date"
@@ -347,29 +377,7 @@ export default function AddContractRateModal({
             {isEditMode ? "Save Changes" : "Create Contract Rate"}
           </Button>
         </div>
-      </form>
-    );
-  };
-
-  return (
-    <Dialog.Root open={isOpen} onOpenChange={handleOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" />
-
-        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-white rounded-2xl shadow-xl w-full max-w-2xl flex flex-col max-h-[90vh]">
-          {/* Fixed header */}
-          <div className="flex justify-between items-center px-6 pt-6 pb-4 border-b border-gray-100 shrink-0">
-            <Dialog.Title className="text-lg font-semibold">
-              {isEditMode ? "Edit Contract Rate" : "Create Contract Rate"}
-            </Dialog.Title>
-            <Dialog.Close asChild>
-              <button className="text-gray-400 hover:text-gray-600">✕</button>
-            </Dialog.Close>
-          </div>
-
-          {/* Scrollable body */}
-          <div className="overflow-y-auto flex-1 px-6 pb-6">
-            <ContractForm />
+            </form>
           </div>
         </Dialog.Content>
       </Dialog.Portal>
