@@ -1,22 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { cn } from "@/utils/cn";
-import Image from "next/image";
-import { Controller, useForm } from "react-hook-form";
-import { yupResolver } from "@hookform/resolvers/yup";
-import { deleteShipmentSchema } from "@/lib/validation";
-import { Input, TextArea } from "../ui/input";
-import { Button } from "../ui/button";
-import {
-  useAddBoxDimensionMutation,
-  useCancelShipmentMutation,
-} from "@/store/slice/apiSlice";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-// ─── Icons ────────────────────────────────────────────────────────────────────
+import { CancelWithRefundPreview } from "./CancelWithRefundPreview";
 
 export default function CancelShipmentModal({
   isOpen,
@@ -29,9 +14,18 @@ export default function CancelShipmentModal({
   id: string;
   shipmentStatus?: string;
 }) {
-  // Gap 6: statuses where cancellation is not permitted — mirrors backend logic
-  // PRD Sprint 5: "IN_TRANSIT / OUT_FOR_DELIVERY / DELIVERED → Cannot cancel"
-  const NON_CANCELLABLE = ["IN_TRANSIT", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED", "RETURNED"];
+  // Statuses where cancellation is not permitted at all — mirrors the
+  // backend's own CANCELLABLE_STATUSES check (shipment.controller.js).
+  // PICKED_UP and FAILED are intentionally NOT in this list — those are
+  // still cancellable, just at a reduced refund %, which is exactly what
+  // CancelWithRefundPreview's refund-preview card shows.
+  const NON_CANCELLABLE = [
+    "IN_TRANSIT",
+    "OUT_FOR_DELIVERY",
+    "DELIVERED",
+    "CANCELLED",
+    "RETURNED",
+  ];
   const cannotCancel = NON_CANCELLABLE.includes(shipmentStatus);
 
   const cancelBlockedMessage =
@@ -40,42 +34,9 @@ export default function CancelShipmentModal({
       : shipmentStatus === "CANCELLED"
         ? "This shipment is already cancelled."
         : "This shipment is in transit and cannot be cancelled. Contact support or file a claim after delivery.";
-  const [handleCancelShipment, { isLoading }] = useCancelShipmentMutation();
-  // Accumulated data across steps
-
-  // ── Step 2 form ──
-  const deleteShipmentForm = useForm<{ reason: string }>({
-    resolver: yupResolver(deleteShipmentSchema),
-    defaultValues: {
-      reason: "",
-    },
-  });
-
-  const reset = () => {
-    deleteShipmentForm.reset({});
-    setIsOpen(false);
-  };
 
   const handleOpenChange = (v: boolean) => {
     setIsOpen(v);
-    if (!v) reset();
-  };
-
-  // Hoisted to top level — a nested `const DeleteForm = () => {...}` here
-  // would get redefined as a new component type on every re-render (e.g. the
-  // instant isLoading flips on submit), causing React to unmount/remount the
-  // form mid-click and silently drop the submit.
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = deleteShipmentForm;
-
-  const onSubmit = (data: { reason: string }) => {
-    handleCancelShipment({ id: id, reason: data.reason })
-      .unwrap()
-      .then(() => reset())
-      .catch(() => {});
   };
 
   return (
@@ -111,7 +72,6 @@ export default function CancelShipmentModal({
               <span className="w-6" />
             </div>
 
-            {/* Gap 6: blocked state — show clear message instead of the form */}
             {cannotCancel ? (
               <div className="mt-6 rounded-xl bg-red-50 border border-red-100 p-4 text-sm text-red-700">
                 <p className="font-semibold mb-1">Cannot Cancel</p>
@@ -125,23 +85,15 @@ export default function CancelShipmentModal({
                 </div>
               </div>
             ) : (
-              <form className="mt-10" onSubmit={handleSubmit(onSubmit)}>
-                <TextArea
-                  label="Reason for cancelling"
-                  {...register("reason")}
-                  error={errors.reason?.message}
+              <>
+                <p className="text-xs text-gray-500 mt-4">
+                  Review the refund amount below before confirming.
+                </p>
+                <CancelWithRefundPreview
+                  shipmentId={id}
+                  onDone={() => setIsOpen(false)}
                 />
-
-                <div className="flex justify-end mt-5">
-                  <Button
-                    isLoading={isLoading}
-                    type="submit"
-                    className="px-5 py-2 text-xs"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </form>
+              </>
             )}
           </Dialog.Content>
         </Dialog.Portal>

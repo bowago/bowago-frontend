@@ -1,9 +1,11 @@
 "use client";
 
 import { MapPin, Clock, ChevronRight } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface ShipmentCardProps {
   id: string;
+  shipmentId?: string;
   trackingId: string;
   status: "In Transit" | "Delivered" | "Pending";
   from: string;
@@ -22,6 +24,7 @@ const statusColors: Record<string, string> = {
 
 export default function ShipmentCard({
   id,
+  shipmentId,
   trackingId,
   status,
   from,
@@ -31,9 +34,21 @@ export default function ShipmentCard({
   estDelivery,
   delay = 0,
 }: ShipmentCardProps) {
+  const router = useRouter();
+  const navId = shipmentId ?? id;
+
   return (
     <div
-      className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 animate-fade-in-up"
+      onClick={() => router.push(`/dashboard/shipments/${navId}`)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          router.push(`/dashboard/shipments/${navId}`);
+        }
+      }}
+      className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 animate-fade-in-up cursor-pointer"
       style={{ animationDelay: `${delay}ms` }}
     >
       {/* Header */}

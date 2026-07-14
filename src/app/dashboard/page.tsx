@@ -305,8 +305,8 @@ export default function Page() {
     const delivered = myShipments.filter(
       (s: any) => s.status === "DELIVERED",
     ).length;
-    const inTransit = myShipments.filter(
-      (s: any) => ["IN_TRANSIT", "OUT_FOR_DELIVERY", "PICKED_UP"].includes(s.status),
+    const inTransit = myShipments.filter((s: any) =>
+      ["IN_TRANSIT", "OUT_FOR_DELIVERY", "PICKED_UP"].includes(s.status),
     ).length;
 
     return (
@@ -358,13 +358,18 @@ export default function Page() {
             <div className="xl:col-span-2">
               <ActiveShipmentsSection items={activeShipments} />
               <div className="mt-4 text-right">
-                <Link href="/dashboard/orders" className="text-sm text-brand hover:underline">
+                <Link
+                  href="/dashboard/orders"
+                  className="text-sm text-brand hover:underline"
+                >
                   View full order history →
                 </Link>
               </div>
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-gray-600 mb-3">Loyalty Rewards</h3>
+              <h3 className="text-sm font-semibold text-gray-600 mb-3">
+                Loyalty Rewards
+              </h3>
               <LoyaltyDashboardCard />
               <Link
                 href="/dashboard/loyalty"
@@ -537,6 +542,36 @@ export default function Page() {
 }
 
 // ── Shared active shipments section ───────────────────────────────────────────
+// Real backend status values (PENDING, PICKED_UP, IN_TRANSIT, OUT_FOR_DELIVERY,
+// DELIVERED, FAILED, RETURNED, CANCELLED, ...) don't match ShipmentCard's
+// 3-value display enum 1:1 — this used to be passed straight through with an
+// `as any` cast, so anything besides those 3 exact strings rendered with no
+// status color at all. Progress was also hardcoded to 50% for every card
+// regardless of actual status.
+const STATUS_ORDER = [
+  "PENDING",
+  "CONFIRMED",
+  "PICKED_UP",
+  "IN_TRANSIT",
+  "OUT_FOR_DELIVERY",
+  "DELIVERED",
+];
+
+function toDisplayStatus(
+  status: string,
+): "In Transit" | "Delivered" | "Pending" {
+  if (status === "DELIVERED") return "Delivered";
+  if (["PICKED_UP", "IN_TRANSIT", "OUT_FOR_DELIVERY"].includes(status)) {
+    return "In Transit";
+  }
+  return "Pending";
+}
+
+function progressFromStatus(status: string): number {
+  const idx = STATUS_ORDER.indexOf(status);
+  return idx < 0 ? 0 : Math.round(((idx + 1) / STATUS_ORDER.length) * 100);
+}
+
 function ActiveShipmentsSection({ items }: { items: ShipmentItem[] }) {
   return (
     <div>
@@ -561,11 +596,12 @@ function ActiveShipmentsSection({ items }: { items: ShipmentItem[] }) {
             <ShipmentCard
               key={s.id}
               id={s.trackingNumber}
+              shipmentId={s.id}
               trackingId={s.trackingNumber}
-              status={s.status as any}
+              status={toDisplayStatus(s.status)}
               from={s.senderCity}
               to={s.recipientCity}
-              progress={50}
+              progress={progressFromStatus(s.status)}
               currentLocation={s.senderCity}
               estDelivery={
                 s.estimatedDelivery

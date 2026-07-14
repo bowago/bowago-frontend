@@ -849,12 +849,18 @@ export const apiSlice = createApi({
     // useGetPromoCodesQuery — admin list, with search/isActive filter + pagination
     GetPromoCodes: builder.query<
       any,
-      { search?: string; isActive?: boolean; page?: number; limit?: number } | void
+      {
+        search?: string;
+        isActive?: boolean;
+        page?: number;
+        limit?: number;
+      } | void
     >({
       query: (params) => {
         const searchParams = new URLSearchParams();
         if (params?.search) searchParams.append("search", params.search);
-        if (params?.isActive !== undefined) searchParams.append("isActive", String(params.isActive));
+        if (params?.isActive !== undefined)
+          searchParams.append("isActive", String(params.isActive));
         if (params?.page) searchParams.append("page", String(params.page));
         if (params?.limit) searchParams.append("limit", String(params.limit));
         const qs = searchParams.toString();
@@ -1063,9 +1069,30 @@ export const apiSlice = createApi({
         url: `/invoices/${paymentId}/download`,
         method: "GET",
         responseHandler: async (response) => {
+          // IMPORTANT: return the error body, don't throw it. fetchBaseQuery
+          // wraps whatever this returns as `{ error: { status, data } }`
+          // automatically when response.ok is false — throwing a plain
+          // object here instead gets caught internally and coerced with
+          // String(), turning a real backend message like "set up 2FA"
+          // into the literal string "[object Object]" by the time it
+          // reaches the UI, which is why this used to always show a
+          // generic "Failed to download invoice" no matter what actually
+          // went wrong server-side (MFA gate, not found, access denied...).
           if (!response.ok) {
-            const err = await response.json().catch(() => ({}));
-            throw err;
+            return response.json().catch(() => ({}));
+          }
+          // The backend has two success shapes depending on whether the
+          // Cloudinary upload succeeded: normally it returns JSON with a
+          // signedUrl (not the PDF itself), only falling back to streaming
+          // raw PDF bytes if that upload fails. This used to always call
+          // response.blob() regardless, which "succeeds" even on the JSON
+          // response (blob() doesn't care about content-type) — producing
+          // a downloaded "invoice.pdf" that was actually just JSON text
+          // and wouldn't open in any PDF viewer.
+          const contentType = response.headers.get("content-type") || "";
+          if (contentType.includes("application/json")) {
+            const json = await response.json().catch(() => ({}));
+            return { __signedUrlResponse: true, ...json };
           }
           return response.blob();
         },
@@ -1073,7 +1100,21 @@ export const apiSlice = createApi({
       }),
       async onQueryStarted({ filename }, { queryFulfilled }) {
         try {
-          const blob = (await queryFulfilled).data as unknown as Blob;
+          const result = (await queryFulfilled).data as any;
+
+          if (result && result.__signedUrlResponse) {
+            const signedUrl = result?.data?.signedUrl;
+            if (!signedUrl) {
+              errorToast("Invoice link was not returned. Please try again.");
+              return;
+            }
+            // This is a real, already-hosted PDF URL — open it directly
+            // rather than trying to re-wrap it as a local blob download.
+            window.open(signedUrl, "_blank", "noopener,noreferrer");
+            return;
+          }
+
+          const blob = result as unknown as Blob;
           const url = window.URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.href = url;
@@ -1160,7 +1201,9 @@ export const apiSlice = createApi({
         try {
           const { data } = await queryFulfilled;
           if (data) {
-            successToast("Address change request submitted — awaiting admin approval");
+            successToast(
+              "Address change request submitted — awaiting admin approval",
+            );
           }
         } catch (error) {
           const errorM = error as CustomError;
@@ -1318,6 +1361,59 @@ export const apiSlice = createApi({
       },
     }),
 
+    // ─── Support KPI CSV export ───────────────────────────────────────────────
+    // Same fix as ExportShipmentsCsv below — window.open() can't attach the
+    // Authorization header this endpoint requires, so the button always 401'd.
+    ExportSupportKpiCsv: builder.mutation<
+      void,
+      { from?: string; to?: string; agentId?: string }
+    >({
+      queryFn: async (params, api, _extraOptions, _baseQuery) => {
+        const qs = new URLSearchParams();
+        if (params.from) qs.set("from", params.from);
+        if (params.to) qs.set("to", params.to);
+        if (params.agentId) qs.set("agentId", params.agentId);
+        qs.set("format", "csv");
+
+        const state = api.getState() as any;
+        const token = state?.auth?.accessToken;
+        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+
+        try {
+          const response = await fetch(
+            `${baseUrl}/support/kpi?${qs.toString()}`,
+            {
+              headers: {
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              },
+            },
+          );
+          if (!response.ok) {
+            errorToast("KPI export failed");
+            return {
+              error: { status: response.status, data: "Export failed" } as any,
+            };
+          }
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `BowaGo-Agent-KPI-${new Date().toISOString().slice(0, 10)}.csv`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          successToast("KPI report exported to CSV");
+          return { data: undefined };
+        } catch (err: any) {
+          errorToast(err?.message || "Export failed");
+          return {
+            error: { status: "FETCH_ERROR", data: err?.message } as any,
+          };
+        }
+      },
+    }),
+
     // ─── Sprint 6: CSV export ─────────────────────────────────────────────────
     // Downloads shipments as a .csv file using blob download pattern
     ExportShipmentsCsv: builder.mutation<
@@ -1332,7 +1428,7 @@ export const apiSlice = createApi({
 
         const state = api.getState() as any;
         const token = state?.auth?.accessToken;
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
         const queryStr = qs.toString();
 
         try {
@@ -1605,7 +1701,9 @@ export const apiSlice = createApi({
           if (data) successToast("Price band rolled back successfully");
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Failed to roll back price band");
+          errorToast(
+            errorM.error?.data?.message || "Failed to roll back price band",
+          );
         }
       },
       invalidatesTags: ["PriceBandAuditLog", "Surcharge"],
@@ -1620,21 +1718,27 @@ export const apiSlice = createApi({
     }),
 
     // useCreatePriceAdjustmentMutation — Dispatcher creates discrepancy adjustment
-    CreatePriceAdjustment: builder.mutation<any, {
-      shipmentId: string;
-      adjustedPrice: number;
-      reason: string;
-      actualWeightKg?: number;
-      proofImageUrls?: string[];
-    }>({
+    CreatePriceAdjustment: builder.mutation<
+      any,
+      {
+        shipmentId: string;
+        adjustedPrice: number;
+        reason: string;
+        actualWeightKg?: number;
+        proofImageUrls?: string[];
+      }
+    >({
       query: (body) => ({ url: "/price-adjustments", method: "POST", body }),
       async onQueryStarted(_a, { queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          if (data) successToast("Price adjustment created. Customer notified.");
+          if (data)
+            successToast("Price adjustment created. Customer notified.");
         } catch (error) {
           const e = error as CustomError;
-          errorToast(e.error?.data?.message || "Failed to create price adjustment");
+          errorToast(
+            e.error?.data?.message || "Failed to create price adjustment",
+          );
         }
       },
       invalidatesTags: ["PriceAdjustment", "Shipment"],
@@ -1642,12 +1746,18 @@ export const apiSlice = createApi({
 
     // useAcknowledgePriceAdjustmentMutation — Customer: pay the difference
     AcknowledgePriceAdjustment: builder.mutation<any, string>({
-      query: (id) => ({ url: `/price-adjustments/${id}/acknowledge`, method: "POST" }),
+      query: (id) => ({
+        url: `/price-adjustments/${id}/acknowledge`,
+        method: "POST",
+      }),
       invalidatesTags: ["PriceAdjustment"],
     }),
 
     // useDowngradePriceAdjustmentMutation — Customer: switch to lower tier
-    DowngradePriceAdjustment: builder.mutation<any, { id: string; newServiceType: string }>({
+    DowngradePriceAdjustment: builder.mutation<
+      any,
+      { id: string; newServiceType: string }
+    >({
       query: ({ id, newServiceType }) => ({
         url: `/price-adjustments/${id}/downgrade`,
         method: "POST",
@@ -1667,7 +1777,10 @@ export const apiSlice = createApi({
 
     // useCancelPriceAdjustmentMutation — Customer: cancel with refund
     CancelPriceAdjustment: builder.mutation<any, string>({
-      query: (id) => ({ url: `/price-adjustments/${id}/cancel`, method: "POST" }),
+      query: (id) => ({
+        url: `/price-adjustments/${id}/cancel`,
+        method: "POST",
+      }),
       async onQueryStarted(_a, { queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
@@ -1681,7 +1794,10 @@ export const apiSlice = createApi({
     }),
 
     // useContactSupportForAdjustmentMutation — Customer: open a PRICING_DISPUTE ticket
-    ContactSupportForAdjustment: builder.mutation<any, { id: string; message?: string }>({
+    ContactSupportForAdjustment: builder.mutation<
+      any,
+      { id: string; message?: string }
+    >({
       query: ({ id, message }) => ({
         url: `/price-adjustments/${id}/contact-support`,
         method: "POST",
@@ -1690,7 +1806,10 @@ export const apiSlice = createApi({
       async onQueryStarted(_a, { queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          if (data) successToast("Support ticket opened. A Finance agent will contact you.");
+          if (data)
+            successToast(
+              "Support ticket opened. A Finance agent will contact you.",
+            );
         } catch (error) {
           const e = error as CustomError;
           errorToast(e.error?.data?.message || "Failed to open support ticket");
@@ -1700,7 +1819,10 @@ export const apiSlice = createApi({
     }),
 
     // useExtendAdjustmentDeadlineMutation — Admin/Support: extend customer response window
-    ExtendAdjustmentDeadline: builder.mutation<any, { id: string; hours: number; note?: string }>({
+    ExtendAdjustmentDeadline: builder.mutation<
+      any,
+      { id: string; hours: number; note?: string }
+    >({
       query: ({ id, ...body }) => ({
         url: `/price-adjustments/${id}/extend`,
         method: "POST",
@@ -1730,7 +1852,15 @@ export const apiSlice = createApi({
     }),
 
     // useUpdateAppSettingMutation — POST /admin/settings
-    UpdateAppSetting: builder.mutation<any, { key: string; value: string | number | boolean; type?: string; group?: string }>({
+    UpdateAppSetting: builder.mutation<
+      any,
+      {
+        key: string;
+        value: string | number | boolean;
+        type?: string;
+        group?: string;
+      }
+    >({
       query: (body) => ({ url: "/admin/settings", method: "POST", body }),
       async onQueryStarted(_a, { queryFulfilled }) {
         try {
@@ -1751,11 +1881,21 @@ export const apiSlice = createApi({
       providesTags: ["Loyalty"],
     }),
 
-    PreviewRedemption: builder.mutation<any, { pointsToRedeem: number; shipmentPriceNaira: number }>({
-      query: (body) => ({ url: "/loyalty/preview-redemption", method: "POST", body }),
+    PreviewRedemption: builder.mutation<
+      any,
+      { pointsToRedeem: number; shipmentPriceNaira: number }
+    >({
+      query: (body) => ({
+        url: "/loyalty/preview-redemption",
+        method: "POST",
+        body,
+      }),
     }),
 
-    RedeemPoints: builder.mutation<any, { shipmentId: string; pointsToRedeem: number }>({
+    RedeemPoints: builder.mutation<
+      any,
+      { shipmentId: string; pointsToRedeem: number }
+    >({
       query: (body) => ({ url: "/loyalty/redeem", method: "POST", body }),
       async onQueryStarted(_a, { queryFulfilled }) {
         try {
@@ -2139,12 +2279,16 @@ export const apiSlice = createApi({
       providesTags: ["Zone"], // Label this data as 'Post'
     }),
     // useGetUsersQuery
-    GetUsers: builder.query<any, { search?: string; role?: string; adminSubRole?: string } | void>({
+    GetUsers: builder.query<
+      any,
+      { search?: string; role?: string; adminSubRole?: string } | void
+    >({
       query: (params) => {
         const searchParams = new URLSearchParams();
         if (params?.search) searchParams.append("search", params.search);
         if (params?.role) searchParams.append("role", params.role);
-        if (params?.adminSubRole) searchParams.append("adminSubRole", params.adminSubRole);
+        if (params?.adminSubRole)
+          searchParams.append("adminSubRole", params.adminSubRole);
         const qs = searchParams.toString();
         return `/users${qs ? `?${qs}` : ""}`;
       },
@@ -2577,6 +2721,37 @@ export const apiSlice = createApi({
       invalidatesTags: ["Notification"],
     }),
 
+    // useGetVapidPublicKeyQuery — the key pushManager.subscribe() needs.
+    // Returns { publicKey: null } if the backend hasn't set VAPID env vars
+    // yet, so the frontend can just skip offering the toggle.
+    GetVapidPublicKey: builder.query<
+      { data: { publicKey: string | null } },
+      void
+    >({
+      query: () => "/notifications/vapid-public-key",
+    }),
+
+    // useSubscribeToPushMutation — register this browser for Web Push
+    SubscribeToPush: builder.mutation<
+      unknown,
+      { subscription: PushSubscriptionJSON }
+    >({
+      query: (body) => ({
+        url: "/notifications/push-subscribe",
+        method: "POST",
+        body,
+      }),
+    }),
+
+    // useUnsubscribeFromPushMutation
+    UnsubscribeFromPush: builder.mutation<unknown, { endpoint: string }>({
+      query: (body) => ({
+        url: "/notifications/push-subscribe",
+        method: "DELETE",
+        body,
+      }),
+    }),
+
     // ─── 2FA ─────────────────────────────────────────────────────────────────
     Setup2FA: builder.mutation<any, { method: "SMS" | "EMAIL" }>({
       query: (body) => ({ url: "/auth/setup-2fa", method: "POST", body }),
@@ -2609,7 +2784,8 @@ export const apiSlice = createApi({
               refreshToken: (data as any)?.data?.refreshToken,
             };
             if (userToken.accessToken) dispatch(authTokenChange(userToken));
-            if ((data as any)?.data?.user) dispatch(setUserData((data as any).data.user));
+            if ((data as any)?.data?.user)
+              dispatch(setUserData((data as any).data.user));
             dispatch(setMfaVerified(new Date().toISOString()));
           } catch (e: any) {
             errorToast(e.error?.data?.message || "Verification failed");
@@ -2624,7 +2800,8 @@ export const apiSlice = createApi({
         try {
           const { data } = await queryFulfilled;
           if (data) successToast("Two-factor authentication disabled");
-          if ((data as any)?.data?.user) dispatch(setUserData((data as any).data.user));
+          if ((data as any)?.data?.user)
+            dispatch(setUserData((data as any).data.user));
         } catch (e: any) {
           errorToast(e.error?.data?.message || "Failed to disable 2FA");
         }
@@ -2818,22 +2995,37 @@ export const apiSlice = createApi({
     // useGetPackagingGuidesQuery — public, powers /packaging-guide page
     GetPackagingGuides: builder.query<any, { category?: string } | void>({
       query: (params) =>
-        params?.category ? `/policies/packaging-guides?category=${params.category}` : "/policies/packaging-guides",
+        params?.category
+          ? `/policies/packaging-guides?category=${params.category}`
+          : "/policies/packaging-guides",
       providesTags: ["PackagingGuide"],
     }),
 
     // useCreatePackagingGuideMutation — business admin
     CreatePackagingGuide: builder.mutation<
       any,
-      { title: string; body: string; category: string; imageUrl?: string; sortOrder?: number; isDangerous?: boolean }
+      {
+        title: string;
+        body: string;
+        category: string;
+        imageUrl?: string;
+        sortOrder?: number;
+        isDangerous?: boolean;
+      }
     >({
-      query: (body) => ({ url: "/policies/packaging-guides", method: "POST", body }),
+      query: (body) => ({
+        url: "/policies/packaging-guides",
+        method: "POST",
+        body,
+      }),
       async onQueryStarted(_, { queryFulfilled }) {
         try {
           await queryFulfilled;
           successToast("Packaging guide created");
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "Failed to create packaging guide");
+          errorToast(
+            e.error?.data?.message || "Failed to create packaging guide",
+          );
         }
       },
       invalidatesTags: ["PackagingGuide"],
@@ -2842,15 +3034,30 @@ export const apiSlice = createApi({
     // useUpdatePackagingGuideMutation — business admin
     UpdatePackagingGuide: builder.mutation<
       any,
-      { id: string; title?: string; body?: string; category?: string; imageUrl?: string; sortOrder?: number; isDangerous?: boolean; isActive?: boolean }
+      {
+        id: string;
+        title?: string;
+        body?: string;
+        category?: string;
+        imageUrl?: string;
+        sortOrder?: number;
+        isDangerous?: boolean;
+        isActive?: boolean;
+      }
     >({
-      query: ({ id, ...body }) => ({ url: `/policies/packaging-guides/${id}`, method: "PATCH", body }),
+      query: ({ id, ...body }) => ({
+        url: `/policies/packaging-guides/${id}`,
+        method: "PATCH",
+        body,
+      }),
       async onQueryStarted(_, { queryFulfilled }) {
         try {
           await queryFulfilled;
           successToast("Packaging guide updated");
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "Failed to update packaging guide");
+          errorToast(
+            e.error?.data?.message || "Failed to update packaging guide",
+          );
         }
       },
       invalidatesTags: ["PackagingGuide"],
@@ -2858,13 +3065,18 @@ export const apiSlice = createApi({
 
     // useDeletePackagingGuideMutation — business admin
     DeletePackagingGuide: builder.mutation<any, { id: string }>({
-      query: ({ id }) => ({ url: `/policies/packaging-guides/${id}`, method: "DELETE" }),
+      query: ({ id }) => ({
+        url: `/policies/packaging-guides/${id}`,
+        method: "DELETE",
+      }),
       async onQueryStarted(_, { queryFulfilled }) {
         try {
           await queryFulfilled;
           successToast("Packaging guide deleted");
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "Failed to delete packaging guide");
+          errorToast(
+            e.error?.data?.message || "Failed to delete packaging guide",
+          );
         }
       },
       invalidatesTags: ["PackagingGuide"],
@@ -2880,11 +3092,16 @@ export const apiSlice = createApi({
     // useGetPolicyQuery — public, full policy body by key
     GetPolicy: builder.query<any, { key: string }>({
       query: ({ key }) => `/policies/${key}`,
-      providesTags: (_res, _err, arg) => [{ type: "Policy" as const, id: arg.key }],
+      providesTags: (_res, _err, arg) => [
+        { type: "Policy" as const, id: arg.key },
+      ],
     }),
 
     // useUpsertPolicyMutation — business admin: create or update by key
-    UpsertPolicy: builder.mutation<any, { key: string; title: string; body: string; isActive?: boolean }>({
+    UpsertPolicy: builder.mutation<
+      any,
+      { key: string; title: string; body: string; isActive?: boolean }
+    >({
       query: (body) => ({ url: "/policies", method: "POST", body }),
       async onQueryStarted(_, { queryFulfilled }) {
         try {
@@ -3281,6 +3498,9 @@ export const {
   useMarkAllNotificationsReadMutation,
   useDeleteNotificationMutation,
   useBulkDeleteNotificationsMutation,
+  useGetVapidPublicKeyQuery,
+  useSubscribeToPushMutation,
+  useUnsubscribeFromPushMutation,
   // Sprint 6: Agent KPI & CSAT
   useGetAgentKpiQuery,
   useSubmitCsatMutation,
@@ -3294,6 +3514,7 @@ export const {
   useGetOrgStatusQuery,
   useUpdateDriverLocationMutation,
   useExportShipmentsCsvMutation,
+  useExportSupportKpiCsvMutation,
   useAssignShipmentMutation,
   useGetCannedResponsesQuery,
   useCreateCannedResponseMutation,

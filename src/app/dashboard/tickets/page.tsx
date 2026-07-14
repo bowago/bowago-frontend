@@ -2,7 +2,8 @@
 import TicketTableView from "@/components/layout/TicketTableView";
 import AddTicketModal from "@/components/modals/AddTicketModal";
 import { Plus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 
@@ -10,6 +11,18 @@ export default function TicketsPage() {
   const [open, setOpen] = useState(false);
   const user = useSelector((s: RootState) => s.auth.user);
   const isAdmin = user?.role === "ADMIN";
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (searchParams.get("new") === "1" && !isAdmin) {
+      setOpen(true);
+      // Clean the URL so refreshing or closing/reopening doesn't re-trigger it.
+      router.replace(pathname);
+    }
+  }, [searchParams, isAdmin, pathname, router]);
+
   return (
     <div className="pb-10">
       <div className="flex items-center justify-between mb-6">

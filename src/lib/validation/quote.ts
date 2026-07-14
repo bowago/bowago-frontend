@@ -17,9 +17,7 @@ export const serviceSchema = yup.object({
     .required("Please select a service"),
 });
 export const deleteShipmentSchema = yup.object({
-  reason: yup
-    .string()
-    .required("Enter reason for cancelling"),
+  reason: yup.string().required("Enter reason for cancelling"),
 });
 
 export const routeSchema = yup.object({
@@ -184,10 +182,7 @@ export const createTicketSchema = yup.object({
 
   // Accept either a tracking number (human-friendly) or a shipmentId UUID.
   // The backend resolves trackingNumber → shipmentId automatically.
-  trackingNumber: yup
-    .string()
-    .trim()
-    .optional(),
+  trackingNumber: yup.string().trim().optional(),
 
   shipmentId: yup
     .string()
@@ -211,19 +206,22 @@ export const createTicketSchema = yup.object({
 
   priority: yup
     .string()
-    .oneOf(["LOW", "NORMAL", "HIGH", "URGENT"], "Please select a valid priority")
+    .oneOf(
+      ["LOW", "NORMAL", "HIGH", "URGENT"],
+      "Please select a valid priority",
+    )
     .required("Priority is required"),
 });
 
 export type CreateTicketFormData = yup.InferType<typeof createTicketSchema>;
 
 export const createClaimSchema = yup.object({
-  shipmentId: yup
-    .string()
-    .uuid("Shipment ID must be a valid UUID")
-    .required("Shipment ID is required"),
+  shipmentId: yup.string().trim().required("Tracking number is required"),
 
-  type: yup.string().oneOf(["DAMAGE", "LOSS", "OTHER"], "Please select a valid claim type").required("Claim type is required"),
+  type: yup
+    .string()
+    .oneOf(["DAMAGE", "LOSS", "OTHER"], "Please select a valid claim type")
+    .required("Claim type is required"),
 
   description: yup
     .string()
@@ -328,7 +326,9 @@ export const promoCodeSchema = yup
 
     discountPercent: yup
       .number()
-      .transform((value, originalValue) => (originalValue === "" || originalValue == null ? null : value))
+      .transform((value, originalValue) =>
+        originalValue === "" || originalValue == null ? null : value,
+      )
       .min(0, "Discount cannot be negative")
       .max(100, "Discount cannot exceed 100%")
       .typeError("Must be a number")
@@ -336,7 +336,9 @@ export const promoCodeSchema = yup
 
     flatDiscount: yup
       .number()
-      .transform((value, originalValue) => (originalValue === "" || originalValue == null ? null : value))
+      .transform((value, originalValue) =>
+        originalValue === "" || originalValue == null ? null : value,
+      )
       .min(0, "Flat discount cannot be negative")
       .typeError("Must be a number")
       .nullable(),
@@ -348,21 +350,27 @@ export const promoCodeSchema = yup
 
     serviceType: yup
       .string()
-      .transform((value, originalValue) => (originalValue === "" ? null : value))
+      .transform((value, originalValue) =>
+        originalValue === "" ? null : value,
+      )
       .oneOf(["STANDARD", "EXPRESS", "ECONOMY"])
       .nullable()
       .notRequired(),
 
     minOrderAmount: yup
       .number()
-      .transform((value, originalValue) => (originalValue === "" || originalValue == null ? null : value))
+      .transform((value, originalValue) =>
+        originalValue === "" || originalValue == null ? null : value,
+      )
       .min(0, "Minimum order cannot be negative")
       .nullable()
       .notRequired(),
 
     maxUses: yup
       .number()
-      .transform((value, originalValue) => (originalValue === "" || originalValue == null ? null : value))
+      .transform((value, originalValue) =>
+        originalValue === "" || originalValue == null ? null : value,
+      )
       .min(0, "Max uses cannot be negative")
       .nullable()
       .notRequired(),
@@ -375,16 +383,20 @@ export const promoCodeSchema = yup
       .string()
       .nullable()
       .notRequired()
-      .test("valid-date", "Enter a valid date (YYYY-MM-DD)", (val) =>
-        !val || /^\d{4}-\d{2}-\d{2}$/.test(val),
+      .test(
+        "valid-date",
+        "Enter a valid date (YYYY-MM-DD)",
+        (val) => !val || /^\d{4}-\d{2}-\d{2}$/.test(val),
       ),
 
     validUntil: yup
       .string()
       .nullable()
       .notRequired()
-      .test("valid-date", "Enter a valid date (YYYY-MM-DD)", (val) =>
-        !val || /^\d{4}-\d{2}-\d{2}$/.test(val),
+      .test(
+        "valid-date",
+        "Enter a valid date (YYYY-MM-DD)",
+        (val) => !val || /^\d{4}-\d{2}-\d{2}$/.test(val),
       )
       .test("after-start", "Must be after the start date", function (val) {
         const { validFrom } = this.parent;

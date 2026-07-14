@@ -2,6 +2,7 @@
 
 import { ColumnDef } from "@tanstack/react-table";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 import {
@@ -10,21 +11,32 @@ import {
   useWaivePaymentMutation,
 } from "@/store/slice/apiSlice";
 import CancelShipmentModal from "@/components/modals/CancelShipmentModal";
-import ViewShipmentModal from "@/components/modals/ViewShipmentModal";
+import ViewShipmentModal, {
+  PAST_CUTOFF_STATUSES,
+} from "@/components/modals/ViewShipmentModal";
 import RequestAddressChangeModal from "@/components/modals/RequestAddressChangeModal";
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 const STATUS_STYLES: Record<string, { label: string; className: string }> = {
-  PENDING:              { label: "Pending",         className: "bg-yellow-100 text-yellow-700" },
-  CONFIRMED:            { label: "Confirmed",        className: "bg-blue-100 text-blue-700" },
-  PICKED_UP:            { label: "Picked Up",        className: "bg-indigo-100 text-indigo-700" },
-  IN_TRANSIT:           { label: "In Transit",       className: "bg-purple-100 text-purple-700" },
-  OUT_FOR_DELIVERY:     { label: "Out for Delivery", className: "bg-orange-100 text-orange-700" },
-  DELIVERED:            { label: "Delivered",        className: "bg-green-100 text-green-700" },
-  FAILED:               { label: "Failed",           className: "bg-red-100 text-red-700" },
-  CANCELLED:            { label: "Cancelled",        className: "bg-gray-200 text-gray-600" },
-  RETURNED:             { label: "Returned",         className: "bg-pink-100 text-pink-700" },
-  PENDING_ADMIN_REVIEW: { label: "Admin Review",     className: "bg-gray-100 text-gray-500" },
+  PENDING: { label: "Pending", className: "bg-yellow-100 text-yellow-700" },
+  CONFIRMED: { label: "Confirmed", className: "bg-blue-100 text-blue-700" },
+  PICKED_UP: { label: "Picked Up", className: "bg-indigo-100 text-indigo-700" },
+  IN_TRANSIT: {
+    label: "In Transit",
+    className: "bg-purple-100 text-purple-700",
+  },
+  OUT_FOR_DELIVERY: {
+    label: "Out for Delivery",
+    className: "bg-orange-100 text-orange-700",
+  },
+  DELIVERED: { label: "Delivered", className: "bg-green-100 text-green-700" },
+  FAILED: { label: "Failed", className: "bg-red-100 text-red-700" },
+  CANCELLED: { label: "Cancelled", className: "bg-gray-200 text-gray-600" },
+  RETURNED: { label: "Returned", className: "bg-pink-100 text-pink-700" },
+  PENDING_ADMIN_REVIEW: {
+    label: "Admin Review",
+    className: "bg-gray-100 text-gray-500",
+  },
 };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -42,6 +54,7 @@ export type Shipment = {
   finalPrice?: number;
   quotedPrice?: number;
   pickupDate: string;
+  hasPendingAddressChange?: boolean;
 };
 
 // ─── Mark as Paid modal (admin only) ─────────────────────────────────────────
@@ -72,14 +85,20 @@ function MarkAsPaidModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={onClose}>
+    <div
+      className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center"
+      onClick={onClose}
+    >
       <div
         className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 m-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-lg font-semibold text-gray-900 mb-1">Record Payment</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">
+          Record Payment
+        </h2>
         <p className="text-sm text-gray-500 mb-4">
-          Use this to record cash, bank transfer, or POS payments made outside Paystack.
+          Use this to record cash, bank transfer, or POS payments made outside
+          Paystack.
         </p>
 
         {isSuperAdmin && (
@@ -102,7 +121,9 @@ function MarkAsPaidModal({
         {mode === "manual" ? (
           <div className="space-y-3">
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Payment Method</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Payment Method
+              </label>
               <select
                 value={method}
                 onChange={(e) => setMethod(e.target.value)}
@@ -116,7 +137,8 @@ function MarkAsPaidModal({
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
-                Reference / Receipt No. <span className="text-gray-400">(optional)</span>
+                Reference / Receipt No.{" "}
+                <span className="text-gray-400">(optional)</span>
               </label>
               <input
                 value={reference}
@@ -141,7 +163,8 @@ function MarkAsPaidModal({
         ) : (
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">
-              Reason for waiver <span className="text-gray-400">(optional)</span>
+              Reason for waiver{" "}
+              <span className="text-gray-400">(optional)</span>
             </label>
             <textarea
               value={reason}
@@ -151,7 +174,8 @@ function MarkAsPaidModal({
               className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none"
             />
             <p className="text-xs text-orange-600 mt-2">
-              ⚠ Waiving sets the final price to ₦0 and marks the shipment as paid.
+              ⚠ Waiving sets the final price to ₦0 and marks the shipment as
+              paid.
             </p>
           </div>
         )}
@@ -168,7 +192,11 @@ function MarkAsPaidModal({
             disabled={marking || waiving}
             className="flex-1 px-4 py-2 bg-brand hover:bg-red-700 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
           >
-            {marking || waiving ? "Saving..." : mode === "waive" ? "Waive Payment" : "Mark as Paid"}
+            {marking || waiving
+              ? "Saving..."
+              : mode === "waive"
+                ? "Waive Payment"
+                : "Mark as Paid"}
           </button>
         </div>
       </div>
@@ -186,26 +214,78 @@ function ShipmentActionCell({ shipment }: { shipment: Shipment }) {
   const user = useSelector((s: RootState) => s.auth.user) as any;
   const isAdmin = user?.role === "ADMIN";
   const isSuperAdmin = user?.adminSubRole === "SUPER_ADMIN";
+  const router = useRouter();
 
-  const [initPayment, { isLoading: paying }] = useInitiateShipmentPaymentMutation();
+  // Dispatcher-tier: operational staff who move packages, not the paying
+  // customer and not full admin/finance staff — they shouldn't see billing
+  // (Pay/Mark Paid) or customer-initiated actions (Change Address/Cancel),
+  // only enough to look up and update a shipment. This covers both:
+  //   - Internal ROLE_ADMIN: the "custom role" a SUPER_ADMIN delegates —
+  //     per earlier discussion, this IS what plays the internal dispatcher
+  //     role. LOGISTICS_MANAGER is the legacy full-ops admin tier and keeps
+  //     the fuller action set below, unchanged.
+  //   - Enterprise ROLE_DISPATCHER: a company's own shipment-ops staff.
+  // SUPER_ADMIN always sees everything regardless of any of this.
+  const isDispatcherTier =
+    !isSuperAdmin &&
+    ((isAdmin && user?.adminSubRole === "ROLE_ADMIN") ||
+      (user?.role === "ENTERPRISE" &&
+        user?.enterpriseRole === "ROLE_DISPATCHER"));
+
+  const [initPayment, { isLoading: paying }] =
+    useInitiateShipmentPaymentMutation();
 
   const isPaid = shipment.paymentStatus === "PAID";
-  const isTerminal = ["DELIVERED", "CANCELLED", "RETURNED"].includes(shipment.status);
+  const isTerminal = ["DELIVERED", "CANCELLED", "RETURNED"].includes(
+    shipment.status,
+  );
 
   const handlePay = async () => {
     try {
       const callbackUrl = `${window.location.origin}/dashboard/payment/callback`;
-      const result = await initPayment({ shipmentId: shipment.id, callbackUrl, refundPolicyAccepted: true }).unwrap();
-      const url = (result as any)?.authorizationUrl ?? (result as any)?.data?.authorizationUrl;
+      const result = await initPayment({
+        shipmentId: shipment.id,
+        callbackUrl,
+        refundPolicyAccepted: true,
+      }).unwrap();
+      const url =
+        (result as any)?.authorizationUrl ??
+        (result as any)?.data?.authorizationUrl;
       if (url) window.location.href = url;
     } catch {}
   };
 
+  if (isDispatcherTier) {
+    return (
+      <div className="flex flex-wrap gap-1.5">
+        <button
+          onClick={() => setOpenViewModal(true)}
+          className="text-blue-500 border border-blue-400 px-2.5 py-1 rounded-md text-xs hover:bg-blue-50 transition-colors"
+        >
+          View
+        </button>
+        <button
+          onClick={() => router.push(`/dashboard/shipments/${shipment.id}`)}
+          className="text-gray-600 border border-gray-300 px-2.5 py-1 rounded-md text-xs hover:bg-gray-50 transition-colors"
+        >
+          Details →
+        </button>
+        {openViewModal && (
+          <ViewShipmentModal
+            isOpen={openViewModal}
+            setIsOpen={setOpenViewModal}
+            id={shipment.id}
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="flex flex-wrap gap-1.5">
-        {/* CUSTOMER: Pay button */}
-        {!isAdmin && !isPaid && (
+        {/* CUSTOMER (or SUPER_ADMIN acting on their behalf): Pay button */}
+        {(!isAdmin || isSuperAdmin) && !isPaid && (
           <button
             onClick={handlePay}
             disabled={paying}
@@ -240,32 +320,67 @@ function ShipmentActionCell({ shipment }: { shipment: Shipment }) {
           View
         </button>
 
-        {/* Change Address (customer, only before PICKED_UP — per PRD Sprint 5) */}
-        {!isAdmin && !["PICKED_UP", "IN_TRANSIT", "OUT_FOR_DELIVERY", "DELIVERED", "FAILED", "CANCELLED", "RETURNED", "PENDING_ADMIN_REVIEW"].includes(shipment.status) && (
-          <button
-            onClick={() => setOpenAddressChangeModal(true)}
-            className="text-amber-600 border border-amber-400 px-2.5 py-1 rounded-md text-xs hover:bg-amber-50 transition-colors"
-          >
-            Change Address
-          </button>
-        )}
+        {/* Change Address (customer, or SUPER_ADMIN acting on their behalf,
+            only before PICKED_UP — per PRD Sprint 5) */}
+        {(!isAdmin || isSuperAdmin) &&
+          ![
+            "PICKED_UP",
+            "IN_TRANSIT",
+            "OUT_FOR_DELIVERY",
+            "DELIVERED",
+            "FAILED",
+            "CANCELLED",
+            "RETURNED",
+            "PENDING_ADMIN_REVIEW",
+          ].includes(shipment.status) && (
+            <button
+              onClick={() => setOpenAddressChangeModal(true)}
+              className="text-amber-600 border border-amber-400 px-2.5 py-1 rounded-md text-xs hover:bg-amber-50 transition-colors"
+            >
+              Change Address
+            </button>
+          )}
 
-        {/* Cancel */}
-        {!isTerminal && (
-          <button
-            onClick={() => setOpenCancelModal(true)}
-            className="text-red-500 border border-red-400 px-2.5 py-1 rounded-md text-xs hover:bg-red-50 transition-colors"
-          >
-            Cancel
-          </button>
-        )}
+        {/* Cancel (customer, or SUPER_ADMIN acting on their behalf) */}
+        {(!isAdmin || isSuperAdmin) &&
+          !isTerminal &&
+          (PAST_CUTOFF_STATUSES.includes(shipment.status) ? (
+            // Past the self-service cutoff — same rule ViewShipmentModal
+            // enforces. Previously this button skipped straight to
+            // CancelShipmentModal regardless of status, so the cutoff
+            // message only ever showed up if you happened to open the
+            // View modal first instead of clicking Cancel directly here.
+            <button
+              onClick={() => setOpenViewModal(true)}
+              title="This shipment is already in transit — the cancellation window has closed. Click to see details and contact support."
+              className="text-gray-400 border border-gray-200 px-2.5 py-1 rounded-md text-xs bg-gray-50 cursor-not-allowed hover:bg-gray-100"
+            >
+              Cancel — Window Closed
+            </button>
+          ) : (
+            <button
+              onClick={() => setOpenCancelModal(true)}
+              className="text-red-500 border border-red-400 px-2.5 py-1 rounded-md text-xs hover:bg-red-50 transition-colors"
+            >
+              Cancel
+            </button>
+          ))}
       </div>
 
       {openViewModal && (
-        <ViewShipmentModal isOpen={openViewModal} setIsOpen={setOpenViewModal} id={shipment.id} />
+        <ViewShipmentModal
+          isOpen={openViewModal}
+          setIsOpen={setOpenViewModal}
+          id={shipment.id}
+        />
       )}
       {openCancelModal && (
-        <CancelShipmentModal isOpen={openCancelModal} setIsOpen={setOpenCancelModal} id={shipment.id} />
+        <CancelShipmentModal
+          isOpen={openCancelModal}
+          setIsOpen={setOpenCancelModal}
+          id={shipment.id}
+          shipmentStatus={shipment.status}
+        />
       )}
       {openMarkPaidModal && (
         <MarkAsPaidModal
@@ -309,7 +424,9 @@ export const ShipmentColumns: ColumnDef<Shipment>[] = [
       return (
         <div className="text-sm">
           <p className="font-medium">{senderName}</p>
-          <p className="text-gray-400 text-xs">{senderPhone} · {senderCity}</p>
+          <p className="text-gray-400 text-xs">
+            {senderPhone} · {senderCity}
+          </p>
         </div>
       );
     },
@@ -322,7 +439,9 @@ export const ShipmentColumns: ColumnDef<Shipment>[] = [
       return (
         <div className="text-sm">
           <p className="font-medium">{recipientName}</p>
-          <p className="text-gray-400 text-xs">{recipientPhone} · {recipientCity}</p>
+          <p className="text-gray-400 text-xs">
+            {recipientPhone} · {recipientCity}
+          </p>
         </div>
       );
     },
@@ -337,11 +456,15 @@ export const ShipmentColumns: ColumnDef<Shipment>[] = [
         <div className="text-sm">
           <p className="font-semibold">₦{price.toLocaleString()}</p>
           {ps && (
-            <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-              ps === "PAID"    ? "bg-green-100 text-green-700"
-              : ps === "PENDING" ? "bg-yellow-100 text-yellow-700"
-              : "bg-gray-100 text-gray-500"
-            }`}>
+            <span
+              className={`text-xs px-1.5 py-0.5 rounded-full ${
+                ps === "PAID"
+                  ? "bg-green-100 text-green-700"
+                  : ps === "PENDING"
+                    ? "bg-yellow-100 text-yellow-700"
+                    : "bg-gray-100 text-gray-500"
+              }`}
+            >
               {ps.toLowerCase()}
             </span>
           )}
@@ -354,11 +477,26 @@ export const ShipmentColumns: ColumnDef<Shipment>[] = [
     header: "Status",
     cell: ({ row }) => {
       const status = row.getValue<string>("status");
-      const config = STATUS_STYLES[status] ?? { label: status, className: "bg-gray-100 text-gray-500" };
+      const config = STATUS_STYLES[status] ?? {
+        label: status,
+        className: "bg-gray-100 text-gray-500",
+      };
       return (
-        <span className={`px-2 py-1 text-xs rounded-full font-medium ${config.className}`}>
-          {config.label}
-        </span>
+        <div className="flex flex-col gap-1 items-start">
+          <span
+            className={`px-2 py-1 text-xs rounded-full font-medium ${config.className}`}
+          >
+            {config.label}
+          </span>
+          {row.original.hasPendingAddressChange && (
+            <span
+              title="An address change request is awaiting admin approval — this shipment is paused until it's reviewed."
+              className="px-2 py-0.5 text-[10px] rounded-full font-medium bg-amber-100 text-amber-700 whitespace-nowrap"
+            >
+              ⏳ Address Change Pending
+            </span>
+          )}
+        </div>
       );
     },
   },
@@ -368,7 +506,11 @@ export const ShipmentColumns: ColumnDef<Shipment>[] = [
     cell: ({ row }) => {
       const d = row.getValue<string>("pickupDate");
       if (!d) return <span className="text-gray-400 text-xs">—</span>;
-      return <div className="text-xs text-gray-600">{new Date(d).toLocaleDateString()}</div>;
+      return (
+        <div className="text-xs text-gray-600">
+          {new Date(d).toLocaleDateString()}
+        </div>
+      );
     },
   },
   {

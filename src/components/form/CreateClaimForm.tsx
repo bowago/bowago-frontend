@@ -1,19 +1,5 @@
 "use client";
 
-/**
- * CreateClaimForm — Gap 2 fixed
- *
- * BEFORE (broken): converted files to base64 data URLs and sent JSON.
- * multer on the backend only processes multipart/form-data — it ignores JSON bodies,
- * so req.files was always undefined and evidence images were silently dropped.
- *
- * AFTER (fixed): stores raw File objects, builds a FormData on submit,
- * and sends multipart/form-data so multer receives the binary parts and
- * uploads them to Cloudinary as intended.
- *
- * Gap 1 also fixed: added LOSS and OTHER claim types to the dropdown.
- */
-
 import { Controller, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { useRef, useState, type ChangeEvent } from "react";
@@ -24,9 +10,9 @@ import { useCreateClaimMutation } from "@/store/slice/apiSlice";
 
 // Gap 1: added LOSS and OTHER per PRD Sprint 7
 const claimTypeOptions = [
-  { label: "Damage",  value: "DAMAGE" },
-  { label: "Loss",    value: "LOSS"   },
-  { label: "Other",   value: "OTHER"  },
+  { label: "Damage", value: "DAMAGE" },
+  { label: "Loss", value: "LOSS" },
+  { label: "Other", value: "OTHER" },
 ];
 
 type CreateClaimFormProps = {
@@ -34,13 +20,13 @@ type CreateClaimFormProps = {
 };
 
 const MAX_IMAGE_COUNT = 5;
-const MAX_IMAGE_SIZE  = 20 * 1024 * 1024; // 20 MB
+const MAX_IMAGE_SIZE = 20 * 1024 * 1024; // 20 MB
 
 export const CreateClaimForm = ({ onSuccess }: CreateClaimFormProps) => {
   const [createClaim, { isLoading }] = useCreateClaimMutation();
 
   // Gap 2: store raw File objects, not base64 strings
-  const [files, setFiles]         = useState<File[]>([]);
+  const [files, setFiles] = useState<File[]>([]);
   const [imageError, setImageError] = useState("");
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -53,15 +39,15 @@ export const CreateClaimForm = ({ onSuccess }: CreateClaimFormProps) => {
   } = useForm<CreateClaimFormData>({
     resolver: yupResolver(createClaimSchema),
     defaultValues: {
-      shipmentId:    "",
-      type:          "DAMAGE",
-      description:   "",
+      shipmentId: "",
+      type: "DAMAGE",
+      description: "",
       declaredValue: 0,
-      claimAmount:   0,
-      bankName:      "",
+      claimAmount: 0,
+      bankName: "",
       accountNumber: "",
-      accountName:   "",
-      images:        [],
+      accountName: "",
+      images: [],
     },
   });
 
@@ -76,14 +62,14 @@ export const CreateClaimForm = ({ onSuccess }: CreateClaimFormProps) => {
 
     // Gap 2: build FormData so multer receives binary file parts
     const formData = new FormData();
-    formData.append("shipmentId",    data.shipmentId);
-    formData.append("type",          data.type);
-    formData.append("description",   data.description);
+    formData.append("shipmentId", data.shipmentId);
+    formData.append("type", data.type);
+    formData.append("description", data.description);
     formData.append("declaredValue", String(Number(data.declaredValue)));
-    formData.append("claimAmount",   String(Number(data.claimAmount)));
-    formData.append("bankName",      data.bankName    ?? "");
+    formData.append("claimAmount", String(Number(data.claimAmount)));
+    formData.append("bankName", data.bankName ?? "");
     formData.append("accountNumber", data.accountNumber ?? "");
-    formData.append("accountName",   data.accountName  ?? "");
+    formData.append("accountName", data.accountName ?? "");
 
     // Append each file under the field name "images" (matches multer .array('images', 5))
     files.forEach((file) => formData.append("images", file));
@@ -134,8 +120,8 @@ export const CreateClaimForm = ({ onSuccess }: CreateClaimFormProps) => {
       <div className="grid grid-cols-2 gap-3 mb-3 mt-6">
         <div className="col-span-2">
           <Input
-            label="Shipment ID"
-            placeholder="3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            label="Tracking Number"
+            placeholder="e.g. BG-20260713-KD7H8"
             error={errors.shipmentId?.message}
             {...register("shipmentId")}
           />
@@ -225,7 +211,8 @@ export const CreateClaimForm = ({ onSuccess }: CreateClaimFormProps) => {
               className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-1 file:text-sm file:text-gray-700"
             />
             <p className="text-xs text-gray-500">
-              Upload up to 5 photos (JPEG / PNG, max 20 MB each). At least 1 photo is required for damage claims.
+              Upload up to 5 photos (JPEG / PNG, max 20 MB each). At least 1
+              photo is required for damage claims.
             </p>
 
             {files.length > 0 && (

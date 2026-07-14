@@ -7,6 +7,7 @@ import {
   useGetAgentKpiQuery,
   useGetClaimsQuery,
   useGetOrgInvitesQuery,
+  useExportSupportKpiCsvMutation,
 } from "@/store/slice/apiSlice";
 import {
   Clock,
@@ -309,12 +310,14 @@ export default function AgentKpiPage() {
   // canManageTickets but not canViewAnalytics) — the frontend just reflects it.
   const isAgent = !!(result as any)?.isSelfScoped;
 
+  const [exportSupportKpiCsv, { isLoading: isExportingKpi }] =
+    useExportSupportKpiCsvMutation();
+
   const handleCsvExport = () => {
-    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
-    window.open(
-      `${apiBase}/api/v1/support/kpi?from=${from}&to=${to}&format=csv`,
-      "_blank",
-    );
+    // window.open() can't attach the Authorization header this endpoint
+    // requires, so it always 401'd regardless of the URL — same bug and
+    // same fix as the shipments CSV export.
+    exportSupportKpiCsv({ from, to });
   };
 
   return (
@@ -357,9 +360,11 @@ export default function AgentKpiPage() {
           {isSuperOrAdmin && (
             <button
               onClick={handleCsvExport}
-              className="flex items-center gap-1.5 border border-gray-200 rounded-lg px-3 py-1.5 text-sm hover:bg-gray-50"
+              disabled={isExportingKpi}
+              className="flex items-center gap-1.5 border border-gray-200 rounded-lg px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50"
             >
-              <Download className="w-4 h-4" /> Export CSV
+              <Download className="w-4 h-4" />{" "}
+              {isExportingKpi ? "Exporting…" : "Export CSV"}
             </button>
           )}
         </div>
@@ -595,26 +600,14 @@ export default function AgentKpiPage() {
         )}
       </div>
 
-      {/* ─────────────────────────────────────────────────────────────────────
-          Sprint 7 & 8 SUCCESS METRICS
-          PRD Success Metrics:
-            1. Claim Resolution Time — 60% reduction vs manual email chains
-            2. Corporate Adoption — B2B accounts with > 2 active sub-users
-            3. Pricing Error Rate — 0% variance between intended and billed
-      ──────────────────────────────────────────────────────────────────────── */}
-
       <div className="mt-8">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-8 h-8 rounded-xl bg-[#1F3A70]/10 flex items-center justify-center">
             <Target className="w-4 h-4 text-[#1F3A70]" />
           </div>
           <div>
-            <h2 className="font-bold text-gray-900">
-              Sprint 7 & 8 Success Metrics
-            </h2>
-            <p className="text-xs text-gray-500">
-              Business-level OKRs — measured against PRD targets
-            </p>
+            <h2 className="font-bold text-gray-900">Success Metrics</h2>
+            <p className="text-xs text-gray-500">Business-level OKRs</p>
           </div>
         </div>
 

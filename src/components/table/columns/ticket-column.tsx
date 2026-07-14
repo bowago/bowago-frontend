@@ -6,13 +6,14 @@ import { ColumnDef } from "@tanstack/react-table";
 import { useState } from "react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
-import { Eye, MoreHorizontal, Loader2 } from "lucide-react";
+import { Eye, MoreHorizontal, Loader2, MessageSquareText } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import {
   useUpdateTicketMutation,
   useGetUsersQuery,
   useGetTicketByIdQuery,
   useReplyToTicketMutation,
+  useGetCannedResponsesQuery,
 } from "@/store/slice/apiSlice";
 /* ───────────────── TYPES ───────────────── */
 
@@ -182,10 +183,18 @@ export const TicketColumns: ColumnDef<Ticket>[] = [
   {
     id: "action",
     header: "Action",
-    cell: ({ row }) => {
+    cell: ({ row, table }) => {
       const ticket = row.original;
       const user = useSelector((s: RootState) => s.auth.user) as any;
       const isAdmin = user?.role === "ADMIN";
+      // Explicit fallback refresh — see TicketTableView's <AppTable meta={...}>.
+      // RTK Query's invalidatesTags on UpdateTicket/AssignTicket should
+      // already refetch this list automatically; this guarantees it happens
+      // even if that doesn't fire for some reason, rather than leaving the
+      // row showing a stale status until a manual page reload.
+      const refetchTickets = (table.options.meta as any)?.refetchTickets as
+        | (() => void)
+        | undefined;
 
       const [isDetailsOpen, setIsDetailsOpen] = useState(false);
       const [isAssignOpen, setIsAssignOpen] = useState(false);
@@ -254,7 +263,10 @@ export const TicketColumns: ColumnDef<Ticket>[] = [
             <DialogContent>
               <AssignTicketForm
                 ticketId={ticket.id}
-                onDone={() => setIsAssignOpen(false)}
+                onDone={() => {
+                  setIsAssignOpen(false);
+                  refetchTickets?.();
+                }}
               />
             </DialogContent>
           </Dialog>
@@ -266,9 +278,18 @@ export const TicketColumns: ColumnDef<Ticket>[] = [
                 ticketId={ticket.id}
                 field="status"
                 currentValue={ticket.status}
-                options={["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED", "ESCALATED"]}
+                options={[
+                  "OPEN",
+                  "IN_PROGRESS",
+                  "RESOLVED",
+                  "CLOSED",
+                  "ESCALATED",
+                ]}
                 title="Update Status"
-                onDone={() => setIsStatusOpen(false)}
+                onDone={() => {
+                  setIsStatusOpen(false);
+                  refetchTickets?.();
+                }}
               />
             </DialogContent>
           </Dialog>
@@ -282,7 +303,10 @@ export const TicketColumns: ColumnDef<Ticket>[] = [
                 currentValue={ticket.priority}
                 options={["LOW", "NORMAL", "HIGH", "URGENT"]}
                 title="Update Priority"
-                onDone={() => setIsPriorityOpen(false)}
+                onDone={() => {
+                  setIsPriorityOpen(false);
+                  refetchTickets?.();
+                }}
               />
             </DialogContent>
           </Dialog>
@@ -314,7 +338,8 @@ const AssignTicketForm = ({
     role: "ADMIN",
     adminSubRole: "ROLE_ADMIN",
   });
-  const agents: any[] = (data as any)?.data?.users ?? (data as any)?.users ?? [];
+  const agents: any[] =
+    (data as any)?.data?.users ?? (data as any)?.users ?? [];
 
   const handleAssign = async () => {
     if (!selected) return;
@@ -417,7 +442,12 @@ const formatNaira = (kobo?: number | null) =>
   typeof kobo === "number" ? `₦${(kobo / 100).toLocaleString()}` : "—";
 
 const formatDate = (d?: string | null) =>
-  d ? new Date(d).toLocaleString("en-NG", { dateStyle: "medium", timeStyle: "short" }) : "—";
+  d
+    ? new Date(d).toLocaleString("en-NG", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      })
+    : "—";
 
 const TicketDetails = ({ ticketId }: { ticketId: string }) => {
   const currentUser = useSelector((s: RootState) => s.auth.user) as any;
@@ -425,6 +455,14 @@ const TicketDetails = ({ ticketId }: { ticketId: string }) => {
 
   const { data, isLoading, isError } = useGetTicketByIdQuery(ticketId);
   const [replyToTicket, { isLoading: isReplying }] = useReplyToTicketMutation();
+  const { data: cannedData } = useGetCannedResponsesQuery(undefined, {
+    skip: !isAdmin,
+  });
+  const cannedResponses: { id: string; title: string; body: string }[] =
+    (cannedData as any)?.data?.cannedResponses ??
+    (cannedData as any)?.data ??
+    [];
+  const [showCannedPicker, setShowCannedPicker] = useState(false);
 
   const [replyBody, setReplyBody] = useState("");
   const [isInternal, setIsInternal] = useState(false);
@@ -436,7 +474,11 @@ const TicketDetails = ({ ticketId }: { ticketId: string }) => {
   const handleReply = async () => {
     if (!replyBody.trim()) return;
     try {
-      await replyToTicket({ id: ticketId, body: replyBody, isInternal }).unwrap();
+      await replyToTicket({
+        id: ticketId,
+        body: replyBody,
+        isInternal,
+      }).unwrap();
       setReplyBody("");
       setIsInternal(false);
     } catch {
@@ -453,7 +495,9 @@ const TicketDetails = ({ ticketId }: { ticketId: string }) => {
   }
 
   if (isError || !ticket) {
-    return <div className="p-6 text-sm text-red-500">Unable to load ticket.</div>;
+    return (
+      <div className="p-6 text-sm text-red-500">Unable to load ticket.</div>
+    );
   }
 
   return (
@@ -466,12 +510,23 @@ const TicketDetails = ({ ticketId }: { ticketId: string }) => {
       </div>
 
       <div className="grid grid-cols-2 gap-2 text-sm mb-5 bg-gray-50 rounded-lg p-3">
-        <div><span className="text-gray-500">Customer: </span>{ticket.username || "—"}</div>
-        <div><span className="text-gray-500">Email: </span>{ticket.email || "—"}</div>
-        <div><span className="text-gray-500">Tracking No.: </span>{ticket.trackingNumber || "—"}</div>
+        <div>
+          <span className="text-gray-500">Customer: </span>
+          {ticket.username || "—"}
+        </div>
+        <div>
+          <span className="text-gray-500">Email: </span>
+          {ticket.email || "—"}
+        </div>
+        <div>
+          <span className="text-gray-500">Tracking No.: </span>
+          {ticket.trackingNumber || "—"}
+        </div>
         <div>
           <span className="text-gray-500">Assigned to: </span>
-          {ticket.assignedTo ? `${ticket.assignedTo.firstName} ${ticket.assignedTo.lastName}` : "Unassigned"}
+          {ticket.assignedTo
+            ? `${ticket.assignedTo.firstName} ${ticket.assignedTo.lastName}`
+            : "Unassigned"}
         </div>
       </div>
 
@@ -483,11 +538,16 @@ const TicketDetails = ({ ticketId }: { ticketId: string }) => {
           {customerContext.recentShipments?.length ? (
             <div className="space-y-1 mb-3">
               {customerContext.recentShipments.map((s: any, i: number) => (
-                <div key={i} className="flex justify-between text-xs bg-gray-50 rounded px-2 py-1.5">
+                <div
+                  key={i}
+                  className="flex justify-between text-xs bg-gray-50 rounded px-2 py-1.5"
+                >
                   <span className="font-mono">{s.trackingNumber}</span>
                   <span>{formatText(s.status)}</span>
                   <span>{formatNaira(s.quotedPrice)}</span>
-                  <span className="text-gray-400">{formatDate(s.createdAt)}</span>
+                  <span className="text-gray-400">
+                    {formatDate(s.createdAt)}
+                  </span>
                 </div>
               ))}
             </div>
@@ -498,7 +558,10 @@ const TicketDetails = ({ ticketId }: { ticketId: string }) => {
           {customerContext.recentPayments?.length ? (
             <div className="space-y-1">
               {customerContext.recentPayments.map((p: any, i: number) => (
-                <div key={i} className="flex justify-between text-xs bg-gray-50 rounded px-2 py-1.5">
+                <div
+                  key={i}
+                  className="flex justify-between text-xs bg-gray-50 rounded px-2 py-1.5"
+                >
                   <span className="font-mono">{p.reference}</span>
                   <span>{formatText(p.status)}</span>
                   <span>{formatNaira(p.amountKobo)}</span>
@@ -536,7 +599,9 @@ const TicketDetails = ({ ticketId }: { ticketId: string }) => {
                       {isMine ? "You" : isCustomerMsg ? "Customer" : "Agent"}
                       {m.isInternal && " · Internal note"}
                     </span>
-                    <span className="text-[10px] text-gray-400">{formatDate(m.createdAt)}</span>
+                    <span className="text-[10px] text-gray-400">
+                      {formatDate(m.createdAt)}
+                    </span>
                   </div>
                   <div className="whitespace-pre-wrap">{m.body}</div>
                 </div>
@@ -551,6 +616,40 @@ const TicketDetails = ({ ticketId }: { ticketId: string }) => {
       {/* Reply box */}
       {ticket.status !== "CLOSED" && (
         <div className="border-t pt-3">
+          {isAdmin && cannedResponses.length > 0 && (
+            <div className="relative mb-2">
+              <button
+                type="button"
+                onClick={() => setShowCannedPicker((v) => !v)}
+                className="flex items-center gap-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-50"
+              >
+                <MessageSquareText className="w-3.5 h-3.5" />
+                Insert Canned Response
+              </button>
+              {showCannedPicker && (
+                <div className="absolute z-10 mt-1 w-80 max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+                  {cannedResponses.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        // Append rather than replace, so an agent can still
+                        // add a personal line before/after the template.
+                        setReplyBody((prev) =>
+                          prev ? `${prev}\n\n${c.body}` : c.body,
+                        );
+                        setShowCannedPicker(false);
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 border-b border-gray-100 last:border-0"
+                    >
+                      <div className="font-medium text-gray-700">{c.title}</div>
+                      <div className="text-gray-400 truncate">{c.body}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <textarea
             value={replyBody}
             onChange={(e) => setReplyBody(e.target.value)}

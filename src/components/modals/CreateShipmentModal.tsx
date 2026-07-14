@@ -4,7 +4,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Controller, type Resolver, useForm, useWatch } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { Input, TextArea, RadioGroupCard, SelectInput } from "../ui/input";
 import { Button } from "../ui/button";
 import { Calendar, MapPin, Package, User } from "lucide-react";
@@ -32,12 +32,36 @@ const createShipmentSchema = yup.object({
   destinationCity: yup.string().required("Destination city is required"),
   pickupDate: yup.date().required("Pickup date is required"),
   boxSize: yup.string().nullable(),
-  weight: yup.number().min(0, "Weight cannot be negative").typeError("Must be a number").nullable(),
-  length: yup.number().min(0, "Length cannot be negative").typeError("Must be a number").nullable(),
-  width: yup.number().min(0, "Width cannot be negative").typeError("Must be a number").nullable(),
-  height: yup.number().min(0, "Height cannot be negative").typeError("Must be a number").nullable(),
-  cartons: yup.number().min(0, "Cartons cannot be negative").typeError("Must be a number").nullable(),
-  tons: yup.number().min(0, "Tons cannot be negative").typeError("Must be a number").nullable(),
+  weight: yup
+    .number()
+    .min(0, "Weight cannot be negative")
+    .typeError("Must be a number")
+    .nullable(),
+  length: yup
+    .number()
+    .min(0, "Length cannot be negative")
+    .typeError("Must be a number")
+    .nullable(),
+  width: yup
+    .number()
+    .min(0, "Width cannot be negative")
+    .typeError("Must be a number")
+    .nullable(),
+  height: yup
+    .number()
+    .min(0, "Height cannot be negative")
+    .typeError("Must be a number")
+    .nullable(),
+  cartons: yup
+    .number()
+    .min(0, "Cartons cannot be negative")
+    .typeError("Must be a number")
+    .nullable(),
+  tons: yup
+    .number()
+    .min(0, "Tons cannot be negative")
+    .typeError("Must be a number")
+    .nullable(),
   isFragile: yup.boolean().default(false),
   hasInsurance: yup.boolean().default(false),
   insuranceValue: yup
@@ -54,6 +78,7 @@ const createShipmentSchema = yup.object({
       otherwise: (schema) => schema.nullable(),
     }),
   itemDescription: yup.string().nullable(),
+  promoCode: yup.string().nullable(),
 
   // Step 2 — Delivery Details
   senderName: yup.string().required("Sender name is required"),
@@ -104,6 +129,12 @@ type ShipmentSummary = {
   pickupDate?: string;
 };
 
+type AppliedDiscount = {
+  type?: string;
+  label?: string;
+  discountAmount?: number;
+};
+
 type QuoteSummary = {
   total?: number;
   totalSurcharge?: number;
@@ -112,6 +143,13 @@ type QuoteSummary = {
   toCity?: { name?: string };
   breakdown?: { subtotal?: number };
   surchargeBreakdown?: SurchargeItem[];
+  pricingMode?: string;
+  appliedDiscount?: AppliedDiscount | null;
+  deliveryEstimate?: {
+    minDays?: number;
+    maxDays?: number;
+    label?: string;
+  } | null;
 };
 
 type ShipmentReviewData = {
@@ -232,12 +270,25 @@ function StepIndicator({ current }: { current: Step }) {
 
 // ─── Review Summary ───────────────────────────────────────────────────────────
 
-function ReviewStep({ data, insuranceRatePercent }: { data: ShipmentReviewData; insuranceRatePercent: number }) {
+function ReviewStep({
+  data,
+  insuranceRatePercent,
+}: {
+  data: ShipmentReviewData;
+  insuranceRatePercent: number;
+}) {
   const shipment = data.shipment;
   const quote = data.quote;
 
   const service = shipment?.serviceType ?? "STANDARD";
-  const deliveryTime = SERVICE_DELIVERY_MAP[service] ?? "—";
+  // Prefer the real zone+service-aware estimate the backend now computes
+  // (pricing.service.js#getDeliveryEstimate) — the static map is only a
+  // fallback for the brief moment before any quote has been generated, so
+  // this screen isn't blank. Previously this static map was the ONLY
+  // source, so e.g. an intra-city Abuja→Abuja shipment showed the same
+  // "1-3 days" as a genuinely cross-country one.
+  const deliveryTime =
+    quote?.deliveryEstimate?.label ?? SERVICE_DELIVERY_MAP[service] ?? "—";
   const serviceLabel =
     SERVICE_OPTIONS.find((s) => s.value === service)?.label ?? service;
 
@@ -324,6 +375,24 @@ function ReviewStep({ data, insuranceRatePercent }: { data: ShipmentReviewData; 
             value: subtotal > 0 ? `₦${subtotal.toLocaleString()}` : "—",
           },
         ])}
+
+        {/* Contract rate / promo code applied — was previously computed
+            correctly on the backend but silently dropped before reaching
+            this screen, so discounted shipments looked identical to
+            standard-priced ones. */}
+        {quote?.appliedDiscount && (
+          <div className="flex justify-between items-center py-[5px] border-b border-gray-100 bg-green-50 -mx-2 px-2 rounded">
+            <span className="text-xs font-medium text-green-700">
+              {quote.appliedDiscount.label ??
+                (quote.pricingMode === "CONTRACT"
+                  ? "Enterprise Contract Rate"
+                  : "Discount Applied")}
+            </span>
+            <span className="text-xs font-semibold text-green-700">
+              −₦{(quote.appliedDiscount.discountAmount ?? 0).toLocaleString()}
+            </span>
+          </div>
+        )}
 
         {/* Surcharges */}
         <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2 mt-4">
@@ -430,6 +499,17 @@ export default function CreateShipmentModal({
   const { data: citiesData, isLoading } = useGetCitiesQuery({});
 
   const [step, setStep] = useState<Step>(1);
+  // Reentrancy guard for handleNext. A ref (not state) because it needs to
+  // block a SECOND click that lands before React has re-rendered from the
+  // first — a plain `isAdvancing` state variable wouldn't help there since
+  // both click handlers would still read the same stale `false` value.
+  // Without this, double-clicking Next on step 1 fired handleNext twice
+  // while `step` was still captured as 1 in both closures — both runs took
+  // the "step 1 → step 2" branch (never the step-2-only createShipment
+  // branch), and both queued a setStep(s => s+1), landing on step 3 with
+  // step 2's fields never shown or validated.
+  const isAdvancingRef = useRef(false);
+  const [isAdvancing, setIsAdvancing] = useState(false);
   const [createdShipmentData, setCreatedShipmentData] =
     useState<ShipmentReviewData | null>(null);
   const [useCustomDimension, setUseCustomDimension] = useState(false);
@@ -549,6 +629,7 @@ export default function CreateShipmentModal({
     insuranceValue: data.hasInsurance ? (data.insuranceValue ?? 0) : 0,
     pickupDate: formatPickupDate(data.pickupDate),
     notes: data.note ?? "",
+    promoCode: data.promoCode || undefined,
     ...(persistedQuoteId ? { quoteId: persistedQuoteId } : {}),
   });
 
@@ -582,62 +663,71 @@ export default function CreateShipmentModal({
   };
 
   const handleNext = async () => {
-    const valid = await trigger(STEP_FIELDS[step]);
-    if (!valid) return;
-    if (step === 2) {
-      await createShipment();
-      return;
-    }
-
-    // Auto-populate sender/receiver city from route (Step 1 → Step 2)
-    // The PRD clarifies: "sender city = pickup city, receiver city = destination city"
-    // so we auto-fill to avoid redundant entry and confusion (Michael's observation).
-    if (step === 1) {
-      const vals = getValues();
-      if (vals.originCity && !getValues("senderCity")) {
-        setValue("senderCity", vals.originCity);
-        const senderCityObj = cities?.find((c) => c.name === vals.originCity);
-        if (senderCityObj) setValue("senderState", senderCityObj.state);
+    if (isAdvancingRef.current) return;
+    isAdvancingRef.current = true;
+    setIsAdvancing(true);
+    try {
+      const valid = await trigger(STEP_FIELDS[step]);
+      if (!valid) return;
+      if (step === 2) {
+        await createShipment();
+        return;
       }
-      if (vals.destinationCity && !getValues("receiverCity")) {
-        setValue("receiverCity", vals.destinationCity);
-        const receiverCityObj = cities?.find(
-          (c) => c.name === vals.destinationCity,
-        );
-        if (receiverCityObj) setValue("receiverState", receiverCityObj.state);
-      }
-    }
 
-    // When moving from Step 1 → Step 2, generate a persistent quote so the
-    // price is locked for 15 minutes. If it fails (no pricing data yet) we
-    // proceed anyway — the shipment controller will calculate the price.
-    if (step === 1) {
-      const vals = getValues();
-      try {
-        const result = await generatePersistedQuote({
-          originCity: vals.originCity,
-          destinationCity: vals.destinationCity,
-          weightKg: vals.weight ?? 0,
-          tons: vals.tons ?? 0,
-          cartons: vals.cartons ?? 0,
-          lengthCm: vals.length ?? 0,
-          widthCm: vals.width ?? 0,
-          heightCm: vals.height ?? 0,
-          boxDimensionId: vals.boxSize ?? undefined,
-          serviceType: vals.serviceType,
-          insuranceSelected: vals.hasInsurance,
-          declaredValue: vals.insuranceValue ?? 0,
-          termsAccepted: true,
-        }).unwrap();
-        const qId = result?.data?.quote?.id ?? result?.data?.id;
-        if (qId) setPersistedQuoteId(qId);
-      } catch {
-        // Non-blocking — proceed without price lock
-        setPersistedQuoteId(null);
+      // Auto-populate sender/receiver city from route (Step 1 → Step 2)
+      // The PRD clarifies: "sender city = pickup city, receiver city = destination city"
+      // so we auto-fill to avoid redundant entry and confusion (Michael's observation).
+      if (step === 1) {
+        const vals = getValues();
+        if (vals.originCity && !getValues("senderCity")) {
+          setValue("senderCity", vals.originCity);
+          const senderCityObj = cities?.find((c) => c.name === vals.originCity);
+          if (senderCityObj) setValue("senderState", senderCityObj.state);
+        }
+        if (vals.destinationCity && !getValues("receiverCity")) {
+          setValue("receiverCity", vals.destinationCity);
+          const receiverCityObj = cities?.find(
+            (c) => c.name === vals.destinationCity,
+          );
+          if (receiverCityObj) setValue("receiverState", receiverCityObj.state);
+        }
       }
-    }
 
-    setStep((s) => (s < 3 ? ((s + 1) as Step) : s));
+      // When moving from Step 1 → Step 2, generate a persistent quote so the
+      // price is locked for 15 minutes. If it fails (no pricing data yet) we
+      // proceed anyway — the shipment controller will calculate the price.
+      if (step === 1) {
+        const vals = getValues();
+        try {
+          const result = await generatePersistedQuote({
+            originCity: vals.originCity,
+            destinationCity: vals.destinationCity,
+            weightKg: vals.weight ?? 0,
+            tons: vals.tons ?? 0,
+            cartons: vals.cartons ?? 0,
+            lengthCm: vals.length ?? 0,
+            widthCm: vals.width ?? 0,
+            heightCm: vals.height ?? 0,
+            boxDimensionId: vals.boxSize ?? undefined,
+            serviceType: vals.serviceType,
+            insuranceSelected: vals.hasInsurance,
+            declaredValue: vals.insuranceValue ?? 0,
+            promoCode: vals.promoCode || undefined,
+            termsAccepted: true,
+          }).unwrap();
+          const qId = result?.data?.quote?.id ?? result?.data?.id;
+          if (qId) setPersistedQuoteId(qId);
+        } catch {
+          // Non-blocking — proceed without price lock
+          setPersistedQuoteId(null);
+        }
+      }
+
+      setStep((s) => (s < 3 ? ((s + 1) as Step) : s));
+    } finally {
+      isAdvancingRef.current = false;
+      setIsAdvancing(false);
+    }
   };
 
   const handleBack = () => {
@@ -1139,7 +1229,8 @@ export default function CreateShipmentModal({
                       {(getValues("insuranceValue") ?? 0) > 0 && (
                         <div className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
                           <span className="text-xs text-blue-600">
-                            Insurance premium ({insuranceRatePercent}% of declared value)
+                            Insurance premium ({insuranceRatePercent}% of
+                            declared value)
                           </span>
                           <span className="text-xs font-semibold text-blue-700">
                             ₦
@@ -1154,7 +1245,9 @@ export default function CreateShipmentModal({
                       )}
                       <p className="text-[11px] text-gray-400">
                         Enter the total value of your goods. The insurance
-                        premium is calculated automatically at {insuranceRatePercent}% (min ₦{insuranceMinPremiumNaira.toLocaleString()}).
+                        premium is calculated automatically at{" "}
+                        {insuranceRatePercent}% (min ₦
+                        {insuranceMinPremiumNaira.toLocaleString()}).
                       </p>
                     </div>
                   )}
@@ -1170,6 +1263,18 @@ export default function CreateShipmentModal({
                     {...register("itemDescription")}
                     error={errors.itemDescription?.message}
                   />
+                  <div className="mt-3">
+                    <Input
+                      label="Promo Code (optional)"
+                      placeholder="e.g. LAUNCH20"
+                      {...register("promoCode")}
+                      error={errors.promoCode?.message}
+                    />
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      If your account has an active enterprise contract rate,
+                      that takes priority and this code won&apos;t be applied.
+                    </p>
+                  </div>
                 </div>
               </>
             )}
@@ -1333,7 +1438,10 @@ export default function CreateShipmentModal({
 
             {/* ── STEP 3 ── */}
             {step === 3 && createdShipmentData && (
-              <ReviewStep data={createdShipmentData} insuranceRatePercent={insuranceRatePercent} />
+              <ReviewStep
+                data={createdShipmentData}
+                insuranceRatePercent={insuranceRatePercent}
+              />
             )}
           </form>
 
@@ -1374,8 +1482,10 @@ export default function CreateShipmentModal({
                 <Button
                   type="button"
                   onClick={handleNext}
-                  isLoading={step === 2 && isCreatingShipment}
-                  disabled={stepHasErrors}
+                  isLoading={
+                    isAdvancing && (step === 2 ? isCreatingShipment : true)
+                  }
+                  disabled={stepHasErrors || isAdvancing}
                 >
                   {step === 2 ? "Create Shipment" : "Continue"}
                 </Button>

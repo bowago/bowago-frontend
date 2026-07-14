@@ -13,6 +13,8 @@ import {
   Shield,
   Trash2,
   AlertTriangle,
+  Bell,
+  Loader2,
 } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
@@ -20,6 +22,7 @@ import { useDeleteAccountMutation } from "@/store/slice/apiSlice";
 import { useDispatch } from "react-redux";
 import { logoutUser } from "@/store/slice/authSlice";
 import { useRouter, useSearchParams } from "next/navigation";
+import { usePushSubscription } from "@/hooks/usePushSubscription";
 
 const TABS = [
   { id: "personal", label: "Personal Info", icon: User },
@@ -27,7 +30,73 @@ const TABS = [
   { id: "security", label: "Password", icon: Lock },
   { id: "twofa", label: "2FA Security", icon: Shield },
   { id: "payment", label: "Payment Method", icon: CreditCard },
+  { id: "notifications", label: "Notifications", icon: Bell },
 ];
+
+function NotificationSettingsSection() {
+  const { status, subscribe, unsubscribe } = usePushSubscription();
+
+  return (
+    <div className="max-w-md">
+      <h3 className="font-semibold text-gray-800 mb-1">Push Notifications</h3>
+      <p className="text-sm text-gray-500 mb-5">
+        Get notified on this device the moment your shipment status changes —
+        picked up, out for delivery, delivered, or delayed — even when BowaGO
+        isn&apos;t open.
+      </p>
+
+      {status === "loading" && (
+        <div className="flex items-center gap-2 text-sm text-gray-400">
+          <Loader2 className="w-4 h-4 animate-spin" /> Checking status…
+        </div>
+      )}
+
+      {status === "unsupported" && (
+        <p className="text-sm text-gray-500 bg-gray-50 rounded-xl p-3">
+          Push notifications aren&apos;t supported on this browser/device.
+          You&apos;ll still get every update by email.
+        </p>
+      )}
+
+      {status === "unconfigured" && (
+        <p className="text-sm text-gray-500 bg-gray-50 rounded-xl p-3">
+          Push notifications aren&apos;t available yet — you&apos;ll still get
+          every update by email.
+        </p>
+      )}
+
+      {status === "denied" && (
+        <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">
+          You previously blocked notifications for this site. Enable them in
+          your browser&apos;s site settings, then refresh this page.
+        </p>
+      )}
+
+      {status === "unsubscribed" && (
+        <button
+          onClick={subscribe}
+          className="bg-brand text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
+        >
+          Enable Push Notifications
+        </button>
+      )}
+
+      {status === "subscribed" && (
+        <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl p-3">
+          <span className="text-sm text-green-700 font-medium">
+            ✓ Push notifications are on for this device
+          </span>
+          <button
+            onClick={unsubscribe}
+            className="text-xs font-medium text-gray-500 hover:text-gray-700 underline"
+          >
+            Turn off
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function DeleteAccountSection() {
   const [confirm, setConfirm] = useState(false);
@@ -188,6 +257,7 @@ export default function SettingsPage() {
         {active === "security" && <ChangePasswordForm />}
         {active === "twofa" && <TwoFASetupSection />}
         {active === "payment" && <PaymentMethodForm />}
+        {active === "notifications" && <NotificationSettingsSection />}
       </div>
     </div>
   );

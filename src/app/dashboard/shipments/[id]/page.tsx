@@ -16,6 +16,7 @@ import {
   Download,
   AlertTriangle,
   Wrench,
+  LocateFixed,
 } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { useState } from "react";
@@ -76,11 +77,18 @@ export default function ShipmentDetails() {
   const user = useSelector((s: RootState) => s.auth.user) as any;
   const isAdmin = user?.role === "ADMIN";
   const adminSubRole = user?.adminSubRole ?? "";
-  // Shipment status updates (marking IN_TRANSIT, DELIVERED, etc.) are an
-  // internal BowaGo ops action (backend: requireShipmentOpsManagement).
-  // Enterprise ROLE_DISPATCHER manages their own shipments but does not
-  // perform platform-wide fulfilment status updates — that stays internal.
-  const isDispatcher =
+  // Shipment status/location updates are allowed for two groups:
+  //  1. Internal BowaGo ops staff (SUPER_ADMIN, LOGISTICS_MANAGER, or a
+  //     ROLE_ADMIN holding the canManageShipments capability) — platform-wide,
+  //     any shipment.
+  //  2. The shipment's OWN enterprise company's ROLE_MASTER or
+  //     ROLE_DISPATCHER — scoped to their own company's shipments only.
+  //     ROLE_DISPATCHER is intentionally enterprise-only; it never grants
+  //     access to another company's or BowaGo's own internal shipments.
+  // The backend (requireShipmentDispatchAccess + the company-ownership
+  // check inside updateShipmentStatus) is the real enforcement — this is
+  // just to decide whether to show the tab at all.
+  const isInternalOps =
     isAdmin &&
     ["SUPER_ADMIN", "LOGISTICS_MANAGER", "ROLE_ADMIN"].includes(adminSubRole);
 
@@ -108,6 +116,24 @@ export default function ShipmentDetails() {
   // ── Derived state (single declaration) ────────────────────────────────────
   const shipment = (data as any)?.data?.shipment ?? (data as any)?.data ?? null;
   const documents = shipment?.documents ?? [];
+  // Populated by getShipment's linked-quote include — see shipment.controller.js.
+  const appliedDiscount = (data as any)?.data?.quote?.appliedDiscount ?? null;
+
+  // Enterprise ROLE_MASTER/ROLE_DISPATCHER may dispatch shipments belonging
+  // to their OWN company only — "company" is determined by comparing
+  // "company root" (a user's masterId if they're staff, or their own id if
+  // they ARE the master). This mirrors the backend check in
+  // updateShipmentStatus exactly; the backend is what actually enforces it,
+  // this just decides whether to show the tab.
+  const isEnterpriseDispatcherForThisShipment =
+    user?.role === "ENTERPRISE" &&
+    ["ROLE_MASTER", "ROLE_DISPATCHER"].includes(user?.enterpriseRole) &&
+    shipment?.customer &&
+    (user.masterId || user.id) ===
+      (shipment.customer.masterId || shipment.customer.id);
+
+  const canDispatch = isInternalOps || isEnterpriseDispatcherForThisShipment;
+  const isDispatcher = canDispatch;
 
   const { data: adjData } = useGetShipmentAdjustmentsQuery(id, { skip: !id });
   const adjustments: any[] = (adjData as any)?.data?.adjustments ?? [];
@@ -147,6 +173,12 @@ export default function ShipmentDetails() {
   const [appliedDocFilters, setAppliedDocFilters] = useState(docFilters);
   const [statusNote, setStatusNote] = useState("");
   const [newStatus, setNewStatus] = useState("");
+  const [locationLabel, setLocationLabel] = useState("");
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
+    null,
+  );
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState("");
 
   const filteredDocs = documents.filter(
     (doc: any) =>
@@ -154,15 +186,50 @@ export default function ShipmentDetails() {
       doc.url?.toLowerCase().includes(appliedDocFilters.name.toLowerCase()),
   );
 
+  // One-click geolocation capture — lets a dispatcher on the road just tap a
+  // button instead of looking up/typing coordinates by hand. Uses the
+  // browser's native Geolocation API (no third-party SDK needed).
+  const handleUseCurrentLocation = () => {
+    setLocationError("");
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation isn't supported on this device/browser.");
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setCoords({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+        setLocating(false);
+      },
+      (err) => {
+        setLocationError(
+          err.code === err.PERMISSION_DENIED
+            ? "Location permission denied. Enable it in your browser settings, or type the location manually."
+            : "Couldn't get your location. Try again or type it manually.",
+        );
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  };
+
   const handleStatusUpdate = async () => {
     if (!newStatus) return;
     await updateStatus({
       id,
       status: newStatus,
       description: statusNote || `Status updated to ${newStatus}`,
+      ...(locationLabel ? { location: locationLabel } : {}),
+      ...(coords ? { lat: coords.lat, lng: coords.lng } : {}),
     });
     setNewStatus("");
     setStatusNote("");
+    setLocationLabel("");
+    setCoords(null);
+    setLocationError("");
   };
 
   if (isLoading) {
@@ -269,7 +336,9 @@ export default function ShipmentDetails() {
         <TabsList>
           <TabsTrigger value="shipment">Shipment Details</TabsTrigger>
           <TabsTrigger value="clearance">Documents</TabsTrigger>
-          {isAdmin && <TabsTrigger value="update">Update Status</TabsTrigger>}
+          {canDispatch && (
+            <TabsTrigger value="update">Update Status</TabsTrigger>
+          )}
         </TabsList>
 
         <div className="mt-5">
@@ -310,6 +379,19 @@ export default function ShipmentDetails() {
                         shipment.finalPrice ?? shipment.quotedPrice,
                       ).toLocaleString()}
                     </p>
+                    {appliedDiscount && (
+                      <p className="text-green-400 text-xs mt-1 font-medium">
+                        {appliedDiscount.label ??
+                          (appliedDiscount.type === "PROMO"
+                            ? "Promo Code Applied"
+                            : "Enterprise Contract Rate")}{" "}
+                        (−₦
+                        {Number(
+                          appliedDiscount.discountAmount ?? 0,
+                        ).toLocaleString()}
+                        )
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -506,8 +588,9 @@ export default function ShipmentDetails() {
             </div>
           </TabsContent>
 
-          {/* Admin: Update Status Tab */}
-          {isAdmin && (
+          {/* Dispatch: Update Status Tab — internal ops staff or the
+              shipment's own enterprise company's Master/Dispatcher */}
+          {canDispatch && (
             <TabsContent value="update" className="w-full">
               <div className="bg-white border rounded-lg p-6 space-y-4 max-w-md">
                 <h3 className="font-semibold">Update Shipment Status</h3>
@@ -536,6 +619,49 @@ export default function ShipmentDetails() {
                     ))}
                   </select>
                 </div>
+
+                {/* Location — feeds the tracking map's current-position
+                    marker (ShipmentMap / the public /track page). Previously
+                    nothing in the UI ever collected this even though the
+                    backend (updateShipmentStatus) always accepted lat/lng,
+                    so the map had no real data to show. */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm text-gray-600">
+                      Location (optional — updates the tracking map)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleUseCurrentLocation}
+                      disabled={locating}
+                      className="text-xs font-medium text-red-600 hover:text-red-700 disabled:opacity-50 flex items-center gap-1"
+                    >
+                      {locating ? (
+                        <Loader2 className="animate-spin w-3 h-3" />
+                      ) : (
+                        <LocateFixed className="w-3 h-3" />
+                      )}
+                      Use my current location
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={locationLabel}
+                    onChange={(e) => setLocationLabel(e.target.value)}
+                    className="border rounded-md p-2 text-sm w-full"
+                    placeholder="e.g. Abuja Regional Hub"
+                  />
+                  {locationError && (
+                    <p className="text-xs text-red-500 mt-1">{locationError}</p>
+                  )}
+                  {coords && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      Coordinates captured: {coords.lat.toFixed(5)},{" "}
+                      {coords.lng.toFixed(5)}
+                    </p>
+                  )}
+                </div>
+
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">
                     Note (optional)

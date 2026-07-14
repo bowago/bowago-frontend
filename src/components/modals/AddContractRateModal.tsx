@@ -55,7 +55,7 @@ export default function AddContractRateModal({
     if (!isOpen) return;
 
     if (editingRate) {
-      const toDateInput = (d: string) =>
+      const toDateInput = (d: string | null | undefined) =>
         d ? new Date(d).toISOString().slice(0, 10) : "";
 
       contractForm.reset({
@@ -170,213 +170,230 @@ export default function AddContractRateModal({
           {/* Scrollable body */}
           <div className="overflow-y-auto flex-1 px-6 pb-6">
             <form onSubmit={handleSubmit(onSubmit)}>
-        <div className="grid grid-cols-2 gap-3 mt-6">
-          {/* User / Enterprise — assign to master to cover whole org */}
-          <div className="col-span-2">
-            <p className="text-xs text-gray-500 mb-1.5 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
-              💡 Assign to a <strong>Master</strong> user to apply this rate to their entire enterprise team.
-              Assigning to an individual user only affects that one person.
-            </p>
-            <Controller
-              control={control}
-              name="userId"
-              render={({ field }) => (
-                <SelectInput
-                  label="Select Enterprise User / Master Account"
-                  disabled={isLoadingUsers || isEditMode}
-                  placeholder={isLoadingUsers ? "...loading" : "Select user"}
-                  options={
-                    usersData?.data?.users?.map(
-                      (item: {
-                        firstName: string;
-                        id: string;
-                        lastName: string;
-                        enterpriseRole?: string;
-                        role?: string;
-                      }) => ({
-                        label: `${item.lastName} ${item.firstName}${item.enterpriseRole === "ROLE_MASTER" ? " — Master (Org)" : ""}`,
-                        value: item.id,
-                      }),
-                    ) || []
-                  }
-                  value={field.value}
-                  onValueChange={field.onChange}
-                  error={errors.userId?.message}
-                />
-              )}
-            />
-          </div>
+              <div className="grid grid-cols-2 gap-3 mt-6">
+                {/* User / Enterprise — assign to master to cover whole org */}
+                <div className="col-span-2">
+                  <p className="text-xs text-gray-500 mb-1.5 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                    💡 Assign to a <strong>Master</strong> user to apply this
+                    rate to their entire enterprise team. Assigning to an
+                    individual user only affects that one person.
+                  </p>
+                  <Controller
+                    control={control}
+                    name="userId"
+                    render={({ field }) => (
+                      <SelectInput
+                        label="Select Enterprise User / Master Account"
+                        disabled={isLoadingUsers || isEditMode}
+                        placeholder={
+                          isLoadingUsers ? "...loading" : "Select user"
+                        }
+                        options={
+                          usersData?.data?.users?.map(
+                            (item: {
+                              firstName: string;
+                              id: string;
+                              lastName: string;
+                              enterpriseRole?: string;
+                              role?: string;
+                            }) => ({
+                              label: `${item.lastName} ${item.firstName}${item.enterpriseRole === "ROLE_MASTER" ? " — Master (Org)" : ""}`,
+                              value: item.id,
+                            }),
+                          ) || []
+                        }
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        error={errors.userId?.message}
+                      />
+                    )}
+                  />
+                </div>
 
-          {/* Service Type */}
-          <div className="col-span-2">
-            <Controller
-              name="serviceType"
-              control={control}
-              render={({ field }) => (
-                <RadioGroupCard
-                  label="Service Type"
-                  className="flex flex-row"
-                  value={field.value}
-                  onValueChange={field.onChange}
-                  options={[
-                    {
-                      label: "Express",
-                      description: "1–3 business days",
-                      value: "EXPRESS",
-                    },
-                    {
-                      label: "Standard",
-                      description: "5–7 business days",
-                      value: "STANDARD",
-                    },
-                    {
-                      label: "Economy",
-                      description: "10–14 business days",
-                      value: "ECONOMY",
-                    },
-                  ]}
-                />
-              )}
-            />
-          </div>
+                {/* Service Type */}
+                <div className="col-span-2">
+                  <Controller
+                    name="serviceType"
+                    control={control}
+                    render={({ field }) => (
+                      <RadioGroupCard
+                        label="Service Type"
+                        className="flex flex-row"
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        error={errors.serviceType?.message}
+                        options={[
+                          {
+                            label: "Express",
+                            description: "1–3 business days",
+                            value: "EXPRESS",
+                          },
+                          {
+                            label: "Standard",
+                            description: "5–7 business days",
+                            value: "STANDARD",
+                          },
+                          {
+                            label: "Economy",
+                            description: "10–14 business days",
+                            value: "ECONOMY",
+                          },
+                        ]}
+                      />
+                    )}
+                  />
+                </div>
 
-          {/* Label */}
-          <div className="col-span-2">
-            <Input
-              label="Contract Label"
-              {...register("label")}
-              error={errors.label?.message}
-            />
-          </div>
-
-          {/* 🔥 Pricing Type */}
-          <div className="col-span-2">
-            <Controller
-              name="pricingType"
-              control={control}
-              render={({ field }) => (
-                <RadioGroupCard
-                  label="Pricing Type"
-                  className="flex flex-row"
-                  value={field.value}
-                  onValueChange={(val) => {
-                    field.onChange(val);
-
-                    // Reset opposite field
-                    if (val === "discount") {
-                      setValue("fixedPricePerKgByZone", {
-                        "1": 0,
-                        "2": 0,
-                        "3": 0,
-                        "4": 0,
-                      });
-                    } else {
-                      setValue("discountPercent", 0);
-                    }
-                  }}
-                  options={[
-                    {
-                      label: "Discount %",
-                      description: "Apply percentage discount",
-                      value: "discount",
-                    },
-                    {
-                      label: "Fixed Price",
-                      description: "Set price per kg by zone",
-                      value: "fixed",
-                    },
-                  ]}
-                />
-              )}
-            />
-          </div>
-
-          {/* Discount */}
-          {pricingType === "discount" && (
-            <Input
-              label="Discount (%)"
-              type="number"
-              min={0}
-              max={100}
-              {...register("discountPercent", { valueAsNumber: true })}
-              error={errors.discountPercent?.message}
-            />
-          )}
-
-          {/* Dates */}
-          <div>
-            <Input
-              type="date"
-              label="Valid From (optional)"
-              {...register("validFrom")}
-              error={errors.validFrom?.message}
-            />
-            <p className="text-xs text-gray-400 mt-1">Leave blank — contract is active from today.</p>
-          </div>
-
-          <div>
-            <Input
-              type="date"
-              label="Valid Until (optional)"
-              {...register("validUntil")}
-              error={errors.validUntil?.message}
-            />
-            <p className="text-xs text-gray-400 mt-1">Leave blank — contract never expires.</p>
-          </div>
-
-          {/* Zone Pricing */}
-          {pricingType === "fixed" && (
-            <div className="col-span-2">
-              <p className="text-sm font-medium mb-2">
-                Fixed Price Per Kg (Zone)
-              </p>
-
-              <div className="grid grid-cols-4 gap-2">
-                {zones.map((zone) => (
+                {/* Label */}
+                <div className="col-span-2">
                   <Input
-                    key={zone}
+                    label="Contract Label"
+                    {...register("label")}
+                    error={errors.label?.message}
+                  />
+                </div>
+
+                {/* 🔥 Pricing Type */}
+                <div className="col-span-2">
+                  <Controller
+                    name="pricingType"
+                    control={control}
+                    render={({ field }) => (
+                      <RadioGroupCard
+                        label="Pricing Type"
+                        className="flex flex-row"
+                        value={field.value}
+                        error={errors.pricingType?.message}
+                        onValueChange={(val) => {
+                          field.onChange(val);
+
+                          // Reset opposite field
+                          if (val === "discount") {
+                            setValue("fixedPricePerKgByZone", {
+                              "1": 0,
+                              "2": 0,
+                              "3": 0,
+                              "4": 0,
+                            });
+                          } else {
+                            setValue("discountPercent", 0);
+                          }
+                        }}
+                        options={[
+                          {
+                            label: "Discount %",
+                            description: "Apply percentage discount",
+                            value: "discount",
+                          },
+                          {
+                            label: "Fixed Price",
+                            description: "Set price per kg by zone",
+                            value: "fixed",
+                          },
+                        ]}
+                      />
+                    )}
+                  />
+                </div>
+
+                {/* Discount */}
+                {pricingType === "discount" && (
+                  <Input
+                    label="Discount (%)"
                     type="number"
                     min={0}
-                    label={`Zone ${zone}`}
-                    {...register(`fixedPricePerKgByZone.${zone}` as const, {
-                      valueAsNumber: true,
-                    })}
-                    error={errors.fixedPricePerKgByZone?.[zone]?.message}
+                    max={100}
+                    {...register("discountPercent", { valueAsNumber: true })}
+                    error={errors.discountPercent?.message}
                   />
-                ))}
+                )}
+
+                {/* Dates */}
+                <div>
+                  <Input
+                    type="date"
+                    label="Valid From (optional)"
+                    {...register("validFrom")}
+                    error={errors.validFrom?.message}
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Leave blank — contract is active from today.
+                  </p>
+                </div>
+
+                <div>
+                  <Input
+                    type="date"
+                    label="Valid Until (optional)"
+                    {...register("validUntil")}
+                    error={errors.validUntil?.message}
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Leave blank — contract never expires.
+                  </p>
+                </div>
+
+                {/* Zone Pricing */}
+                {pricingType === "fixed" && (
+                  <div className="col-span-2">
+                    <p className="text-sm font-medium mb-2">
+                      Fixed Price Per Kg (Zone)
+                    </p>
+
+                    <div className="grid grid-cols-4 gap-2">
+                      {zones.map((zone) => (
+                        <Input
+                          key={zone}
+                          type="number"
+                          min={0}
+                          label={`Zone ${zone}`}
+                          {...register(
+                            `fixedPricePerKgByZone.${zone}` as const,
+                            {
+                              valueAsNumber: true,
+                            },
+                          )}
+                          error={errors.fixedPricePerKgByZone?.[zone]?.message}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Notes */}
+                <div className="col-span-2">
+                  <TextArea
+                    label="Notes"
+                    {...register("notes")}
+                    error={errors.notes?.message}
+                  />
+                </div>
+
+                {/* Active Status */}
+                <div className="col-span-2">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      {...register("isActive")}
+                      defaultChecked
+                      className="w-4 h-4 accent-gray-900 cursor-pointer"
+                    />
+                    <span className="text-sm text-gray-700">Active</span>
+                    <span className="text-xs text-gray-400">
+                      (uncheck to deactivate without deleting)
+                    </span>
+                  </label>
+                </div>
               </div>
-            </div>
-          )}
 
-          {/* Notes */}
-          <div className="col-span-2">
-            <TextArea
-              label="Notes"
-              {...register("notes")}
-              error={errors.notes?.message}
-            />
-          </div>
-
-          {/* Active Status */}
-          <div className="col-span-2">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                {...register("isActive")}
-                defaultChecked
-                className="w-4 h-4 accent-gray-900 cursor-pointer"
-              />
-              <span className="text-sm text-gray-700">Active</span>
-              <span className="text-xs text-gray-400">(uncheck to deactivate without deleting)</span>
-            </label>
-          </div>
-        </div>
-
-        <div className="flex justify-end mt-5">
-          <Button isLoading={isLoading || isLoadingContract} type="submit">
-            {isEditMode ? "Save Changes" : "Create Contract Rate"}
-          </Button>
-        </div>
+              <div className="flex justify-end mt-5">
+                <Button
+                  isLoading={isLoading || isLoadingContract}
+                  type="submit"
+                >
+                  {isEditMode ? "Save Changes" : "Create Contract Rate"}
+                </Button>
+              </div>
             </form>
           </div>
         </Dialog.Content>

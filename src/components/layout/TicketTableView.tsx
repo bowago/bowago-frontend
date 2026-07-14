@@ -1,7 +1,10 @@
 "use client";
 
 import { AppTable } from "@/components/table/Table";
-import { useGetAllTicketQuery, useGetMyTicketQuery } from "@/store/slice/apiSlice";
+import {
+  useGetAllTicketQuery,
+  useGetMyTicketQuery,
+} from "@/store/slice/apiSlice";
 import { Filter } from "lucide-react";
 import { useState } from "react";
 import { useSelector } from "react-redux";
@@ -178,7 +181,14 @@ export default function TicketTableView() {
         <div className="text-sm text-red-600">Unable to load tickets.</div>
       )}
       {/* Table */}
-      <AppTable columns={TicketColumns} data={tickets} />
+      <AppTable
+        columns={TicketColumns}
+        data={tickets}
+        meta={{
+          refetchTickets: () =>
+            isAdmin ? adminQuery.refetch() : customerQuery.refetch(),
+        }}
+      />
     </div>
   );
 }

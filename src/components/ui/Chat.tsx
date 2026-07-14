@@ -1,17 +1,3 @@
-/**
- * BowaGO Live Support Chat — Sprint 6
- *
- * Replaces Tawk.to with a native Socket.IO-powered support ticket chat widget.
- * Renders as a floating button on every page. Clicking it opens the live chat
- * panel. Customers can create a ticket or continue an open one.
- *
- * Real-time: joins the `ticket:{id}` room on open; messages arrive via
- * `ticket:message` events — no polling required.
- *
- * Only renders for authenticated users (reads accessToken from Redux store).
- * Unauthenticated visitors see nothing (they can open a ticket after login).
- */
-
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -41,7 +27,7 @@ import {
 const WS_URL =
   (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_WS_URL) ||
   (typeof process !== "undefined" &&
-    process.env?.NEXT_PUBLIC_API_URL?.replace(/\/api.*$/, "")) ||
+    process.env?.NEXT_PUBLIC_API_BASE_URL?.replace(/\/api.*$/, "")) ||
   "";
 
 interface LiveMessage {

@@ -9,10 +9,13 @@ import {
 } from "@/store/slice/apiSlice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { successToast, warningToast, errorToast } from "@/lib/toast/toast";
 import {
   UserPlus,
   Mail,
   RotateCcw,
+  Loader2,
+  Trash2,
   X,
   Clock,
   CheckCircle,
@@ -212,10 +215,14 @@ export default function TeamManagementPage() {
     filterStatus ? { status: filterStatus } : undefined,
   );
   const [inviteMember, { isLoading: isSending }] = useInviteMemberMutation();
-  const [cancelInvite, { isLoading: isCancelling }] =
-    useCancelOrgInviteMutation();
-  const [resendInvite, { isLoading: isResending }] =
-    useResendOrgInviteMutation();
+  const [cancelInvite] = useCancelOrgInviteMutation();
+  const [resendInvite] = useResendOrgInviteMutation();
+  // Per-row loading state — the mutation hook's own isLoading is shared
+  // across every row, so with more than one pending invite, clicking
+  // Resend on one would show a loading state that looked identical to
+  // (or interfered with) every other row's button.
+  const [resendingId, setResendingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const invites: any[] = data?.data?.invites ?? [];
   const selectedRoleDef =
@@ -233,7 +240,16 @@ export default function TeamManagementPage() {
     }
     setFormError(null);
     try {
-      await inviteMember(inviteForm).unwrap();
+      const result = await inviteMember(inviteForm).unwrap();
+      const emailSent =
+        (result as any)?.data?.emailSent ?? (result as any)?.emailSent;
+      if (emailSent === false) {
+        warningToast(
+          "Invite created, but the email failed to send. Use Resend, or share the invite link directly.",
+        );
+      } else {
+        successToast("Invite sent successfully");
+      }
       setInviteForm({ email: "", role: "ROLE_DISPATCHER" });
       setShowInviteForm(false);
       refetch();
@@ -473,12 +489,26 @@ export default function TeamManagementPage() {
                       </div>
                     </td>
                     <td className="px-5 py-3.5">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.className}`}
-                      >
-                        <BadgeIcon className="w-3 h-3" />
-                        {badge.label}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.className}`}
+                        >
+                          <BadgeIcon className="w-3 h-3" />
+                          {badge.label}
+                        </span>
+                        {invite.emailSent === false && (
+                          <span
+                            title={
+                              invite.emailError
+                                ? `Email failed: ${invite.emailError}`
+                                : "The invite email failed to send — use Resend, or share the invite link directly."
+                            }
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-50 text-red-600 border border-red-100"
+                          >
+                            ✉ Email failed
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-5 py-3.5 text-gray-500 text-xs">
                       {invite.expiresAt
@@ -489,32 +519,118 @@ export default function TeamManagementPage() {
                       <div className="flex items-center justify-end gap-2">
                         {["PENDING", "EXPIRED"].includes(invite.status) && (
                           <button
-                            onClick={() =>
-                              resendInvite({ id: invite.id }).then(() =>
-                                refetch(),
-                              )
-                            }
-                            disabled={isResending}
-                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+                            onClick={async () => {
+                              setResendingId(invite.id);
+                              try {
+                                const result = await resendInvite({
+                                  id: invite.id,
+                                }).unwrap();
+                                const emailSent =
+                                  (result as any)?.data?.emailSent ??
+                                  (result as any)?.emailSent;
+                                if (emailSent === false) {
+                                  warningToast(
+                                    "Invite refreshed, but the email failed to send. Share the invite link directly.",
+                                  );
+                                } else {
+                                  successToast("Invite resent successfully");
+                                }
+                                refetch();
+                              } catch (err: any) {
+                                errorToast(
+                                  err?.data?.message ||
+                                    "Failed to resend invite",
+                                );
+                              } finally {
+                                setResendingId(null);
+                              }
+                            }}
+                            disabled={resendingId === invite.id}
+                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                           >
-                            <RotateCcw className="w-3 h-3" /> Resend
+                            {resendingId === invite.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <RotateCcw className="w-3 h-3" />
+                            )}
+                            {resendingId === invite.id
+                              ? "Resending…"
+                              : "Resend"}
                           </button>
                         )}
                         {invite.status === "PENDING" && (
                           <button
-                            onClick={() => {
+                            onClick={async () => {
                               if (
-                                confirm(`Cancel invite for ${invite.email}?`)
-                              ) {
-                                cancelInvite({ id: invite.id }).then(() =>
-                                  refetch(),
+                                !confirm(`Cancel invite for ${invite.email}?`)
+                              )
+                                return;
+                              setDeletingId(invite.id);
+                              try {
+                                await cancelInvite({ id: invite.id }).unwrap();
+                                successToast("Invite cancelled");
+                                refetch();
+                              } catch (err: any) {
+                                errorToast(
+                                  err?.data?.message ||
+                                    "Failed to cancel invite",
                                 );
+                              } finally {
+                                setDeletingId(null);
                               }
                             }}
-                            disabled={isCancelling}
-                            className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors"
+                            disabled={deletingId === invite.id}
+                            className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                           >
-                            <X className="w-3 h-3" /> Cancel
+                            {deletingId === invite.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <X className="w-3 h-3" />
+                            )}
+                            {deletingId === invite.id
+                              ? "Cancelling…"
+                              : "Cancel"}
+                          </button>
+                        )}
+                        {/* Once an invite is already cancelled or expired, it's
+                            a dead end — the endpoint used to reject calling
+                            cancel again ("Only pending invites can be
+                            cancelled"), so a cancelled invite just sat in the
+                            list forever with no way to clear it out. The same
+                            endpoint now permanently deletes a terminal invite
+                            instead of re-cancelling it. */}
+                        {["CANCELLED", "EXPIRED"].includes(invite.status) && (
+                          <button
+                            onClick={async () => {
+                              if (
+                                !confirm(
+                                  `Permanently remove this invite for ${invite.email}? This can't be undone.`,
+                                )
+                              )
+                                return;
+                              setDeletingId(invite.id);
+                              try {
+                                await cancelInvite({ id: invite.id }).unwrap();
+                                successToast("Invite removed");
+                                refetch();
+                              } catch (err: any) {
+                                errorToast(
+                                  err?.data?.message ||
+                                    "Failed to remove invite",
+                                );
+                              } finally {
+                                setDeletingId(null);
+                              }
+                            }}
+                            disabled={deletingId === invite.id}
+                            className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                          >
+                            {deletingId === invite.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3 h-3" />
+                            )}
+                            {deletingId === invite.id ? "Removing…" : "Delete"}
                           </button>
                         )}
                       </div>

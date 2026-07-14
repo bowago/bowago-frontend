@@ -29,6 +29,8 @@ type AddressChangeRequest = {
     trackingNumber: string;
     senderCity: string;
     recipientCity: string;
+    recipientAddress?: string;
+    recipientState?: string;
     status: string;
   };
   user?: {
@@ -84,7 +86,8 @@ export default function AddressChangesAdminPage() {
         <div>
           <div className="text-dashboard-heading">Address Change Requests</div>
           <p className="text-sm text-gray-500 mt-1">
-            Review delivery address changes requested by customers after booking.
+            Review delivery address changes requested by customers after
+            booking.
           </p>
         </div>
       </div>
@@ -144,8 +147,8 @@ export default function AddressChangesAdminPage() {
                   req.status === "PENDING"
                     ? "bg-yellow-100 text-yellow-700"
                     : req.status === "APPROVED"
-                    ? "bg-green-100 text-green-700"
-                    : "bg-red-100 text-red-700"
+                      ? "bg-green-100 text-green-700"
+                      : "bg-red-100 text-red-700"
                 }`}
               >
                 {req.status}
@@ -155,10 +158,16 @@ export default function AddressChangesAdminPage() {
             <div className="grid sm:grid-cols-2 gap-3 mt-3">
               <div className="bg-gray-50 rounded-lg p-3">
                 <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">
-                  Current City
+                  Current Address
                 </p>
-                <p className="text-sm text-gray-700">
-                  {req.shipment?.recipientCity ?? "—"}
+                <p className="text-sm text-gray-700 font-medium">
+                  {req.shipment?.recipientAddress ?? "—"}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {req.shipment?.recipientCity}
+                  {req.shipment?.recipientState
+                    ? `, ${req.shipment.recipientState}`
+                    : ""}
                 </p>
               </div>
               <div className="bg-amber-50 rounded-lg p-3 border border-amber-100">
@@ -176,7 +185,8 @@ export default function AddressChangesAdminPage() {
 
             {req.reason && (
               <p className="text-xs text-gray-500 mt-2">
-                <span className="font-medium text-gray-600">Reason:</span> {req.reason}
+                <span className="font-medium text-gray-600">Reason:</span>{" "}
+                {req.reason}
               </p>
             )}
 
@@ -185,7 +195,10 @@ export default function AddressChangesAdminPage() {
                 <input
                   value={noteDraft[req.id] ?? ""}
                   onChange={(e) =>
-                    setNoteDraft((prev) => ({ ...prev, [req.id]: e.target.value }))
+                    setNoteDraft((prev) => ({
+                      ...prev,
+                      [req.id]: e.target.value,
+                    }))
                   }
                   placeholder="Review note (optional)"
                   className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-brand"

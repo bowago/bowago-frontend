@@ -30,6 +30,7 @@ export function AppTable<T>({
   columns,
   pageSize,
   hidePagination = false,
+  meta,
 }: {
   data: T[];
   columns: ColumnDef<T>[];
@@ -38,6 +39,11 @@ export function AppTable<T>({
   /** Hide the built-in "Previous/Next/X of Y selected" footer entirely —
    *  use when the parent implements its own server-side pagination. */
   hidePagination?: boolean;
+  /** Arbitrary extra context passed through to every cell via `table.options.meta`.
+   *  Useful for things like an explicit refetch callback a cell can call
+   *  after a mutation, as a guaranteed-correct fallback alongside RTK
+   *  Query's automatic tag-based cache invalidation. */
+  meta?: Record<string, unknown>;
 }) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
@@ -72,6 +78,7 @@ export function AppTable<T>({
   const table = useReactTable({
     data,
     columns,
+    meta,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),

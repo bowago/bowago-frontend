@@ -1,15 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
-import { useForm } from "react-hook-form";
-import { yupResolver } from "@hookform/resolvers/yup";
-import { deleteShipmentSchema } from "@/lib/validation";
-import { TextArea, Input } from "../ui/input";
 import { Button } from "../ui/button";
 import {
-  useCancelShipmentMutation,
-  useCancelPreviewQuery,
   useGetUserShipmentsByIdQuery,
   useInitiateShipmentPaymentMutation,
   useAssignShipmentMutation,
@@ -18,14 +13,8 @@ import {
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 import { SERVICE_DELIVERY_MAP, SERVICE_OPTIONS } from "./CreateShipmentModal";
-import {
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  X,
-  UserCheck,
-  Loader2,
-} from "lucide-react";
+import { CancelWithRefundPreview } from "./CancelWithRefundPreview";
+import { X, UserCheck, Loader2, Maximize2 } from "lucide-react";
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 const STATUS_STYLES: Record<string, string> = {
@@ -45,7 +34,7 @@ const STATUS_STYLES: Record<string, string> = {
 // Statuses where customer can request cancellation
 // PRD Sprint 3 + 5: statuses where cancellation is allowed
 // PICKED_UP → 92% refund; FAILED → 95% refund (aligned with backend)
-const CANCELLABLE_STATUSES = [
+export const CANCELLABLE_STATUSES = [
   "PENDING",
   "BOOKED",
   "AWAITING_PICKUP",
@@ -54,11 +43,22 @@ const CANCELLABLE_STATUSES = [
   "FAILED",
 ];
 
+// Active (non-terminal) statuses beyond CANCELLABLE_STATUSES — i.e. the
+// shipment is still genuinely moving, so "cancel" isn't just inapplicable
+// (like an already-DELIVERED or already-CANCELLED shipment), it's actively
+// blocked by the cutoff rule and worth explaining.
+export const PAST_CUTOFF_STATUSES = ["IN_TRANSIT", "OUT_FOR_DELIVERY"];
+
 // ─── ReviewStep ───────────────────────────────────────────────────────────────
 function ReviewStep({ data }: { data: { shipment?: any; quote?: any } }) {
   const shipment = data.shipment;
   const service = shipment?.serviceType ?? "STANDARD";
-  const deliveryTime = SERVICE_DELIVERY_MAP[service] ?? "—";
+  // Prefer the real zone+service-aware estimate (see CreateShipmentModal.tsx
+  // for the full explanation) — falls back to the static map only if the
+  // linked quote doesn't have one (e.g. a very old shipment booked before
+  // this existed).
+  const deliveryTime =
+    data.quote?.deliveryEstimate?.label ?? SERVICE_DELIVERY_MAP[service] ?? "—";
   const serviceLabel =
     SERVICE_OPTIONS.find((s) => s.value === service)?.label ?? service;
 
@@ -147,6 +147,25 @@ function ReviewStep({ data }: { data: { shipment?: any; quote?: any } }) {
             value: `₦${(shipment.quotedPrice ?? 0).toLocaleString()}`,
           },
         ])}
+
+        {/* Contract rate / promo code applied, if any — this data existed on
+            the backend all along but was never fetched or rendered here. */}
+        {data.quote?.appliedDiscount && (
+          <div className="flex justify-between items-center py-[5px] border-b border-gray-100 bg-green-50 -mx-2 px-2 rounded mt-1">
+            <span className="text-xs font-medium text-green-700">
+              {data.quote.appliedDiscount.label ??
+                (data.quote.pricingMode === "CONTRACT"
+                  ? "Enterprise Contract Rate"
+                  : "Discount Applied")}
+            </span>
+            <span className="text-xs font-semibold text-green-700">
+              −₦
+              {(
+                data.quote.appliedDiscount.discountAmount ?? 0
+              ).toLocaleString()}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Delivery details */}
@@ -175,130 +194,6 @@ function ReviewStep({ data }: { data: { shipment?: any; quote?: any } }) {
   );
 }
 
-// ─── Cancel + Refund Preview ──────────────────────────────────────────────────
-function CancelWithRefund({
-  shipmentId,
-  onDone,
-}: {
-  shipmentId: string;
-  onDone: () => void;
-}) {
-  const [confirmed, setConfirmed] = useState(false);
-  const [cancelShipment, { isLoading: cancelling }] =
-    useCancelShipmentMutation();
-  const { data: previewData, isLoading: loadingPreview } =
-    useCancelPreviewQuery({ id: shipmentId });
-  const preview = previewData?.data;
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<{ reason: string }>({
-    resolver: yupResolver(deleteShipmentSchema),
-    defaultValues: { reason: "" },
-  });
-
-  const onSubmit = async (data: { reason: string }) => {
-    await cancelShipment({ id: shipmentId, reason: data.reason }).unwrap();
-    onDone();
-  };
-
-  if (loadingPreview) {
-    return (
-      <div className="py-6 text-center text-sm text-gray-400">
-        Calculating refund...
-      </div>
-    );
-  }
-
-  return (
-    <div className="mt-4 space-y-4">
-      {/* Refund preview card */}
-      {preview && (
-        <div
-          className={`rounded-xl border p-4 ${
-            preview.refundType === "FULL"
-              ? "bg-green-50 border-green-200"
-              : preview.refundType === "PARTIAL"
-                ? "bg-yellow-50 border-yellow-200"
-                : "bg-gray-50 border-gray-200"
-          }`}
-        >
-          <div className="flex items-start gap-3">
-            {preview.refundType === "FULL" ? (
-              <CheckCircle className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
-            ) : preview.refundType === "PARTIAL" ? (
-              <AlertTriangle className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
-            ) : (
-              <XCircle className="w-5 h-5 text-gray-500 shrink-0 mt-0.5" />
-            )}
-            <div>
-              <p className="text-sm font-semibold text-gray-900">
-                {preview.refundType === "FULL" && "Full Refund"}
-                {preview.refundType === "PARTIAL" &&
-                  `Partial Refund — ${preview.refundPercent}%`}
-                {preview.refundType === "NONE" && "No Refund"}
-              </p>
-              {preview.refundAmount > 0 && (
-                <p className="text-xl font-bold text-gray-900 mt-0.5">
-                  ₦{preview.refundAmount.toLocaleString()}
-                </p>
-              )}
-              <p className="text-xs text-gray-500 mt-1">
-                {preview.refundReason}
-              </p>
-              {preview.refundAmount > 0 && (
-                <p className="text-xs text-gray-400 mt-1">{preview.note}</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {!confirmed ? (
-        <div className="flex gap-3">
-          <Button variant="secondary" className="flex-1" onClick={onDone}>
-            Keep Shipment
-          </Button>
-          <Button
-            className="flex-1 bg-red-600 hover:bg-red-700 text-white"
-            onClick={() => setConfirmed(true)}
-          >
-            Proceed to Cancel
-          </Button>
-        </div>
-      ) : (
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-          <TextArea
-            label="Reason for cancellation"
-            placeholder="e.g. Changed delivery plans"
-            error={errors.reason?.message}
-            {...register("reason")}
-          />
-          <div className="flex gap-3">
-            <Button
-              variant="secondary"
-              className="flex-1"
-              onClick={() => setConfirmed(false)}
-              type="button"
-            >
-              Back
-            </Button>
-            <Button
-              type="submit"
-              isLoading={cancelling}
-              className="flex-1 bg-red-600 hover:bg-red-700 text-white"
-            >
-              Confirm Cancellation
-            </Button>
-          </div>
-        </form>
-      )}
-    </div>
-  );
-}
-
 // ─── Main Modal ───────────────────────────────────────────────────────────────
 export default function ViewShipmentModal({
   id,
@@ -312,6 +207,7 @@ export default function ViewShipmentModal({
   const [showCancel, setShowCancel] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
   const [assignUserId, setAssignUserId] = useState("");
+  const router = useRouter();
 
   const { isLoading, data: shipmentData } = useGetUserShipmentsByIdQuery({
     id,
@@ -428,7 +324,10 @@ export default function ViewShipmentModal({
                     <p className="text-xs text-gray-500">
                       Review the refund amount below before confirming.
                     </p>
-                    <CancelWithRefund shipmentId={id} onDone={handleClose} />
+                    <CancelWithRefundPreview
+                      shipmentId={id}
+                      onDone={handleClose}
+                    />
                   </>
                 ) : (
                   <>
@@ -436,6 +335,22 @@ export default function ViewShipmentModal({
 
                     {/* Action buttons */}
                     <div className="mt-6 pt-4 border-t border-gray-100 space-y-2">
+                      {/* Full detail page — tracking timeline, documents,
+                          admin status controls, price adjustments, etc.
+                          live there and aren't duplicated in this modal. */}
+                      {shipment?.id && (
+                        <button
+                          onClick={() => {
+                            handleClose();
+                            router.push(`/dashboard/shipments/${shipment.id}`);
+                          }}
+                          className="w-full py-2.5 rounded-xl border border-gray-200 text-sm text-gray-700 hover:bg-gray-50 transition-colors font-medium flex items-center justify-center gap-2"
+                        >
+                          <Maximize2 className="w-4 h-4" />
+                          View Full Details
+                        </button>
+                      )}
+
                       {/* Pay Now */}
                       {showPayButton && (
                         <Button
@@ -517,6 +432,41 @@ export default function ViewShipmentModal({
                           {shipment?.paymentStatus === "PAID" ? "& Refund" : ""}
                         </button>
                       )}
+
+                      {/* Cutoff reached: shipment is already moving, so
+                          self-service cancellation is no longer offered.
+                          Previously the button just silently disappeared
+                          with no explanation once past the cutoff — this
+                          makes the rule visible instead of just enforcing
+                          it invisibly. */}
+                      {!showCancelButton &&
+                        (isOwner || isAdmin) &&
+                        PAST_CUTOFF_STATUSES.includes(shipment?.status) && (
+                          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                            <button
+                              disabled
+                              className="w-full py-2.5 rounded-xl border border-gray-200 text-sm text-gray-400 bg-gray-100 font-medium cursor-not-allowed"
+                            >
+                              Cancel Shipment — Window Closed
+                            </button>
+                            <p className="text-xs text-gray-500 mt-2 text-center">
+                              This shipment is already{" "}
+                              {shipment?.status === "OUT_FOR_DELIVERY"
+                                ? "out for delivery"
+                                : "in transit"}
+                              , so it can no longer be cancelled here.
+                            </p>
+                            <button
+                              onClick={() => {
+                                handleClose();
+                                router.push("/dashboard/tickets?new=1");
+                              }}
+                              className="w-full mt-2 py-2 rounded-xl border border-blue-200 text-sm text-blue-700 hover:bg-blue-50 transition-colors font-medium"
+                            >
+                              Contact Support
+                            </button>
+                          </div>
+                        )}
                     </div>
                   </>
                 )}

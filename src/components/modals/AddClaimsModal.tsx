@@ -2,7 +2,6 @@
 
 import * as Dialog from "@radix-ui/react-dialog";
 import { CreateClaimForm } from "../form/CreateClaimForm";
-import { CreateFAQForm } from "../form/CreateFAQForm";
 
 export default function AddClaimsModal({
   isOpen,
@@ -48,7 +47,7 @@ export default function AddClaimsModal({
               <span className="w-6" />
             </div>
 
-            <CreateFAQForm onSuccess={() => setIsOpen(false)} />
+            <CreateClaimForm onSuccess={() => setIsOpen(false)} />
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>

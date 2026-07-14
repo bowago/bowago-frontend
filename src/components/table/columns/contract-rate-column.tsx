@@ -13,8 +13,8 @@ export type ContractRate = {
   discountPercent: number | null;
   fixedPricePerKgByZone: Record<string, number> | null;
   isActive: boolean;
-  validFrom: string;
-  validUntil: string;
+  validFrom: string | null;
+  validUntil: string | null;
   notes?: string | null;
   user: {
     id: string;
@@ -101,11 +101,17 @@ export const ContractRateColumns: ColumnDef<ContractRate>[] = [
     cell: ({ row }) => {
       const { validFrom, validUntil } = row.original;
 
+      // new Date(null) coerces to the Unix epoch (1/1/1970) instead of an
+      // invalid/empty date, so a genuinely open-ended contract (no start or
+      // end date set) was rendering as if it had already expired in 1970.
+      const formatDate = (value: string | null | undefined) =>
+        value ? new Date(value).toLocaleDateString() : "—";
+
       return (
         <div className="text-xs">
-          <div>{new Date(validFrom).toLocaleDateString()}</div>
+          <div>{formatDate(validFrom)}</div>
           <div className="text-gray-400">
-            → {new Date(validUntil).toLocaleDateString()}
+            → {validUntil ? formatDate(validUntil) : "No expiry"}
           </div>
         </div>
       );
@@ -178,7 +184,8 @@ export const ContractRateColumns: ColumnDef<ContractRate>[] = [
               <div className="text-center p-6">
                 <h2 className="text-lg font-semibold">Delete Contract Rate</h2>
                 <p className="text-gray-500 mt-2">
-                  Are you sure you want to delete this rate? This cannot be undone.
+                  Are you sure you want to delete this rate? This cannot be
+                  undone.
                 </p>
 
                 <div className="flex gap-3 mt-4">

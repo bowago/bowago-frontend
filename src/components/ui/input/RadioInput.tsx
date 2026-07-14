@@ -77,6 +77,7 @@ type RadioGroupCardProps = {
   onValueChange?: (value: string) => void;
   className?: string;
   label?: string;
+  error?: string;
 };
 
 export function RadioGroupCard({
@@ -86,11 +87,13 @@ export function RadioGroupCard({
   onValueChange,
   className,
   label,
+  error,
 }: RadioGroupCardProps) {
-  // Controlled: use `value` if provided, otherwise fall back to internal state
-  const [internalValue, setInternalValue] = React.useState(
-    defaultValue ?? options[0]?.value ?? "",
-  );
+  // Controlled: use `value` if provided, otherwise fall back to internal state.
+  // No defaultValue means no visual selection until the user actually picks
+  // one — falling back to options[0] here was what made an unselected field
+  // look selected while the underlying form value stayed undefined.
+  const [internalValue, setInternalValue] = React.useState(defaultValue ?? "");
   const selected = value !== undefined ? value : internalValue;
 
   const handleSelect = (optValue: string) => {
@@ -121,9 +124,7 @@ export function RadioGroupCard({
             >
               <div className="flex items-center gap-3">
                 {item.icon && (
-                  <div
-                    className={isSelected ? "text-brand" : "text-gray-400"}
-                  >
+                  <div className={isSelected ? "text-brand" : "text-gray-400"}>
                     {item.icon}
                   </div>
                 )}
@@ -159,6 +160,8 @@ export function RadioGroupCard({
           );
         })}
       </div>
+
+      {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
     </div>
   );
 }

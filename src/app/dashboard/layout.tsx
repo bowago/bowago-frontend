@@ -22,6 +22,7 @@ import {
   useMarkNotificationReadMutation,
   useMarkAllNotificationsReadMutation,
 } from "@/store/slice/apiSlice";
+import { useNotificationSocket } from "@/hooks/useNotificationSocket";
 
 // ─── Notification bell with dropdown panel ────────────────────────────────────
 function NotificationBell() {
@@ -216,9 +217,15 @@ function isBlockedForRole(
   adminSubRole?: string | null,
   enterpriseRole?: string | null,
 ): boolean {
-  const isInternalOnly = INTERNAL_ADMIN_ONLY_PREFIXES.some((p) => pathname.startsWith(p));
-  const isCustomerOnly = CUSTOMER_ONLY_PREFIXES.some((p) => pathname.startsWith(p));
-  const isEnterpriseOnly = ENTERPRISE_ONLY_PREFIXES.some((p) => pathname.startsWith(p));
+  const isInternalOnly = INTERNAL_ADMIN_ONLY_PREFIXES.some((p) =>
+    pathname.startsWith(p),
+  );
+  const isCustomerOnly = CUSTOMER_ONLY_PREFIXES.some((p) =>
+    pathname.startsWith(p),
+  );
+  const isEnterpriseOnly = ENTERPRISE_ONLY_PREFIXES.some((p) =>
+    pathname.startsWith(p),
+  );
 
   if (isInternalOnly && role !== "ADMIN") return true;
   if (isCustomerOnly && role !== "CUSTOMER") return true;
@@ -262,6 +269,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [ready, setReady] = useState(false);
+
+  // Real-time in-app notifications (Socket.IO — see hook for details on
+  // why this instead of Firebase). Mounted once here so it's active
+  // everywhere in the dashboard, not per-page.
+  useNotificationSocket();
 
   useEffect(() => {
     if (!token) {

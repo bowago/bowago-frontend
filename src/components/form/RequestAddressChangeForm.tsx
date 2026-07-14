@@ -1,25 +1,15 @@
 "use client";
 
-/**
- * RequestAddressChangeForm — Sprint 5
- *
- * PRD: "Critical Fix: Address Change Approval Workflow"
- * POST /api/v1/shipments/{shipmentId}/request-address-change (mapped here to
- * POST /address-changes with shipmentId in the body — matches the backend's
- * actual addressChange.routes.js / addressChange.controller.js).
- *
- * The backend for this workflow (request, admin review, approve/reject,
- * notifications) was fully implemented already. There was simply no UI
- * anywhere in the frontend to call it — this form + the modal that wraps it
- * is that missing piece.
- */
-
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
+import { useMemo } from "react";
 import { Button } from "../ui/button";
-import { Input, TextArea } from "../ui/input";
-import { useRequestAddressChangeMutation } from "@/store/slice/apiSlice";
+import { Input, TextArea, SelectInput } from "../ui/input";
+import {
+  useRequestAddressChangeMutation,
+  useGetCitiesQuery,
+} from "@/store/slice/apiSlice";
 
 const addressChangeSchema = yup.object({
   newRecipientAddress: yup
@@ -47,11 +37,22 @@ export const RequestAddressChangeForm = ({
 }: RequestAddressChangeFormProps) => {
   const [requestAddressChange, { isLoading }] =
     useRequestAddressChangeMutation();
+  const { data: citiesData } = useGetCitiesQuery({});
+  const cities = useMemo(
+    () => (citiesData?.data?.cities ?? []) as { name: string; state: string }[],
+    [citiesData?.data?.cities],
+  );
+  const cityOptions = useMemo(
+    () => cities.map((c) => ({ label: c.name, value: c.name })),
+    [cities],
+  );
 
   const {
     register,
     handleSubmit,
     reset,
+    control,
+    setValue,
     formState: { errors },
   } = useForm<AddressChangeFormValues>({
     resolver: yupResolver(addressChangeSchema),
@@ -92,16 +93,32 @@ export const RequestAddressChangeForm = ({
           />
         </div>
 
-        <Input
-          label="City"
-          placeholder="Aba"
-          error={errors.newRecipientCity?.message}
-          {...register("newRecipientCity")}
+        <Controller
+          name="newRecipientCity"
+          control={control}
+          render={({ field }) => (
+            <SelectInput
+              label="City"
+              options={cityOptions}
+              value={field.value}
+              onValueChange={(val) => {
+                field.onChange(val);
+                // State is derived from the chosen city, same as the
+                // sender/receiver city pattern in CreateShipmentModal —
+                // avoids letting someone type a city/state pair that
+                // doesn't actually exist in the pricing zone tables.
+                const match = cities.find((c) => c.name === val);
+                if (match) setValue("newRecipientState", match.state);
+              }}
+              error={errors.newRecipientCity?.message}
+            />
+          )}
         />
 
         <Input
           label="State"
-          placeholder="Abia"
+          placeholder="Auto-filled from City"
+          disabled
           error={errors.newRecipientState?.message}
           {...register("newRecipientState")}
         />

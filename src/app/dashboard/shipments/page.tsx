@@ -12,6 +12,7 @@ import {
   useGetAdminShipmentsQuery,
   useGetEnterpriseShipmentsQuery,
   useGetUserShipmentsQuery,
+  useExportShipmentsCsvMutation,
   UserShipmentQueryParams,
 } from "@/store/slice/apiSlice";
 import { useResumeShipmentDraft } from "@/lib/shipmentDraft";
@@ -117,37 +118,38 @@ function AdminShipmentsList({
   const adminQuery = useGetAdminShipmentsQuery(appliedFilters as any, {
     skip: scope !== "internal",
   });
-  const enterpriseQuery = useGetEnterpriseShipmentsQuery(appliedFilters as any, {
-    skip: scope !== "enterprise",
-  });
+  const enterpriseQuery = useGetEnterpriseShipmentsQuery(
+    appliedFilters as any,
+    {
+      skip: scope !== "enterprise",
+    },
+  );
   const { data, isLoading, isError } =
     scope === "enterprise" ? enterpriseQuery : adminQuery;
   const shipments = getShipments(data);
 
+  const [exportShipmentsCsv, { isLoading: isExporting }] =
+    useExportShipmentsCsvMutation();
+
   const handleExport = () => {
-    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
-    const qs = new URLSearchParams(
-      Object.fromEntries(Object.entries(applied).filter(([, v]) => Boolean(v))),
-    ).toString();
-    window.open(
-      `${apiBase}/api/v1/shipments/export/csv${qs ? `?${qs}` : ""}`,
-      "_blank",
-    );
+    // window.open() can't attach the Authorization header this endpoint
+    // requires, so it always 401'd regardless of the URL being correct —
+    // exportShipmentsCsv (apiSlice.ts) does a real authenticated fetch +
+    // blob download instead, the same fix pattern used for invoice download.
+    exportShipmentsCsv({ status: applied.status || undefined });
   };
 
   // PRD Sprint 6: "Admin can download a CSV report of all Delivered shipments
   // for the previous month" — one-click shortcut instead of manually setting filters.
   const handleExportLastMonthDelivered = () => {
-    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
     const now = new Date();
     const firstOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const firstOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const qs = new URLSearchParams({
+    exportShipmentsCsv({
       status: "DELIVERED",
       fromDate: firstOfLastMonth.toISOString(),
       toDate: firstOfThisMonth.toISOString(),
-    }).toString();
-    window.open(`${apiBase}/api/v1/shipments/export/csv?${qs}`, "_blank");
+    });
   };
 
   return (
@@ -196,18 +198,22 @@ function AdminShipmentsList({
           {canExport && (
             <button
               onClick={handleExport}
-              className="flex items-center gap-1.5 border rounded-xl px-4 py-2 text-sm font-medium hover:bg-gray-50 transition-colors"
+              disabled={isExporting}
+              className="flex items-center gap-1.5 border rounded-xl px-4 py-2 text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
             >
-              <Download className="w-4 h-4" /> Export CSV
+              <Download className="w-4 h-4" />{" "}
+              {isExporting ? "Exporting…" : "Export CSV"}
             </button>
           )}
           {canExport && (
             <button
               onClick={handleExportLastMonthDelivered}
+              disabled={isExporting}
               title="Delivered shipments, previous calendar month"
-              className="flex items-center gap-1.5 border rounded-xl px-4 py-2 text-sm font-medium hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-1.5 border rounded-xl px-4 py-2 text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
             >
-              <Download className="w-4 h-4" /> Last Month (Delivered)
+              <Download className="w-4 h-4" />{" "}
+              {isExporting ? "Exporting…" : "Last Month (Delivered)"}
             </button>
           )}
           {canCreate && (
@@ -367,9 +373,15 @@ export default function ShipmentsPage() {
   const adminCanExport = isAdmin;
 
   // Enterprise capabilities are keyed off enterpriseRole, never adminSubRole.
-  const enterpriseCanCreate = ["ROLE_MASTER", "ROLE_DISPATCHER"].includes(enterpriseRole);
+  const enterpriseCanCreate = ["ROLE_MASTER", "ROLE_DISPATCHER"].includes(
+    enterpriseRole,
+  );
   const enterpriseCanExport = false; // CSV export is an internal-admin-only tool
-  const enterpriseIsReadOnly = ["ROLE_FINANCE", "ROLE_AGENT", "ROLE_USER"].includes(enterpriseRole);
+  const enterpriseIsReadOnly = [
+    "ROLE_FINANCE",
+    "ROLE_AGENT",
+    "ROLE_USER",
+  ].includes(enterpriseRole);
 
   // Page title personalised for Enterprise members
   const pageTitle = (() => {
