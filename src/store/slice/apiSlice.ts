@@ -730,6 +730,7 @@ export const apiSlice = createApi({
         basePrice: number;
         isActive: boolean;
         serviceType: string;
+        reason?: string;
       }
     >({
       query: (formData) => ({

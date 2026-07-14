@@ -4,7 +4,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Controller, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { StandardRateFormData, standardRateSchema } from "@/lib/validation";
-import { Input, RadioGroupCard, SelectInput } from "../ui/input";
+import { Input, RadioGroupCard, SelectInput, TextArea } from "../ui/input";
 import { Button } from "../ui/button";
 import {
   useAddStandardRateMutation,
@@ -48,6 +48,7 @@ export default function AddStandardRateModal({
       maxTons: initialValue?.maxTons ?? 0,
       minCartons: initialValue?.minCartons ?? 0,
       maxCartons: initialValue?.maxCartons ?? 0,
+      reason: "",
       pricePerKg: initialValue?.pricePerKg ?? 0,
       basePrice: initialValue?.basePrice ?? 0,
     },
@@ -178,6 +179,7 @@ export default function AddStandardRateModal({
                 label="Min Kg"
                 type="number"
                 min={0}
+                step="0.1"
                 {...register("minKg", { valueAsNumber: true })}
                 error={errors.minKg?.message as string}
                 rightElement={<span className="text-xs">kg</span>}
@@ -187,6 +189,7 @@ export default function AddStandardRateModal({
                 label="Max Kg"
                 type="number"
                 min={0}
+                step="0.1"
                 {...register("maxKg", { valueAsNumber: true })}
                 error={errors.maxKg?.message as string}
                 rightElement={<span className="text-xs">kg</span>}
@@ -230,6 +233,22 @@ export default function AddStandardRateModal({
                 error={errors.maxCartons?.message as string}
               />
             </div>
+
+            {/* Only meaningful for edits — a brand-new price band has no
+                previous version for this to explain a diff against. This
+                feeds the "Reason" column on the Pricing Version Control /
+                Price History page, which always showed "—" before since
+                nothing anywhere ever collected it. */}
+            {isEdit && (
+              <div className="mt-3">
+                <TextArea
+                  label="Reason for this change (optional)"
+                  placeholder="e.g. Fuel cost increase, quarterly rate review..."
+                  {...register("reason")}
+                  error={errors.reason?.message as string}
+                />
+              </div>
+            )}
 
             <div className="flex justify-end mt-6">
               <Button

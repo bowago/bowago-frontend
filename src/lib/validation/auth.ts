@@ -38,7 +38,10 @@ export const resetPasswordSchema = yup.object({
     .matches(/[a-z]/, "Password must contain at least one lowercase letter")
     .matches(/[A-Z]/, "Password must contain at least one uppercase letter")
     .matches(/[0-9]/, "Password must contain at least one number")
-    .matches(/[^A-Za-z0-9]/, "Password must contain at least one special character")
+    .matches(
+      /[^A-Za-z0-9]/,
+      "Password must contain at least one special character",
+    )
     .required("Password is required"),
   confirmPassword: yup
     .string()
@@ -57,7 +60,10 @@ export const changePasswordSchema = yup.object({
     .matches(/[a-z]/, "Password must contain at least one lowercase letter")
     .matches(/[A-Z]/, "Password must contain at least one uppercase letter")
     .matches(/[0-9]/, "Password must contain at least one number")
-    .matches(/[^A-Za-z0-9]/, "Password must contain at least one special character")
+    .matches(
+      /[^A-Za-z0-9]/,
+      "Password must contain at least one special character",
+    )
     .required()
     .label("New Password"),
 });
@@ -122,10 +128,7 @@ export const companyInformationSchema = yup.object({
 
   industry: yup.string().optional(),
 
-  email: yup
-    .string()
-    .email("Please enter a valid email address")
-    .optional(),
+  email: yup.string().email("Please enter a valid email address").optional(),
 
   companyPhone: yup
     .string()
@@ -143,15 +146,9 @@ export const companyInformationSchema = yup.object({
     .min(5, "Street address must be at least 5 characters")
     .optional(),
 
-  city: yup
-    .string()
-    .min(2, "City must be at least 2 characters")
-    .optional(),
+  city: yup.string().min(2, "City must be at least 2 characters").optional(),
 
-  state: yup
-    .string()
-    .min(2, "State must be at least 2 characters")
-    .optional(),
+  state: yup.string().min(2, "State must be at least 2 characters").optional(),
 
   country: yup
     .string()
@@ -174,27 +171,15 @@ export const standardRateSchema = yup.object({
 
   minKg: yup.number().required().min(0, "Min kg must be ≥ 0"),
 
-  maxKg: yup
-    .number()
-    .required()
-    .moreThan(yup.ref("minKg"), "Max kg must be greater than min kg"),
+  maxKg: yup.number().required().min(0, "Max kg must be ≥ 0"),
 
   minTons: yup.number().required().min(0, "Min tons must be ≥ 0"),
 
-  maxTons: yup
-    .number()
-    .required()
-    .moreThan(yup.ref("minTons"), "Max tons must be greater than min tons"),
+  maxTons: yup.number().required().min(0, "Max tons must be ≥ 0"),
 
   minCartons: yup.number().required().min(0),
 
-  maxCartons: yup
-    .number()
-    .required()
-    .moreThan(
-      yup.ref("minCartons"),
-      "Max cartons must be greater than min cartons",
-    ),
+  maxCartons: yup.number().required().min(0, "Max cartons must be ≥ 0"),
 
   serviceType: yup
     .string()
@@ -208,6 +193,7 @@ export const standardRateSchema = yup.object({
     .nullable()
     .default(undefined)
     .label("Active"),
+  reason: yup.string().nullable().notRequired(),
 
   pricePerKg: yup.number().required().min(0, "Price must be ≥ 0"),
 
@@ -264,19 +250,43 @@ export const contractRateSchema = yup.object({
   // ✅ Conditional
   fixedPricePerKgByZone: yup
     .object({
-      "1": yup.number().typeError("Required").min(0, "Price cannot be negative"),
-      "2": yup.number().typeError("Required").min(0, "Price cannot be negative"),
-      "3": yup.number().typeError("Required").min(0, "Price cannot be negative"),
-      "4": yup.number().typeError("Required").min(0, "Price cannot be negative"),
+      "1": yup
+        .number()
+        .typeError("Required")
+        .min(0, "Price cannot be negative"),
+      "2": yup
+        .number()
+        .typeError("Required")
+        .min(0, "Price cannot be negative"),
+      "3": yup
+        .number()
+        .typeError("Required")
+        .min(0, "Price cannot be negative"),
+      "4": yup
+        .number()
+        .typeError("Required")
+        .min(0, "Price cannot be negative"),
     })
     .when("pricingType", {
       is: "fixed",
       then: (schema) =>
         schema.shape({
-          "1": yup.number().required("Required").min(0, "Price cannot be negative"),
-          "2": yup.number().required("Required").min(0, "Price cannot be negative"),
-          "3": yup.number().required("Required").min(0, "Price cannot be negative"),
-          "4": yup.number().required("Required").min(0, "Price cannot be negative"),
+          "1": yup
+            .number()
+            .required("Required")
+            .min(0, "Price cannot be negative"),
+          "2": yup
+            .number()
+            .required("Required")
+            .min(0, "Price cannot be negative"),
+          "3": yup
+            .number()
+            .required("Required")
+            .min(0, "Price cannot be negative"),
+          "4": yup
+            .number()
+            .required("Required")
+            .min(0, "Price cannot be negative"),
         }),
       otherwise: (schema) => schema.nullable().notRequired(),
     }),
@@ -292,16 +302,20 @@ export const contractRateSchema = yup.object({
     .string()
     .nullable()
     .notRequired()
-    .test("valid-date", "Enter a valid date (YYYY-MM-DD)", (val) =>
-      !val || /^\d{4}-\d{2}-\d{2}$/.test(val),
+    .test(
+      "valid-date",
+      "Enter a valid date (YYYY-MM-DD)",
+      (val) => !val || /^\d{4}-\d{2}-\d{2}$/.test(val),
     ),
 
   validUntil: yup
     .string()
     .nullable()
     .notRequired()
-    .test("valid-date", "Enter a valid date (YYYY-MM-DD)", (val) =>
-      !val || /^\d{4}-\d{2}-\d{2}$/.test(val),
+    .test(
+      "valid-date",
+      "Enter a valid date (YYYY-MM-DD)",
+      (val) => !val || /^\d{4}-\d{2}-\d{2}$/.test(val),
     )
     .test("after-start", "Must be after the start date", function (val) {
       const { validFrom } = this.parent;
