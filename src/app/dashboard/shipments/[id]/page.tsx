@@ -423,34 +423,38 @@ export default function ShipmentDetails() {
                     Tracking Timeline
                   </h3>
                   <div className="space-y-3">
-                    {shipment.trackingHistory.map((evt: any, i: number) => (
-                      <div key={evt.id} className="flex gap-3 text-sm">
-                        <div className="flex flex-col items-center">
-                          <div
-                            className={`w-3 h-3 rounded-full border-2 ${i === 0 ? "border-red-500 bg-red-500" : "border-gray-300 bg-white"}`}
-                          />
-                          {i < shipment.trackingHistory.length - 1 && (
-                            <div className="w-0.5 h-6 bg-gray-200 mt-1" />
-                          )}
-                        </div>
-                        <div className="pb-3">
-                          <p className="font-medium">
-                            {evt.status?.replace(/_/g, " ")}
-                          </p>
-                          <p className="text-gray-500 text-xs">
-                            {evt.description}
-                          </p>
-                          {evt.location && (
-                            <p className="text-gray-400 text-xs">
-                              {evt.location}
+                    {shipment.trackingHistory.map((evt: any, i: number) => {
+                      const isCurrent =
+                        i === shipment.trackingHistory.length - 1;
+                      return (
+                        <div key={evt.id} className="flex gap-3 text-sm">
+                          <div className="flex flex-col items-center">
+                            <div
+                              className={`w-3 h-3 rounded-full border-2 ${isCurrent ? "border-red-500 bg-red-500" : "border-gray-300 bg-white"}`}
+                            />
+                            {i < shipment.trackingHistory.length - 1 && (
+                              <div className="w-0.5 h-6 bg-gray-200 mt-1" />
+                            )}
+                          </div>
+                          <div className="pb-3">
+                            <p className="font-medium">
+                              {evt.status?.replace(/_/g, " ")}
                             </p>
-                          )}
-                          <p className="text-gray-400 text-xs mt-0.5">
-                            {new Date(evt.createdAt).toLocaleString()}
-                          </p>
+                            <p className="text-gray-500 text-xs">
+                              {evt.description}
+                            </p>
+                            {evt.location && (
+                              <p className="text-gray-400 text-xs">
+                                {evt.location}
+                              </p>
+                            )}
+                            <p className="text-gray-400 text-xs mt-0.5">
+                              {new Date(evt.createdAt).toLocaleString()}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
