@@ -54,26 +54,26 @@ const SETTING_DEFS = [
   {
     key: "price_adjustment.cancel_refund_percent",
     group: "price_adjustment",
-    label: "Customer-Initiated Cancel Refund %",
+    label: "Customer-Initiated Cancel Refund % (Price Adjustment Only)",
     description:
-      "Percentage of the paid amount refunded when a customer chooses to cancel a paused shipment in response to a price adjustment. Set to 100 for a full refund.",
+      "Applies ONLY when a customer cancels a paused shipment in response to a weight-discrepancy price adjustment — this is a separate flow from the general \"Cancel Shipment\" action on the Shipments page. General cancellations follow the fixed PRD refund table below (100% for BOOKED/not-picked-up, and the configurable fee % for PICKED_UP/FAILED in the Cancellation & Returns section). Set to 100 for a full refund.",
     unit: "%",
     type: "number",
     min: 0,
     max: 100,
-    liveEffect: "Applies to all future cancellations",
+    liveEffect: "Price-adjustment cancellations only",
   },
   {
     key: "price_adjustment.auto_cancel_refund_percent",
     group: "price_adjustment",
-    label: "Auto-Cancel (Timeout) Refund %",
+    label: "Auto-Cancel (Timeout) Refund % (Price Adjustment Only)",
     description:
-      "Percentage refunded when a price adjustment expires with no customer response and the system auto-cancels. Usually matches the customer-initiated cancel %, but can be set separately.",
+      "Applies ONLY when a price adjustment expires with no customer response and the system auto-cancels — same price-adjustment flow as the setting above, not the general Cancel Shipment action. Usually matches the customer-initiated cancel %, but can be set separately.",
     unit: "%",
     type: "number",
     min: 0,
     max: 100,
-    liveEffect: "Applies to all future auto-cancellations",
+    liveEffect: "Price-adjustment auto-cancellations only",
   },
   {
     key: "price_adjustment.downgrade_enabled",
@@ -418,6 +418,13 @@ export default function BusinessRulesPage() {
             <div className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">
               Cancellation & Returns — Non-Refundable Fees
             </div>
+            <p className="text-xs text-gray-400 mb-3 -mt-2">
+              Applies to the general "Cancel Shipment" action. Cancelling
+              before pickup (BOOKED / AWAITING_PICKUP / CONFIRMED) is always
+              a 100% refund per the PRD and isn't configurable — the fees
+              below only kick in once a shipment has been picked up or
+              failed delivery.
+            </p>
             <div className="space-y-4">
               {SETTING_DEFS.filter((d) => d.group === "cancellation").map(
                 (def) => renderCard(def),
