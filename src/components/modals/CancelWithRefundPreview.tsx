@@ -69,21 +69,55 @@ export function CancelWithRefundPreview({
             ) : (
               <XCircle className="w-5 h-5 text-gray-500 shrink-0 mt-0.5" />
             )}
-            <div>
+            <div className="flex-1">
               <p className="text-sm font-semibold text-gray-900">
                 {preview.refundType === "FULL" && "Full Refund"}
                 {preview.refundType === "PARTIAL" &&
                   `Partial Refund — ${preview.refundPercent}%`}
                 {preview.refundType === "NONE" && "No Refund"}
               </p>
-              {preview.refundAmount > 0 && (
-                <p className="text-xl font-bold text-gray-900 mt-0.5">
-                  ₦{preview.refundAmount.toLocaleString()}
-                </p>
-              )}
               <p className="text-xs text-gray-500 mt-1">
                 {preview.refundReason}
               </p>
+
+              {/* Breakdown: what was paid, what's retained, what comes back —
+                  always shown so the customer sees the math, not just a
+                  headline number, even when nothing is being retained. */}
+              {preview.paidAmount > 0 && (
+                <div className="mt-3 rounded-lg bg-white/70 border border-black/5 divide-y divide-gray-100 text-sm">
+                  <div className="flex items-center justify-between px-3 py-2">
+                    <span className="text-gray-500">Amount Paid</span>
+                    <span className="font-medium text-gray-900">
+                      ₦{preview.paidAmount.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between px-3 py-2">
+                    <span className="text-gray-500">
+                      Retained{" "}
+                      {preview.feePercent > 0 ? `(${preview.feePercent}% fee)` : ""}
+                    </span>
+                    <span
+                      className={`font-medium ${
+                        preview.amountRetained > 0
+                          ? "text-red-600"
+                          : "text-gray-400"
+                      }`}
+                    >
+                      {preview.amountRetained > 0 ? "− " : ""}₦
+                      {preview.amountRetained.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-b-lg">
+                    <span className="font-semibold text-gray-700">
+                      Final Refund Balance
+                    </span>
+                    <span className="font-bold text-gray-900">
+                      ₦{preview.refundAmount.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {preview.amountRetained > 0 && (
                 <p className="text-xs font-semibold text-yellow-700 bg-yellow-100 rounded px-2 py-1 mt-2 inline-block">
                   ⚠ ₦{preview.amountRetained.toLocaleString()} (
@@ -91,7 +125,7 @@ export function CancelWithRefundPreview({
                 </p>
               )}
               {preview.refundAmount > 0 && (
-                <p className="text-xs text-gray-400 mt-1">{preview.note}</p>
+                <p className="text-xs text-gray-400 mt-2">{preview.note}</p>
               )}
             </div>
           </div>
