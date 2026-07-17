@@ -84,6 +84,12 @@ export function CancelWithRefundPreview({
               <p className="text-xs text-gray-500 mt-1">
                 {preview.refundReason}
               </p>
+              {preview.amountRetained > 0 && (
+                <p className="text-xs font-semibold text-yellow-700 bg-yellow-100 rounded px-2 py-1 mt-2 inline-block">
+                  ⚠ ₦{preview.amountRetained.toLocaleString()} (
+                  {preview.feePercent}%) will NOT be refunded
+                </p>
+              )}
               {preview.refundAmount > 0 && (
                 <p className="text-xs text-gray-400 mt-1">{preview.note}</p>
               )}

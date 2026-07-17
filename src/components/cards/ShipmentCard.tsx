@@ -52,9 +52,9 @@ export default function ShipmentCard({
       style={{ animationDelay: `${delay}ms` }}
     >
       {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
             <svg
               width="18"
               height="18"
@@ -71,15 +71,17 @@ export default function ShipmentCard({
               <circle cx="20" cy="20" r="1" />
             </svg>
           </div>
-          <div>
-            <p className="text-sm font-bold font-display text-gray-800">{id}</p>
-            <p className="text-xs text-gray-400 mt-0.5">
+          <div className="min-w-0">
+            <p className="text-sm font-bold font-display text-gray-800 truncate">
+              {id}
+            </p>
+            <p className="text-xs text-gray-400 mt-0.5 truncate">
               Tracking ID: {trackingId}
             </p>
           </div>
         </div>
         <span
-          className={`text-xs font-semibold px-2.5 py-1 rounded-full ${statusColors[status]}`}
+          className={`text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 whitespace-nowrap ${statusColors[status]}`}
         >
           {status}
         </span>

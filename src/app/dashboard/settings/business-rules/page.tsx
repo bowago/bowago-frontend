@@ -98,6 +98,32 @@ const SETTING_DEFS = [
     liveEffect: "Requires server restart",
   },
 
+  // ── Cancellation & Returns ─────────────────────────────────────────────────
+  {
+    key: "cancellation.picked_up_fee_percent",
+    group: "cancellation",
+    label: "Picked-Up Cancellation Fee",
+    description:
+      "Percentage of the paid amount RETAINED (not refunded) when a customer or admin cancels a shipment after it has already been picked up but before it's in transit. Covers the warehouse handling cost already incurred. PRD range is 5–10%; the customer sees this fee called out on the cancellation confirmation dialog before they confirm.",
+    unit: "% retained",
+    type: "number",
+    min: 0,
+    max: 100,
+    liveEffect: "Applies to all future cancellations",
+  },
+  {
+    key: "cancellation.failed_delivery_fee_percent",
+    group: "cancellation",
+    label: "Failed-Delivery Cancellation Fee",
+    description:
+      "Percentage of the paid amount RETAINED (not refunded) when a shipment marked FAILED delivery is cancelled. Covers the operator/attempt cost already incurred. The customer sees this fee called out on the cancellation confirmation dialog before they confirm.",
+    unit: "% retained",
+    type: "number",
+    min: 0,
+    max: 100,
+    liveEffect: "Applies to all future cancellations",
+  },
+
   // ── Loyalty ─────────────────────────────────────────────────────────────
   {
     key: "loyalty.earn_rate_per_100_naira",
@@ -250,7 +276,7 @@ export default function BusinessRulesPage() {
       key,
       value,
       type: def.type,
-      group: "price_adjustment",
+      group: def.group,
     }).unwrap();
     setSaved((prev) => ({ ...prev, [key]: true }));
     setTimeout(() => setSaved((prev) => ({ ...prev, [key]: false })), 2000);
@@ -382,6 +408,18 @@ export default function BusinessRulesPage() {
             </div>
             <div className="space-y-4">
               {SETTING_DEFS.filter((d) => d.group === "price_adjustment").map(
+                (def) => renderCard(def),
+              )}
+            </div>
+          </section>
+
+          {/* ── Cancellation & Returns ──────────────────────────────────────── */}
+          <section>
+            <div className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">
+              Cancellation & Returns — Non-Refundable Fees
+            </div>
+            <div className="space-y-4">
+              {SETTING_DEFS.filter((d) => d.group === "cancellation").map(
                 (def) => renderCard(def),
               )}
             </div>
