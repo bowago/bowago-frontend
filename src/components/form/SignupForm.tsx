@@ -1,5 +1,6 @@
 "use client";
 import { classifyAuthError } from "@/lib/authErrors";
+import { mapApiFieldErrors } from "@/lib/errors/apiError";
 
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -48,10 +49,35 @@ export function SignupForm({ onSuccess, onLogin }: SignupFormProps) {
         firstName: firstname,
         lastName: lastname,
         phone: data.phoneNumber,
+        businessName: data.businessName || undefined,
       }).unwrap();
       router.push(`/auth/verify-otp/${data.email}`);
     } catch (err: any) {
-      setServerError(classifyAuthError(err));
+      // The backend can reject several fields at once (see
+      // backend/src/validators/auth.validators.js registerSchema).
+      // Show each one next to the input it belongs to instead of a
+      // single opaque "Validation failed" banner; anything that can't
+      // be attributed to a specific field still goes in the banner.
+      const fieldErrors = mapApiFieldErrors(err, {
+        password: ["password"],
+        email: ["email"],
+        phoneNumber: ["phone"],
+        businessName: ["businessname", "business name"],
+        fullName: ["firstname", "first name", "lastname", "last name"],
+      });
+
+      let shownInline = false;
+      for (const [field, message] of Object.entries(fieldErrors)) {
+        if (field === "root") continue;
+        setError(field as keyof SignupFormData, { message });
+        shownInline = true;
+      }
+
+      if (fieldErrors.root) {
+        setServerError(fieldErrors.root);
+      } else if (!shownInline) {
+        setServerError(classifyAuthError(err));
+      }
     }
   };
 

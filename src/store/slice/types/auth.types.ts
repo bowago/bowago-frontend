@@ -103,6 +103,7 @@ export interface ISignup {
   firstName: string;
   lastName: string;
   phone: string;
+  businessName?: string;
 }
 
 export interface IEmployeeApprovalRequestBody {

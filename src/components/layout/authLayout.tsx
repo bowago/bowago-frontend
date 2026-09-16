@@ -179,7 +179,7 @@ export function AlertBanner({
 }) {
   return (
     <div
-      className={`rounded-xl px-4 py-3 text-sm font-medium mb-4 ${
+      className={`rounded-xl px-4 py-3 text-sm font-medium mb-4 whitespace-pre-line ${
         type === "error"
           ? "bg-red-50 text-red-700 border border-red-100"
           : "bg-green-50 text-green-700 border border-green-100"

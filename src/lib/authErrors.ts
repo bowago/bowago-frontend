@@ -1,3 +1,5 @@
+import { getApiFieldErrors } from "./errors/apiError";
+
 /**
  * Classifies API and network errors into user-friendly messages.
  * Used across all auth forms: login, signup, OTP verify, forgot password, etc.
@@ -18,8 +20,24 @@ export function classifyAuthError(err: any): string {
     return "Unable to connect. Please check your internet connection and try again.";
   }
 
+  // ── Field-level validation errors ────────────────────────────────────────
+  // Routes behind `validateBody` (see backend/src/middleware/validate.js)
+  // send a generic top-level `message` ("Validation failed") *plus* an
+  // `errors` array of the real, already user-safe Joi messages (e.g.
+  // "Password must not contain your email address"). When there's more
+  // than one, show all of them — squashing several distinct problems into
+  // one canned sentence below would hide all but one from the user.
+  const fieldErrors = getApiFieldErrors(err);
+  if (fieldErrors.length > 1) {
+    return fieldErrors.join("\n");
+  }
+
   // ── Parse the message from various RTK Query error shapes ────────────────
+  // A single field error gets first crack at the friendlier categories
+  // below (e.g. it may still mention "password"/"otp"/etc.); anything that
+  // doesn't match falls through to the raw pass-through at the bottom.
   const raw: string =
+    fieldErrors[0] ||
     err?.data?.message ||
     err?.error?.data?.message ||
     err?.message ||
@@ -79,10 +97,12 @@ export function classifyAuthError(err: any): string {
     return "An account with this email already exists. Try logging in instead.";
   }
 
-  // ── Password rules ───────────────────────────────────────────────────────
-  if (msg.includes("password") && (msg.includes("weak") || msg.includes("short") || msg.includes("length") || msg.includes("character"))) {
-    return "Your password is too weak. Use at least 8 characters with a mix of letters and numbers.";
-  }
+  // Note: no generic "password rules" bucket here — the backend's Joi
+  // messages (min length, complexity, "must not contain your email",
+  // etc.) are already written to be shown to the user as-is, and they
+  // reflect the actual current policy. A hardcoded rewrite here would
+  // risk contradicting the real rule if either side changes; the raw
+  // pass-through at the bottom of this function forwards them verbatim.
 
   // ── Server/infra issues mentioned in sanitized messages ─────────────────
   if (msg.includes("something went wrong") || msg.includes("internal") || msg.includes("try again")) {

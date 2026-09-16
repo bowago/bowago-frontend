@@ -28,6 +28,7 @@ import {
 } from "./authSlice";
 import { StaffResponseData } from "./types/staff.types";
 import { errorToast, successToast } from "@/lib/toast/toast";
+import { getApiErrorMessage } from "@/lib/errors/apiError";
 import {
   ContractRateFormData,
   CreateFAQFormData,
@@ -189,7 +190,7 @@ export const apiSlice = createApi({
           await queryFulfilled;
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
     }),
@@ -216,7 +217,7 @@ export const apiSlice = createApi({
           dispatch(setUserData(data.data.user));
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
     }),
@@ -233,7 +234,7 @@ export const apiSlice = createApi({
           successToast("Otp Sent");
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
     }),
@@ -253,7 +254,7 @@ export const apiSlice = createApi({
           successToast("Account Verification successful, login");
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
     }),
@@ -270,7 +271,7 @@ export const apiSlice = createApi({
           successToast("Otp sent, check email!");
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
     }),
@@ -288,7 +289,7 @@ export const apiSlice = createApi({
           successToast("Password Updated successfully, Login!");
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
     }),
@@ -309,7 +310,7 @@ export const apiSlice = createApi({
           successToast("Password Updated successfully, Login!");
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
     }),
@@ -324,7 +325,7 @@ export const apiSlice = createApi({
           await queryFulfilled;
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
     }),
@@ -339,7 +340,7 @@ export const apiSlice = createApi({
           await queryFulfilled;
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
     }),
@@ -364,7 +365,7 @@ export const apiSlice = createApi({
           successToast("Profile updated successfully");
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
     }),
@@ -395,7 +396,7 @@ export const apiSlice = createApi({
           const { data } = await queryFulfilled;
           if (data) successToast("Address saved successfully");
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "Failed to save address");
+          errorToast(getApiErrorMessage(e.error, "Failed to save address"));
         }
       },
     }),
@@ -417,7 +418,7 @@ export const apiSlice = createApi({
           const { data } = await queryFulfilled;
           if (data) successToast("Default card updated");
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "Failed to update default card");
+          errorToast(getApiErrorMessage(e.error, "Failed to update default card"));
         }
       },
       invalidatesTags: ["SavedCard"],
@@ -433,7 +434,7 @@ export const apiSlice = createApi({
           const { data } = await queryFulfilled;
           if (data) successToast("Card removed");
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "Failed to remove card");
+          errorToast(getApiErrorMessage(e.error, "Failed to remove card"));
         }
       },
       invalidatesTags: ["SavedCard"],
@@ -458,7 +459,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
       invalidatesTags: ["Zone", "City"],
@@ -481,7 +482,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
       invalidatesTags: ["City"],
@@ -517,7 +518,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
     }),
@@ -547,7 +548,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
       invalidatesTags: ["Dimension"],
@@ -577,7 +578,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
       invalidatesTags: ["Surcharge", "SurchargeAuditLog"],
@@ -610,7 +611,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
       invalidatesTags: ["StandardRate"],
@@ -656,7 +657,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
       invalidatesTags: ["Shipment"],
@@ -708,7 +709,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
       invalidatesTags: ["ContractRate"],
@@ -746,7 +747,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
       invalidatesTags: ["StandardRate"],
@@ -785,7 +786,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
       invalidatesTags: ["ContractRate"],
@@ -819,7 +820,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
       invalidatesTags: ["Surcharge", "SurchargeAuditLog"],
@@ -840,7 +841,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
       invalidatesTags: ["ContractRate"],
@@ -885,7 +886,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected error");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected error"));
         }
       },
       invalidatesTags: ["PromoCode"],
@@ -909,7 +910,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected error");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected error"));
         }
       },
       invalidatesTags: ["PromoCode"],
@@ -929,7 +930,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected error");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected error"));
         }
       },
       invalidatesTags: ["PromoCode"],
@@ -948,7 +949,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
       invalidatesTags: ["Zone", "City"],
@@ -968,7 +969,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
       invalidatesTags: ["Surcharge", "SurchargeAuditLog"],
@@ -988,7 +989,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
       invalidatesTags: ["Zone", "City"],
@@ -1008,7 +1009,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
       invalidatesTags: ["Zone", "City"],
@@ -1031,7 +1032,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
       invalidatesTags: ["Shipment"],
@@ -1051,9 +1052,7 @@ export const apiSlice = createApi({
           const { data } = await queryFulfilled;
           if (data) successToast("Invoice ready");
         } catch (error: any) {
-          errorToast(
-            error.error?.data?.message || "Failed to generate invoice",
-          );
+          errorToast(getApiErrorMessage(error.error, "Failed to generate invoice"));
         }
       },
       invalidatesTags: ["Shipment"],
@@ -1125,11 +1124,7 @@ export const apiSlice = createApi({
           a.remove();
           window.URL.revokeObjectURL(url);
         } catch (error: any) {
-          errorToast(
-            error?.data?.message ||
-              error?.error?.data?.message ||
-              "Failed to download invoice",
-          );
+          errorToast(getApiErrorMessage(error, "Failed to download invoice"));
         }
       },
     }),
@@ -1149,7 +1144,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
       invalidatesTags: ["Ticket"],
@@ -1175,7 +1170,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
       invalidatesTags: ["Claim"],
@@ -1208,7 +1203,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected error");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected error"));
         }
       },
       invalidatesTags: ["AddressChange"],
@@ -1255,7 +1250,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected error");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected error"));
         }
       },
       invalidatesTags: ["AddressChange", "Shipment"],
@@ -1288,7 +1283,7 @@ export const apiSlice = createApi({
           );
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected error");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected error"));
         }
       },
     }),
@@ -1312,7 +1307,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
       invalidatesTags: ["FAQ"],
@@ -1336,7 +1331,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
       invalidatesTags: ["Shipment"],
@@ -1357,7 +1352,7 @@ export const apiSlice = createApi({
           await queryFulfilled;
         } catch (error) {
           const e = error as CustomError;
-          errorToast(e.error?.data?.message || "Location update failed");
+          errorToast(getApiErrorMessage(e.error, "Location update failed"));
         }
       },
     }),
@@ -1407,7 +1402,7 @@ export const apiSlice = createApi({
           successToast("KPI report exported to CSV");
           return { data: undefined };
         } catch (err: any) {
-          errorToast(err?.message || "Export failed");
+          errorToast(getApiErrorMessage(err, "Export failed"));
           return {
             error: { status: "FETCH_ERROR", data: err?.message } as any,
           };
@@ -1459,7 +1454,7 @@ export const apiSlice = createApi({
           successToast("Shipments exported to CSV");
           return { data: undefined };
         } catch (err: any) {
-          errorToast(err?.message || "Export failed");
+          errorToast(getApiErrorMessage(err, "Export failed"));
           return {
             error: { status: "FETCH_ERROR", data: err?.message } as any,
           };
@@ -1499,7 +1494,7 @@ export const apiSlice = createApi({
           successToast("Template created");
         } catch (error) {
           const e = error as CustomError;
-          errorToast(e.error?.data?.message || "Failed to create template");
+          errorToast(getApiErrorMessage(e.error, "Failed to create template"));
         }
       },
     }),
@@ -1526,7 +1521,7 @@ export const apiSlice = createApi({
           successToast("Template updated");
         } catch (error) {
           const e = error as CustomError;
-          errorToast(e.error?.data?.message || "Failed to update template");
+          errorToast(getApiErrorMessage(e.error, "Failed to update template"));
         }
       },
     }),
@@ -1543,7 +1538,7 @@ export const apiSlice = createApi({
           successToast("Template deleted");
         } catch (error) {
           const e = error as CustomError;
-          errorToast(e.error?.data?.message || "Failed to delete template");
+          errorToast(getApiErrorMessage(e.error, "Failed to delete template"));
         }
       },
     }),
@@ -1563,7 +1558,7 @@ export const apiSlice = createApi({
           // 409 = city has dependent zone/km routes — UI shows a confirmation
           // dialog for this instead of a generic error toast.
           if (error?.error?.status === 409) return;
-          errorToast(error?.error?.data?.message || "Unexpected error");
+          errorToast(getApiErrorMessage(error?.error, "Unexpected error"));
         }
       },
       invalidatesTags: ["City", "Zone"],
@@ -1584,7 +1579,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
       invalidatesTags: ["StandardRate"],
@@ -1604,7 +1599,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected errror");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected errror"));
         }
       },
       invalidatesTags: ["Dimension"],
@@ -1702,9 +1697,7 @@ export const apiSlice = createApi({
           if (data) successToast("Price band rolled back successfully");
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(
-            errorM.error?.data?.message || "Failed to roll back price band",
-          );
+          errorToast(getApiErrorMessage(errorM.error, "Failed to roll back price band"));
         }
       },
       invalidatesTags: ["PriceBandAuditLog", "Surcharge"],
@@ -1737,9 +1730,7 @@ export const apiSlice = createApi({
             successToast("Price adjustment created. Customer notified.");
         } catch (error) {
           const e = error as CustomError;
-          errorToast(
-            e.error?.data?.message || "Failed to create price adjustment",
-          );
+          errorToast(getApiErrorMessage(e.error, "Failed to create price adjustment"));
         }
       },
       invalidatesTags: ["PriceAdjustment", "Shipment"],
@@ -1770,7 +1761,7 @@ export const apiSlice = createApi({
           if (data) successToast("Downgrade processed successfully.");
         } catch (error) {
           const e = error as CustomError;
-          errorToast(e.error?.data?.message || "Failed to downgrade shipment");
+          errorToast(getApiErrorMessage(e.error, "Failed to downgrade shipment"));
         }
       },
       invalidatesTags: ["PriceAdjustment", "Shipment"],
@@ -1788,7 +1779,7 @@ export const apiSlice = createApi({
           if (data) successToast("Shipment cancelled. Refund initiated.");
         } catch (error) {
           const e = error as CustomError;
-          errorToast(e.error?.data?.message || "Failed to cancel shipment");
+          errorToast(getApiErrorMessage(e.error, "Failed to cancel shipment"));
         }
       },
       invalidatesTags: ["PriceAdjustment", "Shipment"],
@@ -1813,7 +1804,7 @@ export const apiSlice = createApi({
             );
         } catch (error) {
           const e = error as CustomError;
-          errorToast(e.error?.data?.message || "Failed to open support ticket");
+          errorToast(getApiErrorMessage(e.error, "Failed to open support ticket"));
         }
       },
       invalidatesTags: ["Ticket"],
@@ -1835,7 +1826,7 @@ export const apiSlice = createApi({
           if (data) successToast("Response deadline extended.");
         } catch (error) {
           const e = error as CustomError;
-          errorToast(e.error?.data?.message || "Failed to extend deadline");
+          errorToast(getApiErrorMessage(e.error, "Failed to extend deadline"));
         }
       },
       invalidatesTags: ["PriceAdjustment"],
@@ -1869,7 +1860,7 @@ export const apiSlice = createApi({
           successToast("Setting saved");
         } catch (error) {
           const e = error as CustomError;
-          errorToast(e.error?.data?.message || "Failed to save setting");
+          errorToast(getApiErrorMessage(e.error, "Failed to save setting"));
         }
       },
       invalidatesTags: ["AppSettings"],
@@ -1904,7 +1895,7 @@ export const apiSlice = createApi({
           if (data) successToast("Points redeemed! Discount applied.");
         } catch (error) {
           const e = error as CustomError;
-          errorToast(e.error?.data?.message || "Failed to redeem points");
+          errorToast(getApiErrorMessage(e.error, "Failed to redeem points"));
         }
       },
       invalidatesTags: ["Loyalty", "Shipment"],
@@ -2053,7 +2044,7 @@ export const apiSlice = createApi({
           if (data) successToast("Ticket updated");
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Failed to update ticket");
+          errorToast(getApiErrorMessage(errorM.error, "Failed to update ticket"));
         }
       },
       invalidatesTags: ["Ticket"],
@@ -2075,7 +2066,7 @@ export const apiSlice = createApi({
           if (data) successToast("Reply sent");
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Failed to send reply");
+          errorToast(getApiErrorMessage(errorM.error, "Failed to send reply"));
         }
       },
       invalidatesTags: ["Ticket"],
@@ -2124,7 +2115,7 @@ export const apiSlice = createApi({
           await queryFulfilled;
           successToast("Claim updated successfully");
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "Failed to update claim");
+          errorToast(getApiErrorMessage(e.error, "Failed to update claim"));
         }
       },
       invalidatesTags: ["Claim"],
@@ -2330,9 +2321,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(
-            errorM.error?.data?.message || "Payment verification failed",
-          );
+          errorToast(getApiErrorMessage(errorM.error, "Payment verification failed"));
         }
       },
       invalidatesTags: ["Shipment"],
@@ -2356,7 +2345,7 @@ export const apiSlice = createApi({
           }
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Unexpected error");
+          errorToast(getApiErrorMessage(errorM.error, "Unexpected error"));
         }
       },
       invalidatesTags: ["Shipment"],
@@ -2377,7 +2366,7 @@ export const apiSlice = createApi({
           successToast("Dispatcher assigned");
         } catch (error) {
           const e = error as CustomError;
-          errorToast(e.error?.data?.message || "Failed to assign dispatcher");
+          errorToast(getApiErrorMessage(e.error, "Failed to assign dispatcher"));
         }
       },
     }),
@@ -2439,7 +2428,7 @@ export const apiSlice = createApi({
               (data as any)?.message || "Custom role assigned successfully",
             );
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "Failed to assign custom role");
+          errorToast(getApiErrorMessage(e.error, "Failed to assign custom role"));
         }
       },
       invalidatesTags: ["AdminRole", "User"],
@@ -2459,7 +2448,7 @@ export const apiSlice = createApi({
           const { data } = await queryFulfilled;
           if (data) successToast("Custom role updated successfully");
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "Failed to update custom role");
+          errorToast(getApiErrorMessage(e.error, "Failed to update custom role"));
         }
       },
       invalidatesTags: ["AdminRole"],
@@ -2476,7 +2465,7 @@ export const apiSlice = createApi({
           if (data)
             successToast((data as any)?.message || "Custom role revoked");
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "Failed to revoke custom role");
+          errorToast(getApiErrorMessage(e.error, "Failed to revoke custom role"));
         }
       },
       invalidatesTags: ["AdminRole", "User"],
@@ -2512,7 +2501,7 @@ export const apiSlice = createApi({
               (data as any)?.message || "Webhook re-processed successfully",
             );
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "Retry failed");
+          errorToast(getApiErrorMessage(e.error, "Retry failed"));
         }
       },
       invalidatesTags: ["FailedWebhook"],
@@ -2528,7 +2517,7 @@ export const apiSlice = createApi({
           const { data } = await queryFulfilled;
           if (data) successToast("Webhook entry dismissed");
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "Failed to dismiss");
+          errorToast(getApiErrorMessage(e.error, "Failed to dismiss"));
         }
       },
       invalidatesTags: ["FailedWebhook"],
@@ -2564,7 +2553,7 @@ export const apiSlice = createApi({
           const { data } = await queryFulfilled;
           if (data) successToast("Box dimension updated successfully");
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "Box dimension update failed");
+          errorToast(getApiErrorMessage(e.error, "Box dimension update failed"));
         }
       },
       invalidatesTags: ["Dimension"],
@@ -2585,7 +2574,7 @@ export const apiSlice = createApi({
           const { data } = await queryFulfilled;
           if (data) successToast("City updated successfully");
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "City update failed");
+          errorToast(getApiErrorMessage(e.error, "City update failed"));
         }
       },
       invalidatesTags: ["City"],
@@ -2603,7 +2592,7 @@ export const apiSlice = createApi({
           const { data } = await queryFulfilled;
           if (data) successToast("Zone updated successfully");
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "Zone update failed");
+          errorToast(getApiErrorMessage(e.error, "Zone update failed"));
         }
       },
       invalidatesTags: ["Zone", "City"],
@@ -2624,9 +2613,7 @@ export const apiSlice = createApi({
           const { data } = await queryFulfilled;
           if (data) successToast("Pricing sheet imported successfully");
         } catch (e: any) {
-          errorToast(
-            e.error?.data?.message ?? "Import failed. Check the file format.",
-          );
+          errorToast(getApiErrorMessage(e.error, "Import failed. Check the file format."));
         }
       },
     }),
@@ -2660,11 +2647,7 @@ export const apiSlice = createApi({
           window.URL.revokeObjectURL(url);
           successToast("Pricing data exported");
         } catch (error: any) {
-          errorToast(
-            error?.data?.message ||
-              error?.error?.data?.message ||
-              "Export failed",
-          );
+          errorToast(getApiErrorMessage(error, "Export failed"));
         }
       },
     }),
@@ -2762,7 +2745,7 @@ export const apiSlice = createApi({
           if (data)
             successToast((data as any)?.message || "Verification code sent");
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "2FA setup failed");
+          errorToast(getApiErrorMessage(e.error, "2FA setup failed"));
         }
       },
     }),
@@ -2789,7 +2772,7 @@ export const apiSlice = createApi({
               dispatch(setUserData((data as any).data.user));
             dispatch(setMfaVerified(new Date().toISOString()));
           } catch (e: any) {
-            errorToast(e.error?.data?.message || "Verification failed");
+            errorToast(getApiErrorMessage(e.error, "Verification failed"));
           }
         },
       },
@@ -2804,7 +2787,7 @@ export const apiSlice = createApi({
           if ((data as any)?.data?.user)
             dispatch(setUserData((data as any).data.user));
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "Failed to disable 2FA");
+          errorToast(getApiErrorMessage(e.error, "Failed to disable 2FA"));
         }
       },
     }),
@@ -2827,7 +2810,7 @@ export const apiSlice = createApi({
           dispatch(setMfaVerified(new Date().toISOString()));
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Invalid or expired code");
+          errorToast(getApiErrorMessage(errorM.error, "Invalid or expired code"));
         }
       },
     }),
@@ -2847,7 +2830,7 @@ export const apiSlice = createApi({
           const { data } = await queryFulfilled;
           if (data) successToast("Role updated successfully");
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "Role update failed");
+          errorToast(getApiErrorMessage(e.error, "Role update failed"));
         }
       },
       invalidatesTags: ["User", "AdminRole"],
@@ -2866,7 +2849,7 @@ export const apiSlice = createApi({
           const { data } = await queryFulfilled;
           if (data) successToast("User status updated");
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "Status update failed");
+          errorToast(getApiErrorMessage(e.error, "Status update failed"));
         }
       },
       invalidatesTags: ["User"],
@@ -2886,7 +2869,7 @@ export const apiSlice = createApi({
           const { data } = await queryFulfilled;
           if (data) successToast("User deleted successfully");
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "Delete failed");
+          errorToast(getApiErrorMessage(e.error, "Delete failed"));
         }
       },
       invalidatesTags: ["User"],
@@ -2904,7 +2887,7 @@ export const apiSlice = createApi({
           await queryFulfilled;
           successToast("Account deleted successfully");
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "Failed to delete account");
+          errorToast(getApiErrorMessage(e.error, "Failed to delete account"));
         }
       },
     }),
@@ -2934,7 +2917,7 @@ export const apiSlice = createApi({
           dispatch(setUserData(responseData?.user));
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(errorM.error?.data?.message || "Google sign-in failed");
+          errorToast(getApiErrorMessage(errorM.error, "Google sign-in failed"));
         }
       },
     }),
@@ -2960,7 +2943,7 @@ export const apiSlice = createApi({
           await queryFulfilled;
           successToast("Shipment marked as paid");
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "Failed to mark as paid");
+          errorToast(getApiErrorMessage(e.error, "Failed to mark as paid"));
         }
       },
     }),
@@ -2981,7 +2964,7 @@ export const apiSlice = createApi({
           await queryFulfilled;
           successToast("Payment waived successfully");
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "Failed to waive payment");
+          errorToast(getApiErrorMessage(e.error, "Failed to waive payment"));
         }
       },
     }),
@@ -3024,9 +3007,7 @@ export const apiSlice = createApi({
           await queryFulfilled;
           successToast("Packaging guide created");
         } catch (e: any) {
-          errorToast(
-            e.error?.data?.message || "Failed to create packaging guide",
-          );
+          errorToast(getApiErrorMessage(e.error, "Failed to create packaging guide"));
         }
       },
       invalidatesTags: ["PackagingGuide"],
@@ -3056,9 +3037,7 @@ export const apiSlice = createApi({
           await queryFulfilled;
           successToast("Packaging guide updated");
         } catch (e: any) {
-          errorToast(
-            e.error?.data?.message || "Failed to update packaging guide",
-          );
+          errorToast(getApiErrorMessage(e.error, "Failed to update packaging guide"));
         }
       },
       invalidatesTags: ["PackagingGuide"],
@@ -3075,9 +3054,7 @@ export const apiSlice = createApi({
           await queryFulfilled;
           successToast("Packaging guide deleted");
         } catch (e: any) {
-          errorToast(
-            e.error?.data?.message || "Failed to delete packaging guide",
-          );
+          errorToast(getApiErrorMessage(e.error, "Failed to delete packaging guide"));
         }
       },
       invalidatesTags: ["PackagingGuide"],
@@ -3109,7 +3086,7 @@ export const apiSlice = createApi({
           await queryFulfilled;
           successToast("Policy saved");
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "Failed to save policy");
+          errorToast(getApiErrorMessage(e.error, "Failed to save policy"));
         }
       },
       invalidatesTags: ["Policy"],
@@ -3123,7 +3100,7 @@ export const apiSlice = createApi({
           await queryFulfilled;
           successToast("Policy deactivated");
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "Failed to deactivate policy");
+          errorToast(getApiErrorMessage(e.error, "Failed to deactivate policy"));
         }
       },
       invalidatesTags: ["Policy"],
@@ -3140,7 +3117,7 @@ export const apiSlice = createApi({
           const { data } = await queryFulfilled;
           successToast((data as any)?.message || "FAQ feature status updated");
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "Failed to update FAQ");
+          errorToast(getApiErrorMessage(e.error, "Failed to update FAQ"));
         }
       },
       invalidatesTags: ["FAQ"],
@@ -3169,7 +3146,7 @@ export const apiSlice = createApi({
           await queryFulfilled;
           successToast("FAQ updated");
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "FAQ update failed");
+          errorToast(getApiErrorMessage(e.error, "FAQ update failed"));
         }
       },
       invalidatesTags: ["FAQ"],
@@ -3183,7 +3160,7 @@ export const apiSlice = createApi({
           await queryFulfilled;
           successToast("FAQ deleted");
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "Delete failed");
+          errorToast(getApiErrorMessage(e.error, "Delete failed"));
         }
       },
       invalidatesTags: ["FAQ"],
@@ -3211,7 +3188,7 @@ export const apiSlice = createApi({
           await queryFulfilled;
           successToast("Delivery SLA updated");
         } catch (e: any) {
-          errorToast(e.error?.data?.message || "Update failed");
+          errorToast(getApiErrorMessage(e.error, "Update failed"));
         }
       },
     }),
