@@ -6,6 +6,9 @@ import {
   useInviteMemberMutation,
   useCancelOrgInviteMutation,
   useResendOrgInviteMutation,
+  useGetTeamMembersQuery,
+  useUpdateTeamMemberRoleMutation,
+  useToggleTeamMemberStatusMutation,
 } from "@/store/slice/apiSlice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +28,8 @@ import {
   Truck,
   BarChart2,
   Crown,
+  UserMinus,
+  UserCheck,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -224,6 +229,63 @@ export default function TeamManagementPage() {
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // ─── Team roster (actual members, not just invite history) ────────────────
+  const {
+    data: membersData,
+    isLoading: membersLoading,
+    refetch: refetchMembers,
+  } = useGetTeamMembersQuery();
+  const [updateMemberRole] = useUpdateTeamMemberRoleMutation();
+  const [toggleMemberStatus] = useToggleTeamMemberStatusMutation();
+  const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const members: any[] = membersData?.data?.members ?? [];
+
+  const handleRoleChange = async (memberId: string, role: string) => {
+    if (role === "ROLE_MASTER") {
+      const target = members.find((m) => m.id === memberId);
+      if (
+        !confirm(
+          `Make ${target?.firstName} ${target?.lastName} a co-owner? They will get full access to manage the company, including your team and settings.`,
+        )
+      ) {
+        return;
+      }
+    }
+    setUpdatingRoleId(memberId);
+    try {
+      await updateMemberRole({ id: memberId, role }).unwrap();
+      refetchMembers();
+    } catch {
+      // errorToast already shown by the mutation
+    } finally {
+      setUpdatingRoleId(null);
+    }
+  };
+
+  const handleToggleStatus = async (member: any) => {
+    const action = member.isActive ? "remove" : "reactivate";
+    if (
+      !confirm(
+        `${action === "remove" ? "Remove" : "Reactivate"} ${member.firstName} ${member.lastName} ${
+          action === "remove"
+            ? "from your team? They will immediately lose access."
+            : "? They will regain access with their previous role."
+        }`,
+      )
+    )
+      return;
+    setTogglingId(member.id);
+    try {
+      await toggleMemberStatus({ id: member.id }).unwrap();
+      refetchMembers();
+    } catch {
+      // errorToast already shown by the mutation
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
   const invites: any[] = data?.data?.invites ?? [];
   const selectedRoleDef =
     ROLES.find((r) => r.value === inviteForm.role) ?? ROLES[1];
@@ -410,6 +472,148 @@ export default function TeamManagementPage() {
             {s || "All"}
           </button>
         ))}
+      </div>
+
+      {/* Team roster — actual current members, distinct from invite history
+          below. Previously the only view on this page was invite records,
+          so there was no way to see who was actually active, change a
+          teammate's role after they joined, or remove someone. */}
+      <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm mb-8">
+        <div className="px-5 py-4 border-b border-gray-100">
+          <h2 className="text-sm font-semibold text-gray-800">Team Members</h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Everyone currently in your company, and their access level.
+          </p>
+        </div>
+        {membersLoading ? (
+          <div className="p-8 text-center text-gray-400 text-sm">
+            Loading team…
+          </div>
+        ) : members.length === 0 ? (
+          <div className="p-8 text-center text-gray-400 text-sm">
+            No team members yet.
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-100">
+              <tr>
+                <th className="text-left px-5 py-3 font-medium text-gray-600">
+                  Name
+                </th>
+                <th className="text-left px-5 py-3 font-medium text-gray-600">
+                  Role
+                </th>
+                <th className="text-left px-5 py-3 font-medium text-gray-600">
+                  Status
+                </th>
+                <th className="text-right px-5 py-3 font-medium text-gray-600">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {members.map((member: any) => {
+                const isOwner = member.enterpriseRole === "ROLE_MASTER";
+                const roleDef = ROLES.find(
+                  (r) => r.value === member.enterpriseRole,
+                );
+                const RoleIcon = roleDef?.icon ?? Eye;
+                return (
+                  <tr
+                    key={member.id}
+                    className="hover:bg-gray-50/60 transition-colors"
+                  >
+                    <td className="px-5 py-3.5">
+                      <div className="font-medium text-gray-800">
+                        {member.firstName} {member.lastName}
+                        {isOwner && (
+                          <span className="ml-1.5 text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-medium align-middle">
+                            Owner
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        {member.email}
+                      </div>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      {isOwner ? (
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-6 h-6 rounded-md flex items-center justify-center"
+                            style={{ background: `${roleDef?.accent}22` }}
+                          >
+                            <RoleIcon
+                              className="w-3.5 h-3.5"
+                              style={{ color: roleDef?.accent }}
+                            />
+                          </div>
+                          <span className="text-gray-800 font-medium">
+                            {roleLabel(member.enterpriseRole)}
+                          </span>
+                        </div>
+                      ) : (
+                        <select
+                          value={member.enterpriseRole}
+                          disabled={updatingRoleId === member.id}
+                          onChange={(e) =>
+                            handleRoleChange(member.id, e.target.value)
+                          }
+                          className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white disabled:opacity-50"
+                        >
+                          {ROLES.map((r) => (
+                            <option key={r.value} value={r.value}>
+                              {r.label}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          member.isActive
+                            ? "bg-green-100 text-green-700"
+                            : "bg-gray-100 text-gray-500"
+                        }`}
+                      >
+                        {member.isActive ? "Active" : "Removed"}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center justify-end gap-2">
+                        {!isOwner && (
+                          <button
+                            onClick={() => handleToggleStatus(member)}
+                            disabled={togglingId === member.id}
+                            className={`flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                              member.isActive
+                                ? "text-red-500 hover:text-red-700 hover:bg-red-50"
+                                : "text-green-600 hover:text-green-800 hover:bg-green-50"
+                            }`}
+                          >
+                            {togglingId === member.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : member.isActive ? (
+                              <UserMinus className="w-3 h-3" />
+                            ) : (
+                              <UserCheck className="w-3 h-3" />
+                            )}
+                            {togglingId === member.id
+                              ? "Working…"
+                              : member.isActive
+                                ? "Remove"
+                                : "Reactivate"}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Invites table */}

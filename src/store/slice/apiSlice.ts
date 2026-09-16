@@ -170,6 +170,7 @@ export const apiSlice = createApi({
     "Notification",
     "DeliverySLA",
     "OrgInvite",
+    "TeamMember",
     "CannedResponse",
     "AddressChange",
     "Loyalty",
@@ -3324,6 +3325,56 @@ export const apiSlice = createApi({
       query: () => "/organization/status",
       providesTags: ["OrgInvite"],
     }),
+
+    // useGetTeamMembersQuery — the actual current roster (live User rows),
+    // as opposed to GetOrgInvites which only shows invite history.
+    GetTeamMembers: builder.query<any, { masterId?: string } | void>({
+      query: (params) => {
+        const qs = params?.masterId ? `?masterId=${params.masterId}` : "";
+        return `/organization/members${qs}`;
+      },
+      providesTags: ["TeamMember"],
+    }),
+
+    // useUpdateTeamMemberRoleMutation — Master changes a teammate's role
+    // after they've already joined (invite-time role was previously the
+    // only lever available).
+    UpdateTeamMemberRole: builder.mutation<any, { id: string; role: string }>({
+      query: ({ id, role }) => ({
+        url: `/organization/members/${id}/role`,
+        method: "PATCH",
+        body: { role },
+      }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Team member role updated");
+        } catch (e: any) {
+          errorToast(getApiErrorMessage(e.error, "Failed to update role"));
+        }
+      },
+      invalidatesTags: ["TeamMember"],
+    }),
+
+    // useToggleTeamMemberStatusMutation — Master's "remove"/"reactivate" a
+    // team member (soft, reversible isActive toggle).
+    ToggleTeamMemberStatus: builder.mutation<any, { id: string }>({
+      query: ({ id }) => ({
+        url: `/organization/members/${id}/status`,
+        method: "PATCH",
+      }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          successToast(
+            (data as any)?.message || "Team member status updated",
+          );
+        } catch (e: any) {
+          errorToast(getApiErrorMessage(e.error, "Failed to update team member status"));
+        }
+      },
+      invalidatesTags: ["TeamMember"],
+    }),
   }),
 });
 
@@ -3490,6 +3541,9 @@ export const {
   useResendOrgInviteMutation,
   useRegisterOrganizationMutation,
   useGetOrgStatusQuery,
+  useGetTeamMembersQuery,
+  useUpdateTeamMemberRoleMutation,
+  useToggleTeamMemberStatusMutation,
   useUpdateDriverLocationMutation,
   useExportShipmentsCsvMutation,
   useExportSupportKpiCsvMutation,
