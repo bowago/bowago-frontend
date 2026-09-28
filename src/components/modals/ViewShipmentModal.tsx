@@ -88,10 +88,18 @@ function ReviewStep({ data }: { data: { shipment?: any; quote?: any } }) {
           ₦{(shipment.quotedPrice ?? 0).toLocaleString()}
         </h1>
         <div className="my-3 border-t border-dashed border-gray-700" />
-        <div className="grid grid-cols-2 divide-x divide-gray-700">
+        <div className="grid grid-cols-3 divide-x divide-gray-700">
           <div className="pr-3">
             <p className="text-[10px] text-gray-400">Delivery Time</p>
             <p className="text-sm font-semibold">{deliveryTime}</p>
+          </div>
+          <div className="px-3">
+            <p className="text-[10px] text-gray-400">Mode</p>
+            <p className="text-sm font-semibold">
+              {shipment.shipmentMode
+                ? `${{ AIR: "Air", LAND: "Land", SEA: "Sea" }[shipment.shipmentMode as "AIR" | "LAND" | "SEA"]} freight`
+                : "—"}
+            </p>
           </div>
           <div className="pl-3">
             <p className="text-[10px] text-gray-400">Service Type</p>
@@ -121,6 +129,12 @@ function ReviewStep({ data }: { data: { shipment?: any; quote?: any } }) {
           {
             label: "Route",
             value: `${shipment.senderCity ?? "—"} → ${shipment.recipientCity ?? "—"}`,
+          },
+          {
+            label: "Mode of Shipment",
+            value: shipment.shipmentMode
+              ? `${{ AIR: "Air", LAND: "Land", SEA: "Sea" }[shipment.shipmentMode as "AIR" | "LAND" | "SEA"]} freight`
+              : "—",
           },
           {
             label: "Weight",

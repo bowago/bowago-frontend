@@ -367,6 +367,9 @@ export default function ShipmentDetails() {
                     </p>
                     <p className="text-gray-300 text-sm mt-1">
                       {shipment.serviceType}
+                      {shipment.shipmentMode
+                        ? ` · ${{ AIR: "Air", LAND: "Land", SEA: "Sea" }[shipment.shipmentMode as "AIR" | "LAND" | "SEA"]} freight`
+                        : ""}
                       {shipment.weight && shipment.weightUnit
                         ? ` · ${shipment.weight} ${shipment.weightUnit}`
                         : shipment.weight
@@ -514,6 +517,22 @@ export default function ShipmentDetails() {
                   <div>
                     <p className="text-gray-400">Service</p>
                     <p className="font-medium">{shipment.serviceType}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400">Mode of Shipment</p>
+                    <p className="font-medium">
+                      {shipment.shipmentMode
+                        ? `${{ AIR: "Air", LAND: "Land", SEA: "Sea" }[shipment.shipmentMode as "AIR" | "LAND" | "SEA"]} freight`
+                        : "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400">Value of Items</p>
+                    <p className="font-medium">
+                      {shipment.declaredValueKobo
+                        ? `₦${(shipment.declaredValueKobo / 100).toLocaleString()} (${shipment.insuranceSelected ? "Insured" : "Not insured"})`
+                        : "—"}
+                    </p>
                   </div>
                   <div>
                     <p className="text-gray-400">Fragile</p>

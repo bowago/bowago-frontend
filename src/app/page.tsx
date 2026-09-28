@@ -13,6 +13,7 @@ import {
   useCreateQuoteMutation,
 } from "@/store/slice/apiSlice";
 import { saveShipmentDraft } from "@/lib/shipmentDraft";
+import { useActiveShipmentModes, MODE_META } from "@/hooks/useActiveShipmentModes";
 import LandingAuthModal from "@/components/modals/LandingAuthModal";
 import {
   Loader2,
@@ -51,6 +52,8 @@ export default function LandingPage() {
   const [serviceType, setServiceType] = useState("STANDARD");
   // [V1 Feature 1] Mode of shipment — rates differ per mode.
   const [shipmentMode, setShipmentMode] = useState<"AIR" | "LAND" | "SEA">("LAND");
+  // Only modes admin has left switched on are offered.
+  const { modes: activeModes } = useActiveShipmentModes(shipmentMode, setShipmentMode);
   const [quoteResult, setQuoteResult] = useState<any>(null);
   // Custom dimension toggle — hidden until the user explicitly opts in
   const [useCustomDimension, setUseCustomDimension] = useState(false);
@@ -487,9 +490,11 @@ export default function LandingPage() {
                       }
                       className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-3 py-2.5 text-sm focus:border-brand/60 transition-all [&>option]:bg-gray-900"
                     >
-                      <option value="LAND">Land</option>
-                      <option value="AIR">Air</option>
-                      <option value="SEA">Sea</option>
+                      {activeModes.map((m) => (
+                        <option key={m} value={m}>
+                          {MODE_META[m].label}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -519,6 +524,16 @@ export default function LandingPage() {
                         quoteResult.pricing?.totalNaira ?? quoteResult.total,
                       )}
                     </p>
+                    {(quoteResult.shipmentMode ?? shipmentMode) && (
+                      <p className="text-xs text-white/60 mt-1 font-semibold">
+                        {MODE_META[(quoteResult.shipmentMode ?? shipmentMode) as "AIR" | "LAND" | "SEA"]?.label} freight
+                        {quoteResult.deliveryEstimate?.label
+                          ? ` · ${quoteResult.deliveryEstimate.label}`
+                          : quoteResult.transitHours
+                            ? ` · ~${quoteResult.transitHours} hrs`
+                            : ""}
+                      </p>
+                    )}
                     {quoteResult.zone && (
                       <p className="text-xs text-white/40 mt-1">
                         Zone {quoteResult.zone} ·{" "}

@@ -79,6 +79,15 @@ export function AppTable<T>({
     data,
     columns,
     meta,
+    // Key rows by the record's own id (falling back to position). Without
+    // this, filtering/sorting/refetching reuses each row slot's component
+    // instance, so per-row Edit modals kept the form state of whichever
+    // record used to sit in that slot and showed (and could save) the wrong
+    // values.
+    getRowId: (row, index) => {
+      const id = (row as { id?: unknown })?.id;
+      return id !== undefined && id !== null ? String(id) : String(index);
+    },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),

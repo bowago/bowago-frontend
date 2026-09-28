@@ -1440,6 +1440,18 @@ export const apiSlice = createApi({
     }),
     GetInsuranceDisclaimerHistory: builder.query<unknown, void>({
       query: () => ({ url: "/admin/insurance-disclaimer/history", method: "GET" }),
+      providesTags: ["InsuranceDisclaimer"],
+    }),
+    UpdateInsuranceDisclaimer: builder.mutation<
+      unknown,
+      { id: string; version?: string; body?: string; liabilityLimitKobo?: number; reason?: string }
+    >({
+      query: ({ id, ...body }) => ({ url: `/admin/insurance-disclaimer/${id}`, method: "PATCH", body }),
+      invalidatesTags: ["InsuranceDisclaimer"],
+    }),
+    DeleteInsuranceDisclaimer: builder.mutation<unknown, { id: string; reason?: string }>({
+      query: ({ id, ...body }) => ({ url: `/admin/insurance-disclaimer/${id}`, method: "DELETE", body }),
+      invalidatesTags: ["InsuranceDisclaimer"],
     }),
 
     CreateFAQ: builder.mutation<unknown, CreateFAQFormData>({
@@ -3733,4 +3745,6 @@ export const {
   useGetInsuranceDisclaimerQuery,
   usePublishInsuranceDisclaimerMutation,
   useGetInsuranceDisclaimerHistoryQuery,
+  useUpdateInsuranceDisclaimerMutation,
+  useDeleteInsuranceDisclaimerMutation,
 } = apiSlice;

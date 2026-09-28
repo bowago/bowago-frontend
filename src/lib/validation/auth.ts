@@ -166,7 +166,7 @@ export const standardRateSchema = yup.object({
     .number()
     .min(1)
     .max(4)
-    .typeError("Zone must be a number")
+    .typeError("Please select a zone")
     .required("Zone is required"),
 
   minKg: yup.number().required().min(0, "Min kg must be ≥ 0"),

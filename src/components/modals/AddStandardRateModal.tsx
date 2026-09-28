@@ -1,6 +1,7 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
+import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { StandardRateFormData, standardRateSchema } from "@/lib/validation";
@@ -14,6 +15,29 @@ import {
 type InitialStandardRateFormData = StandardRateFormData & {
   id: string;
 };
+
+// Zone is held as a string because the Zone dropdown's options are strings;
+// a numeric value from the API matched none of them and showed blank.
+function buildDefaults(initialValue?: InitialStandardRateFormData) {
+  return {
+    isActive: initialValue?.isActive ?? false,
+    serviceType: initialValue?.serviceType ?? "STANDARD",
+    shipmentMode: initialValue?.shipmentMode ?? "LAND",
+    zone:
+      initialValue?.zone !== undefined && initialValue?.zone !== null
+        ? String(initialValue.zone)
+        : "",
+    minKg: initialValue?.minKg ?? 0,
+    maxKg: initialValue?.maxKg ?? 0,
+    minTons: initialValue?.minTons ?? 0,
+    maxTons: initialValue?.maxTons ?? 0,
+    minCartons: initialValue?.minCartons ?? 0,
+    maxCartons: initialValue?.maxCartons ?? 0,
+    reason: "",
+    pricePerKg: initialValue?.pricePerKg ?? 0,
+    basePrice: initialValue?.basePrice ?? 0,
+  };
+}
 
 export default function AddStandardRateModal({
   isOpen,
@@ -38,22 +62,16 @@ export default function AddStandardRateModal({
     reset,
   } = useForm<any>({
     resolver: yupResolver(standardRateSchema),
-    defaultValues: {
-      isActive: initialValue?.isActive ?? false,
-      serviceType: initialValue?.serviceType ?? "STANDARD",
-      shipmentMode: initialValue?.shipmentMode ?? "LAND",
-      zone: initialValue?.zone ?? 0,
-      minKg: initialValue?.minKg ?? 0,
-      maxKg: initialValue?.maxKg ?? 0,
-      minTons: initialValue?.minTons ?? 0,
-      maxTons: initialValue?.maxTons ?? 0,
-      minCartons: initialValue?.minCartons ?? 0,
-      maxCartons: initialValue?.maxCartons ?? 0,
-      reason: "",
-      pricePerKg: initialValue?.pricePerKg ?? 0,
-      basePrice: initialValue?.basePrice ?? 0,
-    },
+    defaultValues: buildDefaults(initialValue),
   });
+
+  // The form is created once, when this component first mounts, so its
+  // defaults can belong to a different record (or none). Reload the values of
+  // the rate being edited every time the modal opens.
+  useEffect(() => {
+    if (isOpen) reset(buildDefaults(initialValue));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, initialValue?.id]);
 
   const onSubmit = (data: any) => {
     const { isActive, serviceType, shipmentMode, ...addDataForm } = data;

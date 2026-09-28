@@ -184,6 +184,14 @@ export default function TrackShipmentPage() {
                   </p>
                 </div>
                 <div>
+                  <p className="text-xs text-gray-400 mb-0.5">Mode</p>
+                  <p className="font-medium">
+                    {shipment.shipmentMode
+                      ? `${{ AIR: "Air", LAND: "Land", SEA: "Sea" }[shipment.shipmentMode as "AIR" | "LAND" | "SEA"]} freight`
+                      : "—"}
+                  </p>
+                </div>
+                <div>
                   <p className="text-xs text-gray-400 mb-0.5">Est. Delivery</p>
                   <p className="font-medium">
                     {shipment.estimatedDelivery

@@ -14,6 +14,7 @@ import {
   useGetAppSettingsQuery,
 } from "@/store/slice/apiSlice";
 import { errorToast } from "@/lib/toast/toast";
+import { useActiveShipmentModes, MODE_META } from "@/hooks/useActiveShipmentModes";
 
 interface QuoteFormData {
   fromCity: string;
@@ -72,6 +73,11 @@ type QuoteResponse = {
   totalSurcharge: number;
   total: number;
   currency: string;
+  // [V1]
+  shipmentMode?: string;
+  serviceType?: string;
+  transitHours?: number | null;
+  deliveryEstimate?: { label?: string } | null;
 };
 
 type CreateQuoteResponse = {
@@ -153,6 +159,10 @@ export default function CreateQuoteModal({
   } = form;
 
   const values = watch();
+  // [V1 Feature 1] Only modes admin has left switched on are offered.
+  const { options: modeOptions } = useActiveShipmentModes(values.shipmentMode, (fallback) =>
+    setValue("shipmentMode", fallback, { shouldValidate: true }),
+  );
 
   // Hoisted here (was previously called inside `Step1`/`Step2`, which were
   // components defined INSIDE this component's render body — a React
@@ -402,11 +412,7 @@ export default function CreateQuoteModal({
         render={({ field }) => (
           <SelectInput
             label="Mode of Shipment"
-            options={[
-              { label: "Air — Fastest, higher cost", value: "AIR" },
-              { label: "Land — Balanced speed & cost", value: "LAND" },
-              { label: "Sea — Slowest, lowest cost", value: "SEA" },
-            ]}
+            options={modeOptions.map((o) => ({ label: `${o.label} — ${o.description}`, value: o.value }))}
             value={field.value}
             onValueChange={field.onChange}
             error={errors.shipmentMode?.message}
@@ -792,9 +798,12 @@ export default function CreateQuoteModal({
 
         <div className="grid grid-cols-3 divide-x divide-gray-700 text-left">
           <div className="px-3 first:pl-0">
-            <p className="text-[10px] text-gray-400">Mode</p>
+            <p className="text-[10px] text-gray-400">Mode of Shipment</p>
             <p className="text-sm font-semibold text-white">
-              {quote?.pricingMode ?? "—"}
+              {(() => {
+                const m = (quote?.shipmentMode ?? values.shipmentMode) as keyof typeof MODE_META;
+                return MODE_META[m] ? `${MODE_META[m].label} freight` : "—";
+              })()}
             </p>
           </div>
           <div className="px-3">
@@ -835,6 +844,21 @@ export default function CreateQuoteModal({
             label: "Weight",
             value: quote ? `${quote.weightKg}kg` : `${values.weightKg}kg`,
           },
+          {
+            label: "Mode of Shipment",
+            value: (() => {
+              const m = (quote?.shipmentMode ?? values.shipmentMode) as keyof typeof MODE_META;
+              return MODE_META[m] ? `${MODE_META[m].label} freight` : null;
+            })(),
+          },
+          { label: "Service", value: quote?.serviceType ?? values.serviceType },
+          {
+            label: "Est. Delivery",
+            value:
+              quote?.deliveryEstimate?.label ??
+              (quote?.transitHours ? `~${quote.transitHours} hrs` : null),
+          },
+          { label: "Pricing", value: quote?.pricingMode },
           { label: "Currency", value: quote?.currency },
         ])}
       </div>

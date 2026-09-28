@@ -20,6 +20,10 @@ import {
   useGetZoneByRouteQuery,
   useGetAppSettingsQuery,
 } from "@/store/slice/apiSlice";
+import { errorToast } from "@/lib/toast/toast";
+import { useActiveShipmentModes } from "@/hooks/useActiveShipmentModes";
+import UninsuredNotice from "@/components/shipment/UninsuredNotice";
+import PreCreateReview, { type PersistedQuote } from "@/components/shipment/PreCreateReview";
 
 // ─── Validation Schema ────────────────────────────────────────────────────────
 const createShipmentSchema = yup.object({
@@ -196,6 +200,14 @@ type ShipmentSummary = {
   weight?: number;
   weightUnit?: string;
   pickupDate?: string;
+  // [V1]
+  shipmentMode?: string;
+  declaredValueKobo?: number | null;
+  insuranceSelected?: boolean;
+  senderType?: string;
+  principalName?: string | null;
+  senderAltPhone?: string | null;
+  recipientAltPhone?: string | null;
 };
 
 type AppliedDiscount = {
@@ -424,6 +436,18 @@ function ReviewStep({
             value: `${quote?.fromCity?.name ?? "—"} → ${quote?.toCity?.name ?? "—"}`,
           },
           {
+            label: "Mode of Shipment",
+            value: shipment?.shipmentMode
+              ? `${{ AIR: "Air", LAND: "Land", SEA: "Sea" }[shipment.shipmentMode] ?? shipment.shipmentMode} freight`
+              : "—",
+          },
+          {
+            label: "Value of Items",
+            value: shipment?.declaredValueKobo
+              ? `₦${(shipment.declaredValueKobo / 100).toLocaleString()} (${shipment.insuranceSelected ? "Insured" : "Not insured"})`
+              : "—",
+          },
+          {
             label: "Weight",
             value: shipment?.weight
               ? `${shipment.weight} ${shipment.weightUnit}`
@@ -467,9 +491,9 @@ function ReviewStep({
         <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2 mt-4">
           Surcharges
         </p>
-        {quote?.surchargeBreakdown?.map((item) => (
+        {quote?.surchargeBreakdown?.map((item, i) => (
           <div
-            key={item.type}
+            key={`${item.type}-${i}`}
             className="flex justify-between items-center py-[5px] border-b border-gray-100"
           >
             <span className="text-xs text-gray-500">{item.label}</span>
@@ -510,8 +534,12 @@ function ReviewStep({
         </p>
 
         {rows([
+          ...(shipment?.senderType === "ON_BEHALF_OF"
+            ? [{ label: "Sent on behalf of", value: shipment?.principalName }]
+            : []),
           { label: "Sender Name", value: shipment?.senderName },
           { label: "Sender Phone", value: shipment?.senderPhone },
+          { label: "Sender Alt. Phone", value: shipment?.senderAltPhone },
           { label: "Full Address", value: shipment?.senderAddress },
           { label: "Sender City", value: shipment?.senderCity },
           { label: "Sender State", value: shipment?.senderState },
@@ -522,6 +550,7 @@ function ReviewStep({
         {rows([
           { label: "Receiver Name", value: shipment?.recipientName },
           { label: "Receiver Phone", value: shipment?.recipientPhone },
+          { label: "Receiver Alt. Phone", value: shipment?.recipientAltPhone },
           { label: "Full Address", value: shipment?.recipientAddress },
           { label: "Receiver City", value: shipment?.recipientCity },
           { label: "Receiver State", value: shipment?.recipientState },
@@ -565,6 +594,11 @@ export default function CreateShipmentModal({
     insuranceSettings["insurance.min_premium_naira"]?.value ?? "100",
   );
   const [persistedQuoteId, setPersistedQuoteId] = useState<string | null>(null);
+  // Full response of the locked quote, shown on the review step BEFORE the
+  // shipment is created, plus when the 15-minute price lock runs out.
+  const [persistedQuoteData, setPersistedQuoteData] = useState<PersistedQuote | null>(null);
+  const [quoteExpiresAt, setQuoteExpiresAt] = useState<number | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const { data: citiesData, isLoading } = useGetCitiesQuery({});
 
   const [step, setStep] = useState<Step>(1);
@@ -635,10 +669,21 @@ export default function CreateShipmentModal({
     if (initialValue.isCustomDimension) setUseCustomDimension(true);
   }, [isOpen, initialValue]);
 
+  // Ticks once a second while the (pre-create) review is on screen, only to
+  // show how long the locked price remains valid.
+  useEffect(() => {
+    if (step !== 3 || createdShipmentData || !quoteExpiresAt) return;
+    const t = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [step, createdShipmentData, quoteExpiresAt]);
+
   const handleClose = () => {
     reset();
     setStep(1);
     setCreatedShipmentData(null);
+    setPersistedQuoteId(null);
+    setPersistedQuoteData(null);
+    setQuoteExpiresAt(null);
     setUseCustomDimension(false);
     setIsOpen(false);
   };
@@ -755,7 +800,62 @@ export default function CreateShipmentModal({
     return shipment?.id ?? shipment?.shipmentId;
   };
 
+  // Locks a 15-minute quote from the current form values. Returns
+  // { blocked: true } when the server rejects the request outright (mode
+  // switched off, no rate for that mode/route, invalid input) so the user is
+  // told immediately instead of discovering it after filling in step 2.
+  const generateQuoteFromForm = async (): Promise<{ blocked: boolean; data: PersistedQuote | null }> => {
+    const vals = getValues();
+    try {
+      const result = await generatePersistedQuote({
+        originCity: vals.originCity,
+        destinationCity: vals.destinationCity,
+        weightKg: vals.weight ?? 0,
+        tons: vals.tons ?? 0,
+        cartons: vals.cartons ?? 0,
+        lengthCm: vals.length ?? 0,
+        widthCm: vals.width ?? 0,
+        heightCm: vals.height ?? 0,
+        boxDimensionId: vals.boxSize ?? undefined,
+        serviceType: vals.serviceType,
+        shipmentMode: vals.shipmentMode,
+        insuranceSelected: vals.hasInsurance,
+        declaredValue: vals.insuranceValue ?? 0,
+        promoCode: vals.promoCode || undefined,
+        termsAccepted: true,
+      }).unwrap();
+      const d = (result?.data ?? null) as (PersistedQuote & { quote?: { id?: string }; id?: string }) | null;
+      // The API returns the id as `quoteId` (older builds nested it).
+      const qId = d?.quoteId ?? d?.quote?.id ?? d?.id ?? null;
+      setPersistedQuoteId(qId);
+      setPersistedQuoteData(d);
+      setQuoteExpiresAt(d?.expiresAt ? new Date(d.expiresAt).getTime() : null);
+      return { blocked: false, data: d };
+    } catch (err) {
+      setPersistedQuoteId(null);
+      setPersistedQuoteData(null);
+      setQuoteExpiresAt(null);
+      const e = err as { status?: number; data?: { message?: string } };
+      if (e?.status === 400 || e?.status === 404 || e?.status === 422) {
+        errorToast(e.data?.message ?? "We couldn't price this shipment. Please check your details.");
+        return { blocked: true, data: null };
+      }
+      // Network/server hiccup — keep the old behaviour: carry on, the
+      // shipment is priced when it's created.
+      return { blocked: false, data: null };
+    }
+  };
+
   const createShipment = async () => {
+    // The 15-minute price lock ran out while the customer was reviewing:
+    // refresh it and make them look at the (possibly new) price first.
+    if (quoteExpiresAt && Date.now() >= quoteExpiresAt) {
+      const r = await generateQuoteFromForm();
+      if (!r.blocked) {
+        errorToast("Your quote expired, so the price was refreshed. Please review it and confirm again.");
+      }
+      return;
+    }
     const data = getValues();
     const response = await handleCreateShipment(
       buildShipmentPayload(data),
@@ -772,7 +872,13 @@ export default function CreateShipmentModal({
       const valid = await trigger(STEP_FIELDS[step]);
       if (!valid) return;
       if (step === 2) {
-        await createShipment();
+        // Review comes BEFORE creation. Nothing exists on the server until
+        // the customer presses "Confirm & Create Shipment" on step 3.
+        if (!persistedQuoteId || (quoteExpiresAt && Date.now() >= quoteExpiresAt)) {
+          const r = await generateQuoteFromForm();
+          if (r.blocked) return;
+        }
+        setStep(3);
         return;
       }
 
@@ -796,37 +902,10 @@ export default function CreateShipmentModal({
       }
 
       // When moving from Step 1 → Step 2, generate a persistent quote so the
-      // price is locked for 15 minutes. If it fails (no pricing data yet) we
-      // proceed anyway — the shipment controller will calculate the price.
+      // price is locked for 15 minutes.
       if (step === 1) {
-        const vals = getValues();
-        try {
-          const result = await generatePersistedQuote({
-            originCity: vals.originCity,
-            destinationCity: vals.destinationCity,
-            weightKg: vals.weight ?? 0,
-            tons: vals.tons ?? 0,
-            cartons: vals.cartons ?? 0,
-            lengthCm: vals.length ?? 0,
-            widthCm: vals.width ?? 0,
-            heightCm: vals.height ?? 0,
-            boxDimensionId: vals.boxSize ?? undefined,
-            serviceType: vals.serviceType,
-            // [V1 Feature 1] Required by the backend now.
-            shipmentMode: vals.shipmentMode,
-            insuranceSelected: vals.hasInsurance,
-            // [V1 Feature 2] Always sent now — required regardless of the
-            // insurance toggle.
-            declaredValue: vals.insuranceValue ?? 0,
-            promoCode: vals.promoCode || undefined,
-            termsAccepted: true,
-          }).unwrap();
-          const qId = result?.data?.quote?.id ?? result?.data?.id;
-          if (qId) setPersistedQuoteId(qId);
-        } catch {
-          // Non-blocking — proceed without price lock
-          setPersistedQuoteId(null);
-        }
+        const r = await generateQuoteFromForm();
+        if (r.blocked) return;
       }
 
       setStep((s) => (s < 3 ? ((s + 1) as Step) : s));
@@ -837,8 +916,23 @@ export default function CreateShipmentModal({
   };
 
   const handleBack = () => {
-    if (step === 3) setCreatedShipmentData(null);
+    // Once the shipment exists there is nothing to go back to.
+    if (step === 3 && createdShipmentData) return;
     setStep((s) => (s > 1 ? ((s - 1) as Step) : s));
+  };
+
+  const handleConfirmCreate = async () => {
+    if (isAdvancingRef.current) return;
+    isAdvancingRef.current = true;
+    setIsAdvancing(true);
+    try {
+      await createShipment();
+    } catch {
+      // The mutation surfaces its own error toast; nothing was created.
+    } finally {
+      isAdvancingRef.current = false;
+      setIsAdvancing(false);
+    }
   };
 
   const handleGenerateInvoice = async () => {
@@ -886,6 +980,11 @@ export default function CreateShipmentModal({
     useGetDimensionsQuery({});
   const selectedBoxId = useWatch({ control, name: "boxSize" });
   const hasInsurance = useWatch({ control, name: "hasInsurance" });
+  // [V1 Feature 1] Only modes admin has left switched on are offered.
+  const watchedMode = useWatch({ control, name: "shipmentMode" });
+  const { options: modeOptions } = useActiveShipmentModes(watchedMode, (fallback) =>
+    setValue("shipmentMode", fallback, { shouldValidate: true }),
+  );
   const senderType = useWatch({ control, name: "senderType" });
 
   // Live zone lookup — fires whenever both cities are selected (including same city = Zone 1)
@@ -1148,11 +1247,7 @@ export default function CreateShipmentModal({
                         value={field.value}
                         onValueChange={field.onChange}
                         className="flex flex-row gap-2"
-                        options={[
-                          { label: "Air", description: "Fastest, higher cost", value: "AIR" },
-                          { label: "Land", description: "Balanced speed & cost", value: "LAND" },
-                          { label: "Sea", description: "Slowest, lowest cost", value: "SEA" },
-                        ]}
+                        options={modeOptions}
                       />
                     )}
                   />
@@ -1399,19 +1494,16 @@ export default function CreateShipmentModal({
                     ) : (
                       // [V1 Feature 7] Uninsured risk disclaimer.
                       <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 space-y-2">
-                        <p className="text-xs text-amber-700">
-                          You have not selected insurance. If this shipment is
-                          lost or damaged, compensation is limited to the
-                          standard liability limit — even though you&apos;ve
-                          told us it&apos;s worth ₦
-                          {(getValues("insuranceValue") ?? 0).toLocaleString()}
-                          . Insurance for this shipment would cost ₦
-                          {Math.max(
+                        <UninsuredNotice
+                          declaredValue={getValues("insuranceValue") ?? 0}
+                          premiumNaira={Math.max(
                             100,
-                            Math.ceil((getValues("insuranceValue") ?? 0) * 0.025),
-                          ).toLocaleString()}{" "}
-                          and covers the full declared value.
-                        </p>
+                            Math.ceil(
+                              (getValues("insuranceValue") ?? 0) *
+                                (insuranceRatePercent / 100),
+                            ),
+                          )}
+                        />
                         <label className="flex items-start gap-2 cursor-pointer">
                           <input
                             type="checkbox"
@@ -1723,6 +1815,20 @@ export default function CreateShipmentModal({
             )}
 
             {/* ── STEP 3 ── */}
+            {step === 3 && !createdShipmentData && (
+              <PreCreateReview
+                values={getValues() as any}
+                quote={persistedQuoteData}
+                serviceLabel={
+                  SERVICE_OPTIONS.find((o) => o.value === getValues("serviceType"))?.label ??
+                  getValues("serviceType")
+                }
+                insuranceRatePercent={insuranceRatePercent}
+                secondsLeft={
+                  quoteExpiresAt ? Math.max(0, Math.floor((quoteExpiresAt - nowMs) / 1000)) : null
+                }
+              />
+            )}
             {step === 3 && createdShipmentData && (
               <ReviewStep
                 data={createdShipmentData}
@@ -1733,8 +1839,9 @@ export default function CreateShipmentModal({
 
           {/* Footer */}
           <div className="px-6 py-4 border-t border-gray-100 flex flex-col gap-3 shrink-0">
-            {/* Sprint 7: Refund Policy acknowledgement on Step 3 */}
-            {step === 3 && (
+            {/* Sprint 7: Refund Policy acknowledgement — shown once the
+                shipment exists and the customer is about to pay. */}
+            {step === 3 && createdShipmentData && (
               <p className="text-xs text-gray-400 text-center">
                 By clicking <strong>Pay Now</strong> you acknowledge our{" "}
                 <a
@@ -1748,13 +1855,13 @@ export default function CreateShipmentModal({
               </p>
             )}
             <div className="flex items-center gap-3">
-              {step > 1 && (
+              {step > 1 && !(step === 3 && createdShipmentData) && (
                 <Button variant="secondary" type="button" onClick={handleBack}>
                   ← Back
                 </Button>
               )}
               <div className="flex-1" />
-              {step === 3 && (
+              {step === 3 && createdShipmentData && (
                 <Button
                   variant="secondary"
                   type="button"
@@ -1768,20 +1875,28 @@ export default function CreateShipmentModal({
                 <Button
                   type="button"
                   onClick={handleNext}
-                  isLoading={
-                    isAdvancing && (step === 2 ? isCreatingShipment : true)
-                  }
+                  isLoading={isAdvancing}
                   disabled={stepHasErrors || isAdvancing}
                 >
-                  {step === 2 ? "Create Shipment" : "Continue"}
+                  {step === 2 ? "Review Shipment" : "Continue"}
                 </Button>
-              ) : (
+              ) : createdShipmentData ? (
                 <Button
                   type="button"
                   onClick={handlePayment}
                   className="bg-red-600 hover:bg-red-700 text-white"
                 >
                   Pay Now
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  onClick={handleConfirmCreate}
+                  isLoading={isCreatingShipment || isAdvancing}
+                  disabled={isCreatingShipment || isAdvancing}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  Confirm &amp; Create Shipment
                 </Button>
               )}
             </div>

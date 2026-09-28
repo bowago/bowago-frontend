@@ -55,6 +55,7 @@ export type Shipment = {
   quotedPrice?: number;
   pickupDate: string;
   hasPendingAddressChange?: boolean;
+  shipmentMode?: "AIR" | "LAND" | "SEA" | null;
 };
 
 // ─── Mark as Paid modal (admin only) ─────────────────────────────────────────
@@ -443,6 +444,24 @@ export const ShipmentColumns: ColumnDef<Shipment>[] = [
             {recipientPhone} · {recipientCity}
           </p>
         </div>
+      );
+    },
+  },
+  {
+    id: "mode",
+    header: "Mode",
+    cell: ({ row }) => {
+      const mode = row.original.shipmentMode;
+      const styles: Record<string, string> = {
+        AIR: "bg-purple-100 text-purple-600",
+        LAND: "bg-amber-100 text-amber-600",
+        SEA: "bg-sky-100 text-sky-600",
+      };
+      if (!mode) return <span className="text-xs text-gray-400">—</span>;
+      return (
+        <span className={`px-2 py-1 text-xs rounded-full font-medium ${styles[mode] ?? "bg-gray-100 text-gray-500"}`}>
+          {mode.charAt(0) + mode.slice(1).toLowerCase()}
+        </span>
       );
     },
   },
