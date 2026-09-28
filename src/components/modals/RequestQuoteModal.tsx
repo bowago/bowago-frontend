@@ -19,6 +19,8 @@ interface QuoteFormData {
   fromCity: string;
   toCity: string;
   serviceType: string;
+  // [V1 Feature 1]
+  shipmentMode: "AIR" | "LAND" | "SEA";
   weightKg: number;
   tons: number;
   cartons: number;
@@ -98,6 +100,10 @@ export default function CreateQuoteModal({
     fromCity: string;
     toCity: string;
     serviceType?: string;
+    // [V1 Feature 1/2]
+    shipmentMode?: "AIR" | "LAND" | "SEA";
+    hasInsurance?: boolean;
+    declaredValue?: number;
     boxSize?: string;
     weight?: number;
     length?: number;
@@ -122,6 +128,7 @@ export default function CreateQuoteModal({
       fromCity: "",
       toCity: "",
       serviceType: "STANDARD",
+      shipmentMode: "LAND",
       weightKg: 0,
       tons: 0,
       cartons: 1,
@@ -197,6 +204,7 @@ export default function CreateQuoteModal({
           fromCity: data.fromCity,
           toCity: data.toCity,
           serviceType: data.serviceType,
+          shipmentMode: data.shipmentMode,
           weightKg: data.weightKg,
           tons: data.tons,
           cartons: data.cartons,
@@ -207,12 +215,14 @@ export default function CreateQuoteModal({
             ? data.promoCode.trim().toUpperCase()
             : undefined,
           insuranceSelected: data.hasInsurance,
-          declaredValue: data.hasInsurance ? (data.insuranceValue ?? 0) : 0,
+          // [V1 Feature 2] Always sent now, insured or not.
+          declaredValue: data.insuranceValue ?? 0,
         }
       : {
           fromCity: data.fromCity,
           toCity: data.toCity,
           serviceType: data.serviceType,
+          shipmentMode: data.shipmentMode,
           weightKg: data.weightKg,
           tons: data.tons,
           cartons: data.cartons,
@@ -221,7 +231,7 @@ export default function CreateQuoteModal({
             ? data.promoCode.trim().toUpperCase()
             : undefined,
           insuranceSelected: data.hasInsurance,
-          declaredValue: data.hasInsurance ? (data.insuranceValue ?? 0) : 0,
+          declaredValue: data.insuranceValue ?? 0,
         };
 
     handleCreateQuote({ ...payload, termsAccepted: true })
@@ -255,8 +265,10 @@ export default function CreateQuoteModal({
           "weightKg",
           "cartons",
           "serviceType",
+          "shipmentMode",
+          "insuranceValue",
         ]
-      : ["boxDimensionId", "weightKg", "tons", "cartons", "serviceType"];
+      : ["boxDimensionId", "weightKg", "tons", "cartons", "serviceType", "shipmentMode", "insuranceValue"];
     const valid = await trigger(fields);
     if (valid) {
       handleSubmit(onSubmit)();
@@ -377,6 +389,27 @@ export default function CreateQuoteModal({
             value={field.value}
             onValueChange={field.onChange}
             error={errors.serviceType?.message}
+          />
+        )}
+      />
+
+      {/* [V1 Feature 1] MODE OF SHIPMENT — required, and mode-scoped rates
+            mean the price shown genuinely differs by mode. */}
+      <Controller
+        name="shipmentMode"
+        control={control}
+        rules={{ required: "Mode of shipment is required" }}
+        render={({ field }) => (
+          <SelectInput
+            label="Mode of Shipment"
+            options={[
+              { label: "Air — Fastest, higher cost", value: "AIR" },
+              { label: "Land — Balanced speed & cost", value: "LAND" },
+              { label: "Sea — Slowest, lowest cost", value: "SEA" },
+            ]}
+            value={field.value}
+            onValueChange={field.onChange}
+            error={errors.shipmentMode?.message}
           />
         )}
       />
@@ -615,9 +648,9 @@ export default function CreateQuoteModal({
         />
       </div>
 
-      {/* INSURANCE — was entirely missing from Create Quote even though
-            Create Shipment has always had it and the backend has supported
-            insuranceSelected/declaredValue on this endpoint the whole time. */}
+      {/* [V1 Feature 2] Value of items being sent — always shown and
+            required now, insured or not (previously hidden unless
+            insurance was toggled on). */}
       <div>
         <label className="flex items-center gap-2 cursor-pointer">
           <input
@@ -629,17 +662,21 @@ export default function CreateQuoteModal({
             Add insurance protection?
           </span>
         </label>
-        {values.hasInsurance && (
-          <div className="mt-2 space-y-2">
-            <Input
-              label="Declared Value of Goods (NGN)"
-              type="number"
-              min={1}
-              placeholder="e.g. 500000"
-              {...register("insuranceValue", { valueAsNumber: true })}
-              error={errors.insuranceValue?.message}
-            />
-            {(values.insuranceValue ?? 0) > 0 && (
+        <div className="mt-2 space-y-2">
+          <Input
+            label="Value of Items Being Sent (NGN)"
+            type="number"
+            min={1}
+            placeholder="e.g. 500000"
+            {...register("insuranceValue", {
+              valueAsNumber: true,
+              required: "Value of items being sent is required",
+              min: { value: 1, message: "Must be greater than 0" },
+            })}
+            error={errors.insuranceValue?.message}
+          />
+          {values.hasInsurance ? (
+            (values.insuranceValue ?? 0) > 0 && (
               <div className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
                 <span className="text-xs text-blue-600">
                   Insurance premium ({insuranceRatePercent}% of declared value)
@@ -655,9 +692,15 @@ export default function CreateQuoteModal({
                   ).toLocaleString()}
                 </span>
               </div>
-            )}
-          </div>
-        )}
+            )
+          ) : (
+            <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+              Without insurance, compensation for loss or damage is limited
+              to the standard liability limit — you&apos;ll be asked to
+              confirm this at booking.
+            </p>
+          )}
+        </div>
       </div>
 
       {/* PROMO CODE */}
@@ -867,6 +910,10 @@ export default function CreateQuoteModal({
             onCreateShipment?.({
               fromCity: quote?.fromCity?.name ?? values.fromCity,
               toCity: quote?.toCity?.name ?? values.toCity,
+              serviceType: values.serviceType,
+              shipmentMode: values.shipmentMode,
+              hasInsurance: values.hasInsurance,
+              declaredValue: values.insuranceValue,
               boxSize: useCustomDimension ? undefined : values.boxDimensionId,
               weight: values.weightKg,
               length: values.lengthCm,

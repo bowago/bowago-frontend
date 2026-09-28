@@ -49,6 +49,8 @@ export default function LandingPage() {
   const [boxDimensionId, setBoxDimensionId] = useState("");
   const [boxQuantity, setBoxQuantity] = useState("1");
   const [serviceType, setServiceType] = useState("STANDARD");
+  // [V1 Feature 1] Mode of shipment — rates differ per mode.
+  const [shipmentMode, setShipmentMode] = useState<"AIR" | "LAND" | "SEA">("LAND");
   const [quoteResult, setQuoteResult] = useState<any>(null);
   // Custom dimension toggle — hidden until the user explicitly opts in
   const [useCustomDimension, setUseCustomDimension] = useState(false);
@@ -108,7 +110,8 @@ export default function LandingPage() {
         customWidth: isCustom ? parseFloat(customWidth) : undefined,
         customHeight: isCustom ? parseFloat(customHeight) : undefined,
         serviceType,
-      }).unwrap();
+        shipmentMode,
+      } as any).unwrap();
       setQuoteResult((result as any)?.data?.quote ?? (result as any)?.data);
     } catch {}
   };
@@ -473,6 +476,22 @@ export default function LandingPage() {
                       <option value="ECONOMY">Economy</option>
                     </select>
                   </div>
+                  <div>
+                    <label className="block text-xs text-white/50 mb-1.5">
+                      Mode
+                    </label>
+                    <select
+                      value={shipmentMode}
+                      onChange={(e) =>
+                        setShipmentMode(e.target.value as "AIR" | "LAND" | "SEA")
+                      }
+                      className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-3 py-2.5 text-sm focus:border-brand/60 transition-all [&>option]:bg-gray-900"
+                    >
+                      <option value="LAND">Land</option>
+                      <option value="AIR">Air</option>
+                      <option value="SEA">Sea</option>
+                    </select>
+                  </div>
                 </div>
                 <button
                   type="submit"
@@ -573,6 +592,7 @@ export default function LandingPage() {
                         fromCity,
                         toCity,
                         serviceType,
+                        shipmentMode,
                         boxSize: isCustom
                           ? undefined
                           : boxDimensionId || undefined,

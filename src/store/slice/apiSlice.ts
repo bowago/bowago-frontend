@@ -176,6 +176,13 @@ export const apiSlice = createApi({
     "Loyalty",
     "PackagingGuide",
     "Policy",
+    // [V1 Launch Scope]
+    "ShipmentDraft",
+    "ShipmentMode",
+    "AdhocChargeType",
+    "AdhocChargeRule",
+    "AdhocSuggestion",
+    "InsuranceDisclaimer",
   ],
   baseQuery: baseQueryWithReauth,
   endpoints: (builder) => ({
@@ -502,6 +509,9 @@ export const apiSlice = createApi({
         customWidth?: number;
         customHeight?: number;
         serviceType?: string;
+        shipmentMode?: "AIR" | "LAND" | "SEA"; // [V1 Feature 1]
+        insuranceSelected?: boolean;
+        declaredValue?: number;
         termsAccepted?: boolean;
         promoCode?: string;
       }
@@ -597,6 +607,8 @@ export const apiSlice = createApi({
         maxCartons: number;
         pricePerKg: number;
         basePrice: number;
+        // [V1 Feature 1]
+        shipmentMode?: "AIR" | "LAND" | "SEA";
       }
     >({
       query: (formData) => ({
@@ -643,6 +655,19 @@ export const apiSlice = createApi({
         pickupDate: string;
         notes: string;
         quoteId?: string;
+        // [V1 launch scope] — optional on this legacy endpoint (best-effort);
+        // the fully-validated path is /shipment-drafts (see the ShipmentDraft
+        // endpoints below).
+        shipmentMode?: "AIR" | "LAND" | "SEA";
+        senderType?: "MYSELF" | "ON_BEHALF_OF";
+        principalName?: string;
+        principalPhone?: string;
+        principalEmail?: string;
+        principalRelationship?: "CUSTOMER" | "MERCHANT" | "EMPLOYER" | "OTHER";
+        authorityConfirmed?: boolean;
+        senderAltPhone?: string;
+        recipientAltPhone?: string;
+        uninsuredAck?: boolean;
       }
     >({
       query: (formData) => ({
@@ -679,8 +704,13 @@ export const apiSlice = createApi({
         heightCm?: number;
         boxDimensionId?: string;
         serviceType?: string;
+        // [V1 Feature 1] Required — a single mode to generate & lock the
+        // official quote, or an array of modes to get a side-by-side
+        // comparison preview (no quote is persisted for a comparison call).
+        shipmentMode: "AIR" | "LAND" | "SEA" | Array<"AIR" | "LAND" | "SEA">;
         insuranceSelected?: boolean;
-        declaredValue?: number;
+        // [V1 Feature 2] Always required now, insured or not.
+        declaredValue: number;
         promoCode?: string;
         termsAccepted: true; // Sprint 7: required — logged server-side in consent_logs
       }
@@ -732,6 +762,8 @@ export const apiSlice = createApi({
         basePrice: number;
         isActive: boolean;
         serviceType: string;
+        // [V1 Feature 1]
+        shipmentMode?: "AIR" | "LAND" | "SEA";
         reason?: string;
       }
     >({
@@ -1292,6 +1324,122 @@ export const apiSlice = createApi({
     // useGetOverdueShipmentsQuery (Admin — candidates for delay alerts)
     GetOverdueShipments: builder.query<unknown, void>({
       query: () => ({ url: "/delay-alerts/overdue", method: "GET" }),
+    }),
+
+    // ─── [V1 Launch Scope] ──────────────────────────────────────────────────
+
+    // useRefreshQuoteMutation — POST /quotes/{id}/refresh
+    RefreshQuote: builder.mutation<any, string>({
+      query: (quoteId) => ({ url: `/quotes/${quoteId}/refresh`, method: "POST" }),
+    }),
+
+    // useGetShipmentModesQuery — GET /admin/shipment-modes (public read)
+    GetShipmentModes: builder.query<unknown, void>({
+      query: () => ({ url: "/admin/shipment-modes", method: "GET" }),
+      providesTags: ["ShipmentMode"],
+    }),
+    // useUpdateShipmentModeMutation
+    UpdateShipmentMode: builder.mutation<
+      unknown,
+      { mode: "AIR" | "LAND" | "SEA"; volumetricDivisor?: number; transitHoursDefault?: number | null; isActive?: boolean }
+    >({
+      query: ({ mode, ...body }) => ({ url: `/admin/shipment-modes/${mode}`, method: "PATCH", body }),
+      invalidatesTags: ["ShipmentMode"],
+    }),
+
+    // ── Shipment drafts (review-before-create booking flow) ────────────────
+    // useCreateShipmentDraftMutation
+    CreateShipmentDraft: builder.mutation<unknown, { quoteId: string; [key: string]: unknown }>({
+      query: (body) => ({ url: "/shipment-drafts", method: "POST", body }),
+      invalidatesTags: ["ShipmentDraft"],
+    }),
+    // useGetShipmentDraftQuery
+    GetShipmentDraft: builder.query<unknown, string>({
+      query: (id) => ({ url: `/shipment-drafts/${id}`, method: "GET" }),
+      providesTags: (result, error, id) => [{ type: "ShipmentDraft", id }],
+    }),
+    // usePatchShipmentDraftMutation
+    PatchShipmentDraft: builder.mutation<unknown, { id: string; [key: string]: unknown }>({
+      query: ({ id, ...body }) => ({ url: `/shipment-drafts/${id}`, method: "PATCH", body }),
+      invalidatesTags: (result, error, { id }) => [{ type: "ShipmentDraft", id }],
+    }),
+    // useConfirmShipmentDraftMutation — pass a fresh UUID as idempotencyKey
+    // on every tap; a retry after a network error should reuse the SAME key.
+    ConfirmShipmentDraft: builder.mutation<unknown, { id: string; idempotencyKey: string }>({
+      query: ({ id, idempotencyKey }) => ({
+        url: `/shipment-drafts/${id}/confirm`,
+        method: "POST",
+        headers: { "Idempotency-Key": idempotencyKey },
+      }),
+      invalidatesTags: ["Shipment", "ShipmentDraft"],
+    }),
+
+    // ── Adhoc charge types (Admin) ──────────────────────────────────────────
+    GetAdhocChargeTypes: builder.query<unknown, { isActive?: boolean; search?: string; page?: number } | void>({
+      query: (params) => ({ url: "/admin/adhoc-charges", method: "GET", params: params ?? undefined }),
+      providesTags: ["AdhocChargeType"],
+    }),
+    CreateAdhocChargeType: builder.mutation<unknown, Record<string, unknown>>({
+      query: (body) => ({ url: "/admin/adhoc-charges", method: "POST", body }),
+      invalidatesTags: ["AdhocChargeType"],
+    }),
+    UpdateAdhocChargeType: builder.mutation<unknown, { id: string; [key: string]: unknown }>({
+      query: ({ id, ...body }) => ({ url: `/admin/adhoc-charges/${id}`, method: "PATCH", body }),
+      invalidatesTags: ["AdhocChargeType"],
+    }),
+    DeactivateAdhocChargeType: builder.mutation<unknown, { id: string; reason?: string }>({
+      query: ({ id, ...body }) => ({ url: `/admin/adhoc-charges/${id}/deactivate`, method: "POST", body }),
+      invalidatesTags: ["AdhocChargeType"],
+    }),
+    GetAdhocChargeTypeHistory: builder.query<unknown, string>({
+      query: (id) => ({ url: `/admin/adhoc-charges/${id}/history`, method: "GET" }),
+    }),
+
+    // ── Adhoc charge suggestion rules (Admin) ───────────────────────────────
+    GetAdhocChargeRules: builder.query<unknown, { isActive?: boolean; behaviour?: string } | void>({
+      query: (params) => ({ url: "/admin/adhoc-rules", method: "GET", params: params ?? undefined }),
+      providesTags: ["AdhocChargeRule"],
+    }),
+    CreateAdhocChargeRule: builder.mutation<unknown, Record<string, unknown>>({
+      query: (body) => ({ url: "/admin/adhoc-rules", method: "POST", body }),
+      invalidatesTags: ["AdhocChargeRule"],
+    }),
+    UpdateAdhocChargeRule: builder.mutation<unknown, { id: string; [key: string]: unknown }>({
+      query: ({ id, ...body }) => ({ url: `/admin/adhoc-rules/${id}`, method: "PATCH", body }),
+      invalidatesTags: ["AdhocChargeRule"],
+    }),
+    DeactivateAdhocChargeRule: builder.mutation<unknown, { id: string; reason?: string }>({
+      query: ({ id, ...body }) => ({ url: `/admin/adhoc-rules/${id}/deactivate`, method: "POST", body }),
+      invalidatesTags: ["AdhocChargeRule"],
+    }),
+
+    // ── Adhoc suggestion queue (Admin) ──────────────────────────────────────
+    GetAdhocSuggestions: builder.query<unknown, { scope?: "quote" | "shipment" } | void>({
+      query: (params) => ({ url: "/admin/adhoc-suggestions", method: "GET", params: params ?? undefined }),
+      providesTags: ["AdhocSuggestion"],
+    }),
+    DecideAdhocSuggestion: builder.mutation<
+      unknown,
+      { id: string; decision: "APPROVE" | "EDIT" | "DISMISS"; amountKobo?: number; reason?: string }
+    >({
+      query: ({ id, ...body }) => ({ url: `/admin/adhoc-suggestions/${id}/decision`, method: "POST", body }),
+      invalidatesTags: ["AdhocSuggestion", "Shipment"],
+    }),
+
+    // ── Insurance disclaimer ────────────────────────────────────────────────
+    GetInsuranceDisclaimer: builder.query<unknown, void>({
+      query: () => ({ url: "/admin/insurance-disclaimer", method: "GET" }),
+      providesTags: ["InsuranceDisclaimer"],
+    }),
+    PublishInsuranceDisclaimer: builder.mutation<
+      unknown,
+      { version: string; body: string; liabilityLimitKobo: number; effectiveFrom?: string }
+    >({
+      query: (body) => ({ url: "/admin/insurance-disclaimer", method: "POST", body }),
+      invalidatesTags: ["InsuranceDisclaimer"],
+    }),
+    GetInsuranceDisclaimerHistory: builder.query<unknown, void>({
+      query: () => ({ url: "/admin/insurance-disclaimer/history", method: "GET" }),
     }),
 
     CreateFAQ: builder.mutation<unknown, CreateFAQFormData>({
@@ -1935,6 +2083,8 @@ export const apiSlice = createApi({
       {
         zone?: number | string;
         serviceType?: string;
+        // [V1 Feature 1]
+        shipmentMode?: "AIR" | "LAND" | "SEA";
         minKg?: number;
         maxKg?: number;
         isActive?: string;
@@ -1945,6 +2095,8 @@ export const apiSlice = createApi({
         if (params?.zone) searchParams.append("zone", String(params.zone));
         if (params?.serviceType)
           searchParams.append("serviceType", params.serviceType);
+        if (params?.shipmentMode)
+          searchParams.append("shipmentMode", params.shipmentMode);
         if (params?.minKg !== undefined)
           searchParams.append("minKg", String(params.minKg));
         if (params?.maxKg !== undefined)
@@ -3559,4 +3711,26 @@ export const {
   useReviewAddressChangeMutation,
   useSendDelayAlertMutation,
   useGetOverdueShipmentsQuery,
+  // [V1 Launch Scope]
+  useRefreshQuoteMutation,
+  useGetShipmentModesQuery,
+  useUpdateShipmentModeMutation,
+  useCreateShipmentDraftMutation,
+  useGetShipmentDraftQuery,
+  usePatchShipmentDraftMutation,
+  useConfirmShipmentDraftMutation,
+  useGetAdhocChargeTypesQuery,
+  useCreateAdhocChargeTypeMutation,
+  useUpdateAdhocChargeTypeMutation,
+  useDeactivateAdhocChargeTypeMutation,
+  useGetAdhocChargeTypeHistoryQuery,
+  useGetAdhocChargeRulesQuery,
+  useCreateAdhocChargeRuleMutation,
+  useUpdateAdhocChargeRuleMutation,
+  useDeactivateAdhocChargeRuleMutation,
+  useGetAdhocSuggestionsQuery,
+  useDecideAdhocSuggestionMutation,
+  useGetInsuranceDisclaimerQuery,
+  usePublishInsuranceDisclaimerMutation,
+  useGetInsuranceDisclaimerHistoryQuery,
 } = apiSlice;

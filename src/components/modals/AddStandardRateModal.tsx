@@ -41,6 +41,7 @@ export default function AddStandardRateModal({
     defaultValues: {
       isActive: initialValue?.isActive ?? false,
       serviceType: initialValue?.serviceType ?? "STANDARD",
+      shipmentMode: initialValue?.shipmentMode ?? "LAND",
       zone: initialValue?.zone ?? 0,
       minKg: initialValue?.minKg ?? 0,
       maxKg: initialValue?.maxKg ?? 0,
@@ -55,9 +56,12 @@ export default function AddStandardRateModal({
   });
 
   const onSubmit = (data: any) => {
-    const { isActive, serviceType, ...addDataForm } = data;
+    const { isActive, serviceType, shipmentMode, ...addDataForm } = data;
     if (!isEdit) {
-      handleAddStandardRate(addDataForm)
+      handleAddStandardRate({
+        ...addDataForm,
+        shipmentMode: shipmentMode ?? "LAND",
+      })
         .unwrap()
         .then(() => {
           reset();
@@ -69,6 +73,7 @@ export default function AddStandardRateModal({
         id: initialValue?.id ?? "",
         isActive: isActive ?? initialValue?.isActive ?? false,
         serviceType: serviceType ?? initialValue?.serviceType ?? "STANDARD",
+        shipmentMode: shipmentMode ?? initialValue?.shipmentMode ?? "LAND",
         ...addDataForm,
       })
         .unwrap()
@@ -119,6 +124,26 @@ export default function AddStandardRateModal({
                   />
                 )}
               />
+
+              <div className="col-span-2">
+                <Controller
+                  name="shipmentMode"
+                  control={control}
+                  render={({ field }) => (
+                    <RadioGroupCard
+                      label="Mode of Shipment"
+                      className="flex flex-row"
+                      value={field.value?.toString()}
+                      onValueChange={field.onChange}
+                      options={[
+                        { label: "Air", description: "Fastest, higher cost", value: "AIR" },
+                        { label: "Land", description: "Balanced speed & cost", value: "LAND" },
+                        { label: "Sea", description: "Slowest, lowest cost", value: "SEA" },
+                      ]}
+                    />
+                  )}
+                />
+              </div>
 
               <div className="col-span-2">
                 {isEdit && (

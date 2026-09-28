@@ -12,6 +12,8 @@ export type Rate = {
   id: string;
   zone: number;
   serviceType: "STANDARD" | "CONTRACT" | "PROMO";
+  // [V1 Feature 1]
+  shipmentMode?: "AIR" | "LAND" | "SEA";
   minKg: number;
   maxKg: number;
   minTons: number;
@@ -21,6 +23,12 @@ export type Rate = {
   pricePerKg: number;
   basePrice: number;
   isActive: boolean;
+};
+
+const MODE_BADGE: Record<string, string> = {
+  AIR: "bg-purple-100 text-purple-600",
+  LAND: "bg-amber-100 text-amber-600",
+  SEA: "bg-sky-100 text-sky-600",
 };
 
 export const RateColumns: ColumnDef<Rate>[] = [
@@ -34,6 +42,23 @@ export const RateColumns: ColumnDef<Rate>[] = [
     accessorKey: "zone",
     header: "Zone",
     cell: ({ row }) => <div>Zone {row.getValue("zone")}</div>,
+  },
+
+  {
+    accessorKey: "shipmentMode",
+    header: "Mode",
+    cell: ({ row }) => {
+      const mode = (row.getValue("shipmentMode") as string) || "LAND";
+      return (
+        <span
+          className={`px-2 py-1 text-xs rounded-full font-medium ${
+            MODE_BADGE[mode] ?? "bg-gray-100 text-gray-500"
+          }`}
+        >
+          {mode.charAt(0) + mode.slice(1).toLowerCase()}
+        </span>
+      );
+    },
   },
 
   {

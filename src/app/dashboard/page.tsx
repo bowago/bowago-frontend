@@ -7,6 +7,7 @@ import { RootState } from "@/store/store";
 import StatCard from "@/components/cards/StatCard";
 import ShipmentCard from "@/components/cards/ShipmentCard";
 import ServiceDistribution from "@/components/charts/ServiceDistribution";
+import ShipmentModeDistribution from "@/components/charts/ShipmentModeDistribution";
 import ShipmentTrend from "@/components/charts/ShipmentTrend";
 import TopRoutes from "@/components/List/TopRoute";
 import { LoyaltyDashboardCard } from "@/components/layout/LoyaltyView";
@@ -530,6 +531,15 @@ export default function Page() {
               </div>
               <div className="col-span-3">
                 <TopRoutes />
+              </div>
+            </div>
+          )}
+
+          {/* [V1] Shipment mode breakdown (Air/Land/Sea) */}
+          {showCharts && (
+            <div className="grid grid-cols-12 gap-4 mb-6">
+              <div className="col-span-4">
+                <ShipmentModeDistribution />
               </div>
             </div>
           )}

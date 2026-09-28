@@ -38,6 +38,8 @@ import {
   UserCheck,
   Award,
   History,
+  Plane,
+  ShieldAlert,
 } from "lucide-react";
 
 const ICON_CLS = "w-4 h-4 flex-shrink-0";
@@ -133,6 +135,50 @@ const adminMenuList: MenuItem[] = [
         roles: ["ADMIN"],
         subRoles: RATE_MANAGERS,
         icon: <ClipboardList className={ICON_CLS} />,
+      },
+      {
+        label: "Shipment Modes",
+        href: "/dashboard/rate/modes",
+        roles: ["ADMIN"],
+        subRoles: RATE_MANAGERS,
+        icon: <Plane className={ICON_CLS} />,
+      },
+    ],
+  },
+  {
+    label: "Adhoc Charges",
+    href: "/dashboard/adhoc-charges",
+    roles: ["ADMIN"],
+    subRoles: RATE_MANAGERS,
+    icon: <ShieldAlert className={ICON_CLS} />,
+    children: [
+      {
+        label: "Charge Types",
+        href: "/dashboard/adhoc-charges",
+        roles: ["ADMIN"],
+        subRoles: RATE_MANAGERS,
+        icon: <Tag className={ICON_CLS} />,
+      },
+      {
+        label: "Suggestion Rules",
+        href: "/dashboard/adhoc-charges/rules",
+        roles: ["ADMIN"],
+        subRoles: RATE_MANAGERS,
+        icon: <Layers className={ICON_CLS} />,
+      },
+      {
+        label: "Suggestion Queue",
+        href: "/dashboard/adhoc-charges/suggestions",
+        roles: ["ADMIN"],
+        subRoles: RATE_MANAGERS,
+        icon: <ClipboardList className={ICON_CLS} />,
+      },
+      {
+        label: "Insurance Disclaimer",
+        href: "/dashboard/adhoc-charges/insurance-disclaimer",
+        roles: ["ADMIN"],
+        subRoles: RATE_MANAGERS,
+        icon: <Shield className={ICON_CLS} />,
       },
     ],
   },

@@ -7,12 +7,14 @@ import { useState } from "react";
 import { RateColumns } from "../table/columns/standard-rate-column";
 
 const SERVICE_TYPES = ["EXPRESS", "STANDARD", "ECONOMY"];
+const SHIPMENT_MODES = ["AIR", "LAND", "SEA"];
 const ZONES = ["1", "2", "3", "4"];
 
 export default function StandardRateManagementView() {
   const [filters, setFilters] = useState({
     zone: "",
     serviceType: "",
+    shipmentMode: "",
     isActive: "",
   });
   const [applied, setApplied] = useState(filters);
@@ -20,6 +22,7 @@ export default function StandardRateManagementView() {
   const { data, isLoading } = useGetStandardRateQuery({
     zone: applied.zone ? Number(applied.zone) : undefined,
     serviceType: applied.serviceType || undefined,
+    shipmentMode: (applied.shipmentMode || undefined) as any,
     isActive: applied.isActive || undefined,
   } as any);
 
@@ -27,7 +30,7 @@ export default function StandardRateManagementView() {
 
   const applyFilters = () => setApplied(filters);
   const clearFilters = () => {
-    const empty = { zone: "", serviceType: "", isActive: "" };
+    const empty = { zone: "", serviceType: "", shipmentMode: "", isActive: "" };
     setFilters(empty);
     setApplied(empty);
   };
@@ -37,6 +40,7 @@ export default function StandardRateManagementView() {
   const labelMap: Record<string, (v: string) => string> = {
     zone: (v) => `Zone ${v}`,
     serviceType: (v) => `Service: ${v}`,
+    shipmentMode: (v) => `Mode: ${v}`,
     isActive: (v) => (v === "true" ? "Active" : "Inactive"),
   };
 
@@ -65,6 +69,17 @@ export default function StandardRateManagementView() {
           <option value="">All Services</option>
           {SERVICE_TYPES.map((s) => (
             <option key={s} value={s}>{s.charAt(0) + s.slice(1).toLowerCase()}</option>
+          ))}
+        </select>
+
+        <select
+          value={filters.shipmentMode}
+          onChange={(e) => set("shipmentMode", e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="">All Modes</option>
+          {SHIPMENT_MODES.map((m) => (
+            <option key={m} value={m}>{m.charAt(0) + m.slice(1).toLowerCase()}</option>
           ))}
         </select>
 

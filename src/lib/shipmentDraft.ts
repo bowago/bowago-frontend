@@ -22,6 +22,7 @@ export type ShipmentDraft = {
   fromCity?: string;
   toCity?: string;
   serviceType?: string;
+  shipmentMode?: "AIR" | "LAND" | "SEA"; // [V1 Feature 1]
   boxSize?: string; // boxDimensionId, when a predefined box was chosen
   weight?: number;
   length?: number;

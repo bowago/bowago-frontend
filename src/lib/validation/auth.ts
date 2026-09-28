@@ -187,6 +187,15 @@ export const standardRateSchema = yup.object({
     .nullable()
     .default(undefined)
     .label("Service Type"),
+  // [V1 Feature 1] Mode of shipment — defaults to LAND (matching the
+  // Prisma column default) when not shown/selected.
+  shipmentMode: yup
+    .string()
+    .oneOf(["AIR", "LAND", "SEA"])
+    .notRequired()
+    .nullable()
+    .default("LAND")
+    .label("Mode of Shipment"),
   isActive: yup
     .boolean()
     .notRequired()
@@ -212,6 +221,8 @@ export type StandardRateFormData = {
   basePrice: number;
 
   serviceType?: string | null;
+  // [V1 Feature 1]
+  shipmentMode?: "AIR" | "LAND" | "SEA" | null;
   isActive?: boolean | null;
 };
 

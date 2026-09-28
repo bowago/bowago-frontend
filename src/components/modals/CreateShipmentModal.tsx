@@ -63,31 +63,100 @@ const createShipmentSchema = yup.object({
     .typeError("Must be a number")
     .nullable(),
   isFragile: yup.boolean().default(false),
+  // [V1 Feature 1] Mode of shipment — required on every quote/booking.
+  shipmentMode: yup
+    .string()
+    .oneOf(["AIR", "LAND", "SEA"], "Choose a mode of shipment")
+    .required("Mode of shipment is required"),
   hasInsurance: yup.boolean().default(false),
+  // [V1 Feature 2] Always required now — whether or not insurance is
+  // selected. The v2.0 "defaults to booking price" behaviour is gone.
   insuranceValue: yup
     .number()
     .transform((value) => (Number.isNaN(value) ? null : value))
-    .nullable()
+    .typeError("Must be a number")
+    .min(1, "Value of items being sent must be greater than 0")
+    .required("Value of items being sent is required"),
+  // [V1 Feature 7] Required when insurance is left off.
+  uninsuredAck: yup
+    .boolean()
+    .default(false)
     .when("hasInsurance", {
-      is: true,
+      is: false,
       then: (schema) =>
-        schema
-          .typeError("Must be a number")
-          .min(1, "Declared value must be greater than 0")
-          .required("Please enter the declared value of your goods"),
+        schema.oneOf([true], "You must acknowledge the uninsured shipping risk"),
       otherwise: (schema) => schema.nullable(),
     }),
   itemDescription: yup.string().nullable(),
   promoCode: yup.string().nullable(),
 
   // Step 2 — Delivery Details
+  // [V1 Feature 3] Sender type — MYSELF (default) or ON_BEHALF_OF.
+  senderType: yup
+    .string()
+    .oneOf(["MYSELF", "ON_BEHALF_OF"])
+    .default("MYSELF")
+    .required(),
+  principalName: yup.string().when("senderType", {
+    is: "ON_BEHALF_OF",
+    then: (schema) => schema.required("Principal name is required"),
+    otherwise: (schema) => schema.nullable(),
+  }),
+  principalPhone: yup.string().when("senderType", {
+    is: "ON_BEHALF_OF",
+    then: (schema) => schema.required("Principal phone is required"),
+    otherwise: (schema) => schema.nullable(),
+  }),
+  principalEmail: yup.string().email("Enter a valid email").nullable(),
+  principalRelationship: yup
+    .string()
+    .oneOf(["CUSTOMER", "MERCHANT", "EMPLOYER", "OTHER"])
+    .when("senderType", {
+      is: "ON_BEHALF_OF",
+      then: (schema) => schema.required("Relationship is required"),
+      otherwise: (schema) => schema.nullable(),
+    }),
+  authorityConfirmed: yup
+    .boolean()
+    .default(false)
+    .when("senderType", {
+      is: "ON_BEHALF_OF",
+      then: (schema) =>
+        schema.oneOf([true], "You must confirm you are authorised to send on their behalf"),
+      otherwise: (schema) => schema.nullable(),
+    }),
   senderName: yup.string().required("Sender name is required"),
   senderPhone: yup.string().required("Sender phone is required"),
+  // [V1 Feature 4] Optional backup number for the sender (or principal).
+  senderAltPhone: yup
+    .string()
+    .nullable()
+    .test(
+      "different-from-main",
+      "Alternative number must be different from the main number",
+      function (value) {
+        if (!value) return true;
+        const main = this.parent.senderType === "ON_BEHALF_OF" ? this.parent.principalPhone : this.parent.senderPhone;
+        return value !== main;
+      },
+    ),
   senderAddress: yup.string().required("Sender address is required"),
   senderState: yup.string().nullable(),
   senderCity: yup.string().nullable(),
   receiverName: yup.string().required("Receiver name is required"),
   receiverPhone: yup.string().required("Receiver phone is required"),
+  // [V1 Feature 4] Required backup number for the recipient.
+  receiverAltPhone: yup
+    .string()
+    .required("Recipient's alternative number is required")
+    .test(
+      "different-from-main",
+      "Alternative number must be different from the main number",
+      function (value) {
+        if (!value) return true;
+        return value !== this.parent.receiverPhone;
+      },
+    ),
   receiverAddress: yup.string().required("Receiver address is required"),
   receiverState: yup.string().nullable(),
   receiverCity: yup.string().nullable(),
@@ -529,9 +598,13 @@ export default function CreateShipmentModal({
     mode: "onChange",
     defaultValues: {
       serviceType: "EXPRESS",
+      shipmentMode: "LAND",
       isFragile: false,
       hasInsurance: false,
       insuranceValue: 0,
+      uninsuredAck: false,
+      senderType: "MYSELF",
+      authorityConfirmed: false,
       termsAccepted: false,
     },
   });
@@ -552,6 +625,13 @@ export default function CreateShipmentModal({
     if (initialValue.height != null) setValue("height", initialValue.height);
     if (initialValue.cartons != null) setValue("cartons", initialValue.cartons);
     if (initialValue.tons != null) setValue("tons", initialValue.tons);
+    // [V1] Carry the mode and declared value picked in the quote modal
+    // through to the booking form, so the user never has to re-enter them.
+    if (initialValue.shipmentMode) setValue("shipmentMode", initialValue.shipmentMode);
+    if (initialValue.declaredValue != null)
+      setValue("insuranceValue", initialValue.declaredValue);
+    if (initialValue.hasInsurance != null)
+      setValue("hasInsurance", initialValue.hasInsurance);
     if (initialValue.isCustomDimension) setUseCustomDimension(true);
   }, [isOpen, initialValue]);
 
@@ -574,6 +654,7 @@ export default function CreateShipmentModal({
   const STEP_FIELDS: Record<Step, (keyof CreateShipmentFormData)[]> = {
     1: [
       "serviceType",
+      "shipmentMode",
       "originCity",
       "destinationCity",
       "pickupDate",
@@ -582,13 +663,21 @@ export default function CreateShipmentModal({
       "cartons",
       "hasInsurance",
       "insuranceValue",
+      "uninsuredAck",
     ],
     2: [
+      "senderType",
+      "principalName",
+      "principalPhone",
+      "principalRelationship",
+      "authorityConfirmed",
       "senderName",
       "senderPhone",
+      "senderAltPhone",
       "senderAddress",
       "receiverName",
       "receiverPhone",
+      "receiverAltPhone",
       "receiverAddress",
       "termsAccepted",
     ],
@@ -626,10 +715,23 @@ export default function CreateShipmentModal({
     serviceType: data.serviceType,
     isFragile: data.isFragile,
     requiresInsurance: data.hasInsurance,
-    insuranceValue: data.hasInsurance ? (data.insuranceValue ?? 0) : 0,
+    // [V1 Feature 2] Value of items being sent is always captured now,
+    // whether or not insurance is selected.
+    insuranceValue: data.insuranceValue ?? 0,
     pickupDate: formatPickupDate(data.pickupDate),
     notes: data.note ?? "",
     promoCode: data.promoCode || undefined,
+    // [V1 launch scope]
+    shipmentMode: data.shipmentMode,
+    senderType: data.senderType,
+    principalName: data.senderType === "ON_BEHALF_OF" ? data.principalName : undefined,
+    principalPhone: data.senderType === "ON_BEHALF_OF" ? data.principalPhone : undefined,
+    principalEmail: data.senderType === "ON_BEHALF_OF" ? data.principalEmail ?? undefined : undefined,
+    principalRelationship: data.senderType === "ON_BEHALF_OF" ? data.principalRelationship : undefined,
+    authorityConfirmed: data.senderType === "ON_BEHALF_OF" ? !!data.authorityConfirmed : undefined,
+    senderAltPhone: data.senderAltPhone || undefined,
+    recipientAltPhone: data.receiverAltPhone,
+    uninsuredAck: !data.hasInsurance ? !!data.uninsuredAck : undefined,
     ...(persistedQuoteId ? { quoteId: persistedQuoteId } : {}),
   });
 
@@ -710,7 +812,11 @@ export default function CreateShipmentModal({
             heightCm: vals.height ?? 0,
             boxDimensionId: vals.boxSize ?? undefined,
             serviceType: vals.serviceType,
+            // [V1 Feature 1] Required by the backend now.
+            shipmentMode: vals.shipmentMode,
             insuranceSelected: vals.hasInsurance,
+            // [V1 Feature 2] Always sent now — required regardless of the
+            // insurance toggle.
             declaredValue: vals.insuranceValue ?? 0,
             promoCode: vals.promoCode || undefined,
             termsAccepted: true,
@@ -780,6 +886,7 @@ export default function CreateShipmentModal({
     useGetDimensionsQuery({});
   const selectedBoxId = useWatch({ control, name: "boxSize" });
   const hasInsurance = useWatch({ control, name: "hasInsurance" });
+  const senderType = useWatch({ control, name: "senderType" });
 
   // Live zone lookup — fires whenever both cities are selected (including same city = Zone 1)
   const watchedPickupDate = useWatch({ control, name: "pickupDate" });
@@ -1027,6 +1134,43 @@ export default function CreateShipmentModal({
                   )}
                 </div>
 
+                {/* ── [V1 Feature 1] MODE OF SHIPMENT ── */}
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">
+                    Mode of Shipment
+                  </p>
+                  <Controller
+                    name="shipmentMode"
+                    control={control}
+                    render={({ field }) => (
+                      <RadioGroupCard
+                        label=""
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        className="flex flex-row gap-2"
+                        options={[
+                          { label: "Air", description: "Fastest, higher cost", value: "AIR" },
+                          { label: "Land", description: "Balanced speed & cost", value: "LAND" },
+                          { label: "Sea", description: "Slowest, lowest cost", value: "SEA" },
+                        ]}
+                      />
+                    )}
+                  />
+                  {errors.shipmentMode && (
+                    <p className="text-xs text-red-500 mt-1">
+                      {errors.shipmentMode.message}
+                    </p>
+                  )}
+                  {(getValues("shipmentMode") === "AIR" ||
+                    getValues("shipmentMode") === "SEA") && (
+                    <p className="text-xs text-amber-600 mt-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      Shipping batteries or other dangerous goods by{" "}
+                      {getValues("shipmentMode") === "AIR" ? "air" : "sea"}?
+                      Check our packaging guidelines before you continue.
+                    </p>
+                  )}
+                </div>
+
                 <div>
                   <div className="flex items-center justify-between mb-3 border-2 border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50/50">
                     <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">
@@ -1210,47 +1354,83 @@ export default function CreateShipmentModal({
                       <span className="text-xs text-gray-500">Insurance</span>
                     </label>
                   </div>
-                  {hasInsurance && (
-                    <div className="mt-3 space-y-2">
-                      <Input
-                        label="Declared Value of Goods (NGN)"
-                        type="number"
-                        min={1}
-                        placeholder="e.g. 500000"
-                        rightElement={
-                          <span className="text-xs font-medium text-gray-400">
-                            NGN
+                  {/* [V1 Feature 2] Value of items being sent — always shown
+                      and required now, insured or not. */}
+                  <div className="mt-3 space-y-2">
+                    <Input
+                      label="Value of Items Being Sent (NGN)"
+                      type="number"
+                      min={1}
+                      placeholder="e.g. 500000"
+                      rightElement={
+                        <span className="text-xs font-medium text-gray-400">
+                          NGN
+                        </span>
+                      }
+                      {...register("insuranceValue", { valueAsNumber: true })}
+                      error={errors.insuranceValue?.message}
+                    />
+                    {hasInsurance ? (
+                      <>
+                        {/* Read-only premium preview — user sees what they'll be charged */}
+                        {(getValues("insuranceValue") ?? 0) > 0 && (
+                          <div className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                            <span className="text-xs text-blue-600">
+                              Insurance premium ({insuranceRatePercent}% of
+                              declared value)
+                            </span>
+                            <span className="text-xs font-semibold text-blue-700">
+                              ₦
+                              {Math.max(
+                                100,
+                                Math.ceil(
+                                  (getValues("insuranceValue") ?? 0) * 0.025,
+                                ),
+                              ).toLocaleString()}
+                            </span>
+                          </div>
+                        )}
+                        <p className="text-[11px] text-gray-400">
+                          The insurance premium is calculated automatically at{" "}
+                          {insuranceRatePercent}% (min ₦
+                          {insuranceMinPremiumNaira.toLocaleString()}).
+                        </p>
+                      </>
+                    ) : (
+                      // [V1 Feature 7] Uninsured risk disclaimer.
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 space-y-2">
+                        <p className="text-xs text-amber-700">
+                          You have not selected insurance. If this shipment is
+                          lost or damaged, compensation is limited to the
+                          standard liability limit — even though you&apos;ve
+                          told us it&apos;s worth ₦
+                          {(getValues("insuranceValue") ?? 0).toLocaleString()}
+                          . Insurance for this shipment would cost ₦
+                          {Math.max(
+                            100,
+                            Math.ceil((getValues("insuranceValue") ?? 0) * 0.025),
+                          ).toLocaleString()}{" "}
+                          and covers the full declared value.
+                        </p>
+                        <label className="flex items-start gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            {...register("uninsuredAck")}
+                            className="w-4 h-4 mt-0.5 accent-gray-900 cursor-pointer"
+                          />
+                          <span className="text-xs text-amber-700">
+                            I understand the risk of shipping without
+                            insurance.
                           </span>
-                        }
-                        {...register("insuranceValue", { valueAsNumber: true })}
-                        error={errors.insuranceValue?.message}
-                      />
-                      {/* Read-only premium preview — user sees what they'll be charged */}
-                      {(getValues("insuranceValue") ?? 0) > 0 && (
-                        <div className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
-                          <span className="text-xs text-blue-600">
-                            Insurance premium ({insuranceRatePercent}% of
-                            declared value)
-                          </span>
-                          <span className="text-xs font-semibold text-blue-700">
-                            ₦
-                            {Math.max(
-                              100,
-                              Math.ceil(
-                                (getValues("insuranceValue") ?? 0) * 0.025,
-                              ),
-                            ).toLocaleString()}
-                          </span>
-                        </div>
-                      )}
-                      <p className="text-[11px] text-gray-400">
-                        Enter the total value of your goods. The insurance
-                        premium is calculated automatically at{" "}
-                        {insuranceRatePercent}% (min ₦
-                        {insuranceMinPremiumNaira.toLocaleString()}).
-                      </p>
-                    </div>
-                  )}
+                        </label>
+                        {errors.uninsuredAck && (
+                          <p className="text-xs text-red-500">
+                            {errors.uninsuredAck.message}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div>
@@ -1282,6 +1462,95 @@ export default function CreateShipmentModal({
             {/* ── STEP 2 ── */}
             {step === 2 && (
               <>
+                {/* ── [V1 Feature 3] SENDER TYPE ── */}
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">
+                    Who is sending this shipment?
+                  </p>
+                  <Controller
+                    name="senderType"
+                    control={control}
+                    render={({ field }) => (
+                      <RadioGroupCard
+                        label=""
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        className="flex flex-row gap-2"
+                        options={[
+                          { label: "Myself", description: "I am the sender", value: "MYSELF" },
+                          {
+                            label: "On behalf of someone",
+                            description: "e.g. a merchant or employer",
+                            value: "ON_BEHALF_OF",
+                          },
+                        ]}
+                      />
+                    )}
+                  />
+                  {senderType === "ON_BEHALF_OF" && (
+                    <div className="mt-3 space-y-3 bg-gray-50 border border-gray-200 rounded-xl p-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <Input
+                          label="Principal Name"
+                          placeholder="Who owns the goods"
+                          {...register("principalName")}
+                          error={errors.principalName?.message}
+                        />
+                        <Input
+                          label="Principal Phone"
+                          placeholder="+234 000 0000 000"
+                          {...register("principalPhone")}
+                          error={errors.principalPhone?.message}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Controller
+                          control={control}
+                          name="principalRelationship"
+                          render={({ field }) => (
+                            <SelectInput
+                              label="Relationship"
+                              options={[
+                                { label: "Customer", value: "CUSTOMER" },
+                                { label: "Merchant", value: "MERCHANT" },
+                                { label: "Employer", value: "EMPLOYER" },
+                                { label: "Other", value: "OTHER" },
+                              ]}
+                              placeholder="Select relationship"
+                              value={field.value as string}
+                              onValueChange={field.onChange}
+                              error={errors.principalRelationship?.message}
+                            />
+                          )}
+                        />
+                        <Input
+                          label="Principal Email (optional)"
+                          placeholder="name@example.com"
+                          {...register("principalEmail")}
+                          error={errors.principalEmail?.message}
+                        />
+                      </div>
+                      <label className="flex items-start gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          {...register("authorityConfirmed")}
+                          className="w-4 h-4 mt-0.5 accent-gray-900 cursor-pointer"
+                        />
+                        <span className="text-xs text-gray-600">
+                          I am authorised to send these items on their behalf.
+                        </span>
+                      </label>
+                      {errors.authorityConfirmed && (
+                        <p className="text-xs text-red-500">
+                          {errors.authorityConfirmed.message}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="h-px bg-gray-100" />
+
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">
                     Sender
@@ -1299,6 +1568,14 @@ export default function CreateShipmentModal({
                       placeholder="+234 000 0000 000"
                       {...register("senderPhone")}
                       error={errors.senderPhone?.message}
+                    />
+                  </div>
+                  <div className="mt-3">
+                    <Input
+                      label="Alternative Phone Number (optional)"
+                      placeholder="+234 000 0000 000 — a backup number if the main one can't be reached"
+                      {...register("senderAltPhone")}
+                      error={errors.senderAltPhone?.message}
                     />
                   </div>
                   <div className="mt-3">
@@ -1364,6 +1641,14 @@ export default function CreateShipmentModal({
                   </div>
                   <div className="mt-3">
                     <Input
+                      label="Recipient's Alternative Phone Number"
+                      placeholder="+234 000 0000 000 — required so drivers can always reach someone"
+                      {...register("receiverAltPhone")}
+                      error={errors.receiverAltPhone?.message}
+                    />
+                  </div>
+                  <div className="mt-3">
+                    <Input
                       label="Full Address"
                       placeholder="2, Ajalekoko Street, Ikopaje, Lagos"
                       leftIcon={<MapPin size={14} />}
@@ -1381,6 +1666,7 @@ export default function CreateShipmentModal({
                           disabled={true}
                           options={cityOptions}
                           placeholder="Auto-filled from Destination"
+
                           value={field.value as string}
                           onValueChange={(val) => {
                             field.onChange(val);
