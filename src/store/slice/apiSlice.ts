@@ -1335,7 +1335,7 @@ export const apiSlice = createApi({
 
     // useGetShipmentModesQuery — GET /admin/shipment-modes (public read)
     GetShipmentModes: builder.query<unknown, void>({
-      query: () => ({ url: "/admin/shipment-modes", method: "GET" }),
+      query: () => ({ url: "/shipment-modes", method: "GET" }),
       providesTags: ["ShipmentMode"],
     }),
     // useUpdateShipmentModeMutation
@@ -1428,7 +1428,7 @@ export const apiSlice = createApi({
 
     // ── Insurance disclaimer ────────────────────────────────────────────────
     GetInsuranceDisclaimer: builder.query<unknown, void>({
-      query: () => ({ url: "/admin/insurance-disclaimer", method: "GET" }),
+      query: () => ({ url: "/insurance-disclaimer", method: "GET" }),
       providesTags: ["InsuranceDisclaimer"],
     }),
     PublishInsuranceDisclaimer: builder.mutation<
