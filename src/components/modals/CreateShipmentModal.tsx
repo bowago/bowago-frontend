@@ -1025,7 +1025,9 @@ export default function CreateShipmentModal({
   // Delivery label for a (mode, service) at a zone. The delivery promise
   // depends on ALL THREE together — never a per-service guess. There is no
   // fallback table: if the exact zone + mode + service has no configured SLA,
-  // that is shown honestly rather than inventing a number.
+  // that is shown honestly rather than inventing a number. Worded distinctly
+  // from "Select both cities…" above, since by the time this runs the zone
+  // IS already known — what's missing is the admin-side SLA row for it.
   const getSLALabel = (serviceType: string, mode: string, zone?: number | null): string => {
     const svcKey = serviceType.toUpperCase();
     if (zone != null) {
@@ -1034,7 +1036,7 @@ export default function CreateShipmentModal({
       );
       if (match) return match.label ?? `${match.minDays}–${match.maxDays} business days`;
     }
-    return "Varies by zone";
+    return "Not yet available for this route";
   };
 
   return (
