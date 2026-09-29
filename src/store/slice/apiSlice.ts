@@ -2915,7 +2915,62 @@ export const apiSlice = createApi({
       },
     }),
 
-    // useGetNotificationsQuery — polls every 30s for real-time bell updates
+    // useImportZoneCitySheetMutation — POST /pricing/zone-city/import
+    // (multipart). Lighter counterpart to ImportPricingSheet — only touches
+    // Cities/Zone Matrix/Matrix by KM, never Price Bands or Dimensions.
+    // Accessible to Super Admin and any Role Admin with the "canManageRates"
+    // capability.
+    ImportZoneCitySheet: builder.mutation<any, FormData>({
+      query: (formData) => ({
+        url: "/pricing/zone-city/import",
+        method: "POST",
+        body: formData,
+        formData: true,
+      }),
+      invalidatesTags: ["Zone", "City"],
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data) successToast((data as { message?: string })?.message ?? "Zone & city data imported");
+        } catch (e: any) {
+          errorToast(getApiErrorMessage(e.error, "Import failed. Check the file format."));
+        }
+      },
+    }),
+
+    // useExportZoneCitySheetMutation — Rate Management capability: download
+    // just Cities/Zone Matrix/Matrix by KM/Coverage Gaps, in the SAME layout
+    // ExportPricingSheet uses — the two are interchangeable as import inputs.
+    ExportZoneCitySheet: builder.mutation<void, void>({
+      query: () => ({
+        url: "/pricing/zone-city/export",
+        method: "GET",
+        responseHandler: async (response) => {
+          if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw err;
+          }
+          return response.blob();
+        },
+        cache: "no-cache",
+      }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          const blob = (await queryFulfilled).data as unknown as Blob;
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `BowaGO-Zone-City-Export-${new Date().toISOString().slice(0, 10)}.xlsx`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+          successToast("Zone & city data exported");
+        } catch (error: any) {
+          errorToast(getApiErrorMessage(error, "Export failed"));
+        }
+      },
+    }),
     GetNotifications: builder.query<any, { page?: number } | void>({
       query: (params) => {
         const qs = params?.page ? `?page=${params.page}` : "";
@@ -3816,6 +3871,8 @@ export const {
   useDismissFailedWebhookMutation,
   useImportPricingSheetMutation,
   useExportPricingSheetMutation,
+  useImportZoneCitySheetMutation,
+  useExportZoneCitySheetMutation,
   useEditBoxDimensionMutation,
   useEditCityMutation,
   useEditZoneMutation,
