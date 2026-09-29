@@ -70,10 +70,14 @@ function EditCell({
     await deleteSLA({ id: sla.id }).unwrap();
   };
 
-  if (!editing) {
+  // The `key` on this component (set by the caller) forces a remount on
+  // every mode-tab switch, so `editing`'s initial state is always
+  // recomputed from the CURRENT `sla` — but render defensively anyway
+  // rather than assert `sla` is defined here.
+  if (!editing && sla) {
     return (
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium">{sla!.label ?? `${sla!.minDays}–${sla!.maxDays} days`}</span>
+        <span className="text-sm font-medium">{sla.label ?? `${sla.minDays}–${sla.maxDays} days`}</span>
         <button
           onClick={() => setEditing(true)}
           className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-blue-500 transition-colors"
@@ -230,7 +234,13 @@ export default function DeliverySLAManagementView() {
                   </td>
                   {SERVICE_TYPES.map((sType) => (
                     <td key={sType} className="px-5 py-4">
-                      <EditCell zone={zone} mode={mode} serviceType={sType} sla={getSLA(zone, sType)} />
+                      <EditCell
+                        key={`${mode}-${zone}-${sType}`}
+                        zone={zone}
+                        mode={mode}
+                        serviceType={sType}
+                        sla={getSLA(zone, sType)}
+                      />
                     </td>
                   ))}
                 </tr>
