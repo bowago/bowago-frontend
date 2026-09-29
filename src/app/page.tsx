@@ -49,7 +49,7 @@ export default function LandingPage() {
   const [weight, setWeight] = useState("");
   const [boxDimensionId, setBoxDimensionId] = useState("");
   const [boxQuantity, setBoxQuantity] = useState("1");
-  const [serviceType, setServiceType] = useState("STANDARD");
+  const [serviceType, setServiceType] = useState<"EXPRESS" | "STANDARD" | "ECONOMY">("STANDARD");
   // [V1 Feature 1] Mode of shipment — rates differ per mode.
   const [shipmentMode, setShipmentMode] = useState<"AIR" | "LAND" | "SEA">("LAND");
   // Only modes admin has left switched on are offered.
@@ -114,7 +114,7 @@ export default function LandingPage() {
         customHeight: isCustom ? parseFloat(customHeight) : undefined,
         serviceType,
         shipmentMode,
-      } as any).unwrap();
+      }).unwrap();
       setQuoteResult((result as any)?.data?.quote ?? (result as any)?.data);
     } catch {}
   };
@@ -471,7 +471,9 @@ export default function LandingPage() {
                     </label>
                     <select
                       value={serviceType}
-                      onChange={(e) => setServiceType(e.target.value)}
+                      onChange={(e) =>
+                        setServiceType(e.target.value as "EXPRESS" | "STANDARD" | "ECONOMY")
+                      }
                       className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-3 py-2.5 text-sm focus:border-brand/60 transition-all [&>option]:bg-gray-900"
                     >
                       <option value="STANDARD">Standard</option>
@@ -529,9 +531,7 @@ export default function LandingPage() {
                         {MODE_META[(quoteResult.shipmentMode ?? shipmentMode) as "AIR" | "LAND" | "SEA"]?.label} freight
                         {quoteResult.deliveryEstimate?.label
                           ? ` · ${quoteResult.deliveryEstimate.label}`
-                          : quoteResult.transitHours
-                            ? ` · ~${quoteResult.transitHours} hrs`
-                            : ""}
+                          : ""}
                       </p>
                     )}
                     {quoteResult.zone && (

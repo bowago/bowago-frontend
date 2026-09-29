@@ -234,10 +234,24 @@ export const contractRateSchema = yup.object({
     .min(3, "Label must be at least 3 characters")
     .required("Label is required"),
 
+  // Both scope fields are OPTIONAL — an empty value means "applies to all
+  // modes" / "applies to all services" respectively (an explicit scope, not
+  // a missing one). A fixed ₦/kg card is an absolute price and must still
+  // name its mode (an absolute figure isn't meaningful across air/land/sea).
+  shipmentMode: yup
+    .string()
+    .oneOf(["", "AIR", "LAND", "SEA"])
+    .when("pricingType", {
+      is: "fixed",
+      then: (schema) => schema.required("A fixed ₦/kg contract must specify a shipment mode").min(1, "A fixed ₦/kg contract must specify a shipment mode"),
+      otherwise: (schema) => schema.nullable().notRequired(),
+    }),
+
   serviceType: yup
     .string()
-    .oneOf(["STANDARD", "EXPRESS", "ECONOMY"])
-    .required("Service type is required"),
+    .oneOf(["", "STANDARD", "EXPRESS", "ECONOMY"])
+    .nullable()
+    .notRequired(),
 
   // ✅ NEW
   pricingType: yup

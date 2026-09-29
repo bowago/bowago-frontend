@@ -13,7 +13,7 @@ import {
   useEditPromoCodeMutation,
 } from "@/store/slice/apiSlice";
 import { PromoCodeFormData, promoCodeSchema } from "@/lib/validation";
-import { PromoCode } from "../table/columns/promo-code-column";
+import type { PromoCode } from "../table/columns/promo-code-column";
 
 export default function AddPromoCodeModal({
   isOpen,
@@ -47,6 +47,7 @@ export default function AddPromoCodeModal({
       discountPercent: "",
       flatDiscount: "",
       serviceType: "",
+      shipmentMode: "",
       minOrderAmount: "",
       maxUses: "",
       validFrom: "",
@@ -73,6 +74,7 @@ export default function AddPromoCodeModal({
         discountPercent: editingPromo.discountPercent ?? "",
         flatDiscount: editingPromo.flatDiscount ?? "",
         serviceType: editingPromo.serviceType ?? "",
+        shipmentMode: editingPromo.shipmentMode ?? "",
         minOrderAmount: editingPromo.minOrderAmount ?? "",
         maxUses: editingPromo.maxUses ?? "",
         validFrom: toDateInput(editingPromo.validFrom),
@@ -87,6 +89,7 @@ export default function AddPromoCodeModal({
         discountPercent: "",
         flatDiscount: "",
         serviceType: "",
+        shipmentMode: "",
         minOrderAmount: "",
         maxUses: "",
         validFrom: "",
@@ -113,8 +116,9 @@ export default function AddPromoCodeModal({
     } else {
       payload.discountPercent = null;
     }
-    // serviceType "" means "all services" — send null, not empty string
+    // "" means "applies to all modes/services" — send null, not empty string
     payload.serviceType = data.serviceType || null;
+    payload.shipmentMode = data.shipmentMode || null;
 
     if (isEdit && editingPromo) {
       handleEditPromo({ id: editingPromo.id, ...payload })
@@ -181,7 +185,7 @@ export default function AddPromoCodeModal({
                 </div>
 
                 {/* SERVICE TYPE */}
-                <div className="col-span-2">
+                <div>
                   <Controller
                     control={control}
                     name="serviceType"
@@ -198,6 +202,29 @@ export default function AddPromoCodeModal({
                         value={field.value ?? ""}
                         onValueChange={field.onChange}
                         error={errors.serviceType?.message as string}
+                      />
+                    )}
+                  />
+                </div>
+
+                {/* SHIPMENT MODE — independent of service; empty = all modes */}
+                <div>
+                  <Controller
+                    control={control}
+                    name="shipmentMode"
+                    render={({ field }) => (
+                      <SelectInput
+                        label="Shipment Mode"
+                        placeholder="All Modes"
+                        options={[
+                          { label: "All Modes", value: "" },
+                          { label: "Air", value: "AIR" },
+                          { label: "Land", value: "LAND" },
+                          { label: "Sea", value: "SEA" },
+                        ]}
+                        value={field.value ?? ""}
+                        onValueChange={field.onChange}
+                        error={errors.shipmentMode?.message as string}
                       />
                     )}
                   />

@@ -4,22 +4,9 @@ import { Dialog, DialogContent } from "@/components/ui/dialog/dialog";
 import { useDeletePromoCodeMutation } from "@/store/slice/apiSlice";
 import { ColumnDef } from "@tanstack/react-table";
 import { useState } from "react";
+import type { PromoCode as CanonicalPromoCode } from "@/store/slice/types";
 
-export type PromoCode = {
-  id: string;
-  code: string;
-  description: string | null;
-  discountPercent: number | null;
-  flatDiscount: number | null;
-  minOrderAmount: number | null;
-  maxUses: number | null;
-  usedCount: number;
-  isActive: boolean;
-  validFrom: string | null;
-  validUntil: string | null;
-  serviceType: "STANDARD" | "EXPRESS" | "ECONOMY" | null;
-  _count?: { redemptions: number };
-};
+export type PromoCode = CanonicalPromoCode & { usedCount: number; _count?: { redemptions: number } };
 
 export const PromoCodeColumns: ColumnDef<PromoCode>[] = [
   {
@@ -61,15 +48,20 @@ export const PromoCodeColumns: ColumnDef<PromoCode>[] = [
     },
   },
 
-  // 🚚 Service Type
+  // ✈️🚚🚢 Scope — mode and service are independent; null in either means
+  // "all" for that dimension.
   {
-    accessorKey: "serviceType",
-    header: "Service",
-    cell: ({ row }) => (
-      <span className="capitalize text-sm">
-        {row.original.serviceType ? row.original.serviceType.toLowerCase() : "All"}
-      </span>
-    ),
+    id: "scope",
+    header: "Scope",
+    cell: ({ row }) => {
+      const { shipmentMode, serviceType } = row.original;
+      return (
+        <div className="text-xs">
+          <div className="font-medium capitalize">{shipmentMode ? shipmentMode.toLowerCase() : "All modes"}</div>
+          <div className="text-gray-400 capitalize">{serviceType ? serviceType.toLowerCase() : "All services"}</div>
+        </div>
+      );
+    },
   },
 
   // 📦 Min Order

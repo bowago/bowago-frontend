@@ -5,14 +5,16 @@ import { useGetContractRateQuery } from "@/store/slice/apiSlice";
 import { Filter, X } from "lucide-react";
 import { useState } from "react";
 import AddContractRateModal from "../modals/AddContractRateModal";
-import { ContractRateColumns } from "../table/columns/contract-rate-column";
+import { ContractRateColumns, type ContractRate } from "../table/columns/contract-rate-column";
 
 const SERVICE_TYPES = ["EXPRESS", "STANDARD", "ECONOMY"];
+const SHIPMENT_MODES = ["AIR", "LAND", "SEA"];
 
 export default function ContractRateManagementView() {
   const [filters, setFilters] = useState({
     search: "",
     serviceType: "",
+    shipmentMode: "",
     isActive: "",
     validFrom: "",
     validUntil: "",
@@ -24,11 +26,12 @@ export default function ContractRateManagementView() {
     isActive: applied.isActive ? applied.isActive === "true" : undefined,
   } as any);
 
-  const rates: any[] = data?.data?.rates ?? [];
+  const rates: ContractRate[] = data?.data?.rates ?? [];
 
-  // Client-side filter for serviceType and date range
+  // Client-side filter for scope (mode/service) and date range
   const filtered = rates.filter((r) => {
     if (applied.serviceType && r.serviceType !== applied.serviceType) return false;
+    if (applied.shipmentMode && r.shipmentMode !== applied.shipmentMode) return false;
     if (applied.validFrom && r.validFrom && new Date(r.validFrom) < new Date(applied.validFrom)) return false;
     if (applied.validUntil && r.validUntil && new Date(r.validUntil) > new Date(applied.validUntil)) return false;
     return true;
@@ -39,7 +42,7 @@ export default function ContractRateManagementView() {
 
   const applyFilters = () => setApplied(filters);
   const clearFilters = () => {
-    const empty = { search: "", serviceType: "", isActive: "", validFrom: "", validUntil: "" };
+    const empty = { search: "", serviceType: "", shipmentMode: "", isActive: "", validFrom: "", validUntil: "" };
     setFilters(empty);
     setApplied(empty);
   };
@@ -49,6 +52,7 @@ export default function ContractRateManagementView() {
   const labelMap: Record<string, (v: string) => string> = {
     search: (v) => `Search: "${v}"`,
     serviceType: (v) => `Service: ${v}`,
+    shipmentMode: (v) => `Mode: ${v}`,
     isActive: (v) => (v === "true" ? "Active" : "Inactive"),
     validFrom: (v) => `Valid From: ${v}`,
     validUntil: (v) => `Valid Until: ${v}`,
@@ -74,6 +78,17 @@ export default function ContractRateManagementView() {
           <option value="">All Services</option>
           {SERVICE_TYPES.map((s) => (
             <option key={s} value={s}>{s.charAt(0) + s.slice(1).toLowerCase()}</option>
+          ))}
+        </select>
+
+        <select
+          value={filters.shipmentMode}
+          onChange={(e) => set("shipmentMode", e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="">All Modes</option>
+          {SHIPMENT_MODES.map((m) => (
+            <option key={m} value={m}>{m.charAt(0) + m.slice(1).toLowerCase()}</option>
           ))}
         </select>
 

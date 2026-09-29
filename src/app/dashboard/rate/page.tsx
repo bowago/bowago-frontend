@@ -5,6 +5,7 @@ import ContractRateManagementView from "@/components/layout/ContractRateManageme
 import PromoCodeManagementView from "@/components/layout/PromoCodeManagementView";
 import StandardRateManagementView from "@/components/layout/StandardRateManagementView";
 import DeliverySLAManagementView from "@/components/layout/DeliverySLAManagementView";
+import OfferingManagementView from "@/components/layout/OfferingManagementView";
 import CreateRateModal, { RateType } from "@/components/modals/CreateRateModal";
 import ImportPricingModal from "@/components/modals/ImportPricingModal";
 import { Button } from "@/components/ui/button";
@@ -135,6 +136,7 @@ export default function ShipmentsPage() {
           <TabsTrigger value="contract">Contract Rate</TabsTrigger>
           <TabsTrigger value="promo">Promo Code</TabsTrigger>
           <TabsTrigger value="delivery-sla">Delivery SLA</TabsTrigger>
+          <TabsTrigger value="offerings">Offerings</TabsTrigger>
         </TabsList>
         <div className="mt-5">
           <TabsContent value="standard" className="w-full flex flex-col gap-6">
@@ -148,6 +150,9 @@ export default function ShipmentsPage() {
           </TabsContent>
           <TabsContent value="delivery-sla" className="w-full">
             <DeliverySLAManagementView />
+          </TabsContent>
+          <TabsContent value="offerings" className="w-full">
+            <OfferingManagementView />
           </TabsContent>
         </div>
       </Tabs>

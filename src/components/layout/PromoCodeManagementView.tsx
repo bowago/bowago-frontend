@@ -5,13 +5,16 @@ import { useGetPromoCodesQuery } from "@/store/slice/apiSlice";
 import { Filter, X } from "lucide-react";
 import { useState } from "react";
 import { PromoCodeColumns } from "../table/columns/promo-code-column";
+import type { PromoCode } from "@/store/slice/types";
 
 const SERVICE_TYPES = ["EXPRESS", "STANDARD", "ECONOMY"];
+const SHIPMENT_MODES = ["AIR", "LAND", "SEA"];
 
 export default function PromoCodeManagementView() {
   const [filters, setFilters] = useState({
     search: "",
     serviceType: "",
+    shipmentMode: "",
     isActive: "",
   });
   const [applied, setApplied] = useState(filters);
@@ -21,12 +24,13 @@ export default function PromoCodeManagementView() {
     isActive: applied.isActive ? applied.isActive === "true" : undefined,
   } as any);
 
-  const promoCodes: any[] = data?.data?.promoCodes ?? [];
+  const promoCodes: PromoCode[] = data?.data?.promoCodes ?? [];
 
-  // Client-side filter for serviceType (backend list endpoint doesn't take
-  // this param — it's a small admin list, filtering client-side is fine)
+  // Client-side filter for scope (backend list endpoint doesn't take these
+  // params — it's a small admin list, filtering client-side is fine)
   const filtered = promoCodes.filter((p) => {
     if (applied.serviceType && p.serviceType !== applied.serviceType) return false;
+    if (applied.shipmentMode && p.shipmentMode !== applied.shipmentMode) return false;
     return true;
   });
 
@@ -35,7 +39,7 @@ export default function PromoCodeManagementView() {
 
   const applyFilters = () => setApplied(filters);
   const clearFilters = () => {
-    const empty = { search: "", serviceType: "", isActive: "" };
+    const empty = { search: "", serviceType: "", shipmentMode: "", isActive: "" };
     setFilters(empty);
     setApplied(empty);
   };
@@ -45,6 +49,7 @@ export default function PromoCodeManagementView() {
   const labelMap: Record<string, (v: string) => string> = {
     search: (v) => `Search: "${v}"`,
     serviceType: (v) => `Service: ${v}`,
+    shipmentMode: (v) => `Mode: ${v}`,
     isActive: (v) => (v === "true" ? "Active" : "Inactive"),
   };
 
@@ -68,6 +73,17 @@ export default function PromoCodeManagementView() {
           <option value="">All Services</option>
           {SERVICE_TYPES.map((s) => (
             <option key={s} value={s}>{s.charAt(0) + s.slice(1).toLowerCase()}</option>
+          ))}
+        </select>
+
+        <select
+          value={filters.shipmentMode}
+          onChange={(e) => set("shipmentMode", e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="">All Modes</option>
+          {SHIPMENT_MODES.map((m) => (
+            <option key={m} value={m}>{m.charAt(0) + m.slice(1).toLowerCase()}</option>
           ))}
         </select>
 

@@ -357,6 +357,18 @@ export const promoCodeSchema = yup
       .nullable()
       .notRequired(),
 
+    // Empty means "applies to all modes" — an explicit scope, not a missing
+    // one. Independent of serviceType: a promo can be mode-scoped only,
+    // service-scoped only, both, or neither.
+    shipmentMode: yup
+      .string()
+      .transform((value, originalValue) =>
+        originalValue === "" ? null : value,
+      )
+      .oneOf(["AIR", "LAND", "SEA"])
+      .nullable()
+      .notRequired(),
+
     minOrderAmount: yup
       .number()
       .transform((value, originalValue) =>

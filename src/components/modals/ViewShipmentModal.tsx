@@ -12,7 +12,7 @@ import {
 } from "@/store/slice/apiSlice";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
-import { SERVICE_DELIVERY_MAP, SERVICE_OPTIONS } from "./CreateShipmentModal";
+import { SERVICE_OPTIONS } from "./CreateShipmentModal";
 import { CancelWithRefundPreview } from "./CancelWithRefundPreview";
 import { X, UserCheck, Loader2, Maximize2 } from "lucide-react";
 
@@ -53,12 +53,10 @@ export const PAST_CUTOFF_STATUSES = ["IN_TRANSIT", "OUT_FOR_DELIVERY"];
 function ReviewStep({ data }: { data: { shipment?: any; quote?: any } }) {
   const shipment = data.shipment;
   const service = shipment?.serviceType ?? "STANDARD";
-  // Prefer the real zone+service-aware estimate (see CreateShipmentModal.tsx
-  // for the full explanation) — falls back to the static map only if the
-  // linked quote doesn't have one (e.g. a very old shipment booked before
-  // this existed).
-  const deliveryTime =
-    data.quote?.deliveryEstimate?.label ?? SERVICE_DELIVERY_MAP[service] ?? "—";
+  // The delivery promise depends on zone + mode + service together and is
+  // always resolved server-side. A very old shipment booked before this
+  // existed simply has none — shown honestly rather than guessed.
+  const deliveryTime = data.quote?.deliveryEstimate?.label ?? "—";
   const serviceLabel =
     SERVICE_OPTIONS.find((s) => s.value === service)?.label ?? service;
 

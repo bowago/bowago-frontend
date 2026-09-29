@@ -5,14 +5,8 @@ import {
   useGetShipmentModesQuery,
   useUpdateShipmentModeMutation,
 } from "@/store/slice/apiSlice";
+import type { ShipmentModeSetting } from "@/store/slice/types";
 import { Loader2, Pencil, Check, X, Plane, Truck, Ship } from "lucide-react";
-
-type ModeSetting = {
-  mode: "AIR" | "LAND" | "SEA";
-  volumetricDivisor: number;
-  transitHoursDefault: number | null;
-  isActive: boolean;
-};
 
 const MODE_META: Record<
   string,
@@ -38,10 +32,11 @@ const MODE_META: Record<
   },
 };
 
-function EditRow({ setting }: { setting: ModeSetting }) {
+function EditRow({ setting }: { setting: ShipmentModeSetting }) {
   const [editing, setEditing] = useState(false);
   const [divisor, setDivisor] = useState(setting.volumetricDivisor);
-  const [transitHours, setTransitHours] = useState(setting.transitHoursDefault ?? 0);
+  const [maxWeightKg, setMaxWeightKg] = useState(setting.maxWeightKg ?? 0);
+  const [maxLongestSideCm, setMaxLongestSideCm] = useState(setting.maxLongestSideCm ?? 0);
   const [updateMode, { isLoading }] = useUpdateShipmentModeMutation();
 
   const save = async () => {
@@ -49,9 +44,17 @@ function EditRow({ setting }: { setting: ModeSetting }) {
     await updateMode({
       mode: setting.mode,
       volumetricDivisor: divisor,
-      transitHoursDefault: transitHours || null,
+      maxWeightKg: maxWeightKg > 0 ? maxWeightKg : null,
+      maxLongestSideCm: maxLongestSideCm > 0 ? maxLongestSideCm : null,
     }).unwrap();
     setEditing(false);
+  };
+
+  const cancel = () => {
+    setEditing(false);
+    setDivisor(setting.volumetricDivisor);
+    setMaxWeightKg(setting.maxWeightKg ?? 0);
+    setMaxLongestSideCm(setting.maxLongestSideCm ?? 0);
   };
 
   const toggleActive = async () => {
@@ -94,19 +97,35 @@ function EditRow({ setting }: { setting: ModeSetting }) {
       </td>
       <td className="px-5 py-4">
         {editing ? (
-          <div className="flex items-center gap-1.5">
-            <input
-              type="number"
-              min={0}
-              value={transitHours}
-              onChange={(e) => setTransitHours(Number(e.target.value))}
-              className="w-20 border rounded-lg px-2 py-1 text-xs text-center"
-            />
-            <span className="text-xs text-gray-400">hrs</span>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                min={0}
+                value={maxWeightKg}
+                onChange={(e) => setMaxWeightKg(Number(e.target.value))}
+                className="w-20 border rounded-lg px-2 py-1 text-xs text-center"
+                placeholder="No limit"
+              />
+              <span className="text-xs text-gray-400">kg max</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                min={0}
+                value={maxLongestSideCm}
+                onChange={(e) => setMaxLongestSideCm(Number(e.target.value))}
+                className="w-20 border rounded-lg px-2 py-1 text-xs text-center"
+                placeholder="No limit"
+              />
+              <span className="text-xs text-gray-400">cm longest side</span>
+            </div>
           </div>
         ) : (
           <span className="text-sm text-gray-700">
-            {setting.transitHoursDefault ? `${setting.transitHoursDefault} hrs` : "—"}
+            {setting.maxWeightKg ? `${setting.maxWeightKg}kg` : "No weight limit"}
+            {" · "}
+            {setting.maxLongestSideCm ? `${setting.maxLongestSideCm}cm` : "No size limit"}
           </span>
         )}
       </td>
@@ -139,11 +158,7 @@ function EditRow({ setting }: { setting: ModeSetting }) {
               )}
             </button>
             <button
-              onClick={() => {
-                setEditing(false);
-                setDivisor(setting.volumetricDivisor);
-                setTransitHours(setting.transitHoursDefault ?? 0);
-              }}
+              onClick={cancel}
               className="p-1 rounded bg-red-50 hover:bg-red-100 text-red-500"
             >
               <X className="w-3.5 h-3.5" />
@@ -163,12 +178,15 @@ function EditRow({ setting }: { setting: ModeSetting }) {
   );
 }
 
-// [V1 Feature 1] Admin screen for per-mode volumetric divisor, default
-// transit hours, and whether a mode is offered at all — mirrors
-// DeliverySLAManagementView.tsx's inline-edit pattern.
+// [V1 Feature 1] Admin screen for per-mode PHYSICAL settings — volumetric
+// divisor, weight/size limits, and whether a mode is offered at all. This is
+// NOT where delivery times are set: a mode has no delivery promise of its
+// own (that depends on the zone and service too) — see Delivery SLA
+// Management for that. Mirrors DeliverySLAManagementView.tsx's inline-edit
+// pattern.
 export default function ShipmentModeSettingsView() {
   const { data, isLoading } = useGetShipmentModesQuery();
-  const modes: ModeSetting[] = (data as any)?.data?.modes ?? [];
+  const modes: ShipmentModeSetting[] = data?.data?.modes ?? [];
 
   if (isLoading) {
     return (
@@ -185,9 +203,11 @@ export default function ShipmentModeSettingsView() {
           Shipment Mode Settings
         </h3>
         <p className="text-sm text-gray-500 mt-1">
-          Configure the volumetric weight divisor and default transit time for
+          Configure the volumetric weight divisor and weight/size limits for
           each mode of shipment. Turning a mode off hides it from the quote
           form entirely — it won&apos;t 404, it just won&apos;t be offered.
+          Delivery times are configured per zone under Delivery SLA
+          Management, not here.
         </p>
       </div>
 
@@ -200,7 +220,7 @@ export default function ShipmentModeSettingsView() {
                 Volumetric Divisor
               </th>
               <th className="text-left px-5 py-3 font-semibold text-gray-700">
-                Default Transit Time
+                Weight & Size Limits
               </th>
               <th className="text-left px-5 py-3 font-semibold text-gray-700">Status</th>
               <th className="text-left px-5 py-3 font-semibold text-gray-700 w-16">

@@ -11,3 +11,4 @@ export type CustomError = {
 };
 export * from "./auth.types";
 export * from "./setting.types";
+export * from "./pricing.types";

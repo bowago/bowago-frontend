@@ -218,11 +218,18 @@ type AppliedDiscount = {
 
 type QuoteSummary = {
   total?: number;
-  totalSurcharge?: number;
+  // Explicit components straight from the pricing engine — never reconstruct
+  // a subtotal by subtracting a "totalSurcharge" catch-all from the total
+  // (that used to fold ad-hoc charges, insurance and tax in under the name
+  // "surcharge", so the arithmetic only worked by coincidence).
+  finalBasePrice?: number;
+  surchargeTotal?: number;
+  adhocTotal?: number;
+  insurancePremium?: number;
+  tax?: number;
   distanceKm?: number;
   fromCity?: { name?: string };
   toCity?: { name?: string };
-  breakdown?: { subtotal?: number };
   surchargeBreakdown?: SurchargeItem[];
   pricingMode?: string;
   appliedDiscount?: AppliedDiscount | null;
@@ -261,29 +268,27 @@ type PaymentResponse = {
   };
 };
 
+// Descriptions are deliberately generic — the actual delivery promise depends
+// on the mode and zone too, and is resolved server-side per exact product
+// (see deliveryEstimate on the quote). A fixed day range here would be wrong
+// for most mode/zone combinations.
 export const SERVICE_OPTIONS = [
   {
     label: "Express",
-    description: "1–4 business days (by zone)",
+    description: "Fastest option",
     value: "EXPRESS",
   },
   {
     label: "Standard",
-    description: "2–7 business days (by zone)",
+    description: "Balanced speed & cost",
     value: "STANDARD",
   },
   {
     label: "Economy",
-    description: "4–14 business days (by zone)",
+    description: "Most economical",
     value: "ECONOMY",
   },
 ];
-
-export const SERVICE_DELIVERY_MAP: Record<string, string> = {
-  EXPRESS: "1–3 days",
-  STANDARD: "5–7 days",
-  ECONOMY: "10–14 days",
-};
 
 // ─── Step Indicator ───────────────────────────────────────────────────────────
 
@@ -362,14 +367,10 @@ function ReviewStep({
   const quote = data.quote;
 
   const service = shipment?.serviceType ?? "STANDARD";
-  // Prefer the real zone+service-aware estimate the backend now computes
-  // (pricing.service.js#getDeliveryEstimate) — the static map is only a
-  // fallback for the brief moment before any quote has been generated, so
-  // this screen isn't blank. Previously this static map was the ONLY
-  // source, so e.g. an intra-city Abuja→Abuja shipment showed the same
-  // "1-3 days" as a genuinely cross-country one.
-  const deliveryTime =
-    quote?.deliveryEstimate?.label ?? SERVICE_DELIVERY_MAP[service] ?? "—";
+  // The delivery promise depends on zone + mode + service together and is
+  // always resolved server-side (never a static per-service guess) — shown
+  // only once the server actually has one for this exact product and route.
+  const deliveryTime = quote?.deliveryEstimate?.label ?? "—";
   const serviceLabel =
     SERVICE_OPTIONS.find((s) => s.value === service)?.label ?? service;
 
@@ -386,10 +387,9 @@ function ReviewStep({
       </div>
     ));
 
-  // ── FIX: guard both total and totalSurcharge before arithmetic ──
   const total = quote?.total ?? 0;
-  const totalSurcharge = quote?.totalSurcharge ?? 0;
-  const subtotal = total - totalSurcharge;
+  // The base price, straight from the engine — not derived from the total.
+  const subtotal = quote?.finalBasePrice ?? 0;
 
   return (
     <div>
@@ -999,29 +999,6 @@ export default function CreateShipmentModal({
   const liveZone: number | null =
     zoneRouteData?.data?.matrix?.[0]?.zone ?? null;
 
-  // Hardcoded SLA fallback — used when DB seed hasn't run yet or SLA table is empty.
-  // Mirrors the values in seed.js exactly.
-  const SLA_FALLBACK: Record<string, Record<string, string>> = {
-    EXPRESS: {
-      "1": "Same day – next day",
-      "2": "1–2 business days",
-      "3": "2–3 business days",
-      "4": "3–5 business days",
-    },
-    STANDARD: {
-      "1": "1–2 business days",
-      "2": "2–4 business days",
-      "3": "3–5 business days",
-      "4": "5–7 business days",
-    },
-    ECONOMY: {
-      "1": "2–4 business days",
-      "2": "4–7 business days",
-      "3": "5–10 business days",
-      "4": "7–14 business days",
-    },
-  };
-
   const cities = useMemo(
     () => (citiesData?.data?.cities ?? []) as CityOption[],
     [citiesData?.data?.cities],
@@ -1045,32 +1022,19 @@ export default function CreateShipmentModal({
   const maxWidth = selectedBox?.widthCm || 0;
   const maxTons = maxWeight / 1000;
 
-  // Get delivery label for a service type based on SLA table.
-  // zone is optional — derived from the zone matrix API when both cities are selected.
-  const getSLALabel = (serviceType: string, zone?: number | null): string => {
+  // Delivery label for a (mode, service) at a zone. The delivery promise
+  // depends on ALL THREE together — never a per-service guess. There is no
+  // fallback table: if the exact zone + mode + service has no configured SLA,
+  // that is shown honestly rather than inventing a number.
+  const getSLALabel = (serviceType: string, mode: string, zone?: number | null): string => {
     const svcKey = serviceType.toUpperCase();
     if (zone != null) {
-      // 1. Try live SLA data from DB
-      if (slas.length > 0) {
-        const match = slas.find(
-          (s: any) => s.zone === zone && s.serviceType === svcKey,
-        );
-        if (match)
-          return (
-            match.label ?? `${match.minDays}–${match.maxDays} business days`
-          );
-      }
-      // 2. Fallback to hardcoded table (covers case where seed hasn't run)
-      const fallback = SLA_FALLBACK[svcKey]?.[String(zone)];
-      if (fallback) return fallback;
+      const match = slas.find(
+        (s: any) => s.zone === zone && s.shipmentMode === mode && s.serviceType === svcKey,
+      );
+      if (match) return match.label ?? `${match.minDays}–${match.maxDays} business days`;
     }
-    // 3. Generic placeholder when zone not yet known
-    const generic: Record<string, string> = {
-      EXPRESS: "1–4 business days (by zone)",
-      STANDARD: "2–7 business days (by zone)",
-      ECONOMY: "4–14 business days (by zone)",
-    };
-    return generic[svcKey] ?? "Varies by zone";
+    return "Varies by zone";
   };
 
   return (
@@ -1204,21 +1168,21 @@ export default function CreateShipmentModal({
                           {
                             label: "Express",
                             description: canLookupZone
-                              ? getSLALabel("EXPRESS", liveZone)
+                              ? getSLALabel("EXPRESS", watchedMode, liveZone)
                               : "Fastest delivery",
                             value: "EXPRESS",
                           },
                           {
                             label: "Standard",
                             description: canLookupZone
-                              ? getSLALabel("STANDARD", liveZone)
+                              ? getSLALabel("STANDARD", watchedMode, liveZone)
                               : "Balanced speed & cost",
                             value: "STANDARD",
                           },
                           {
                             label: "Economy",
                             description: canLookupZone
-                              ? getSLALabel("ECONOMY", liveZone)
+                              ? getSLALabel("ECONOMY", watchedMode, liveZone)
                               : "Most affordable",
                             value: "ECONOMY",
                           },

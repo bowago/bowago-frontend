@@ -177,17 +177,17 @@ export default function AddStandardRateModal({
                         options={[
                           {
                             label: "Express",
-                            description: "1–3 business days",
+                            description: "Fastest option",
                             value: "EXPRESS",
                           },
                           {
                             label: "Standard",
-                            description: "5–7 business days",
+                            description: "Balanced speed & cost",
                             value: "STANDARD",
                           },
                           {
                             label: "Economy",
-                            description: "10–14 business days",
+                            description: "Most economical",
                             value: "ECONOMY",
                           },
                         ]}

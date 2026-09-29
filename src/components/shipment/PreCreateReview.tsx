@@ -43,9 +43,10 @@ export type PersistedQuote = {
   quoteId?: string;
   expiresAt?: string;
   shipmentMode?: string;
-  transitHours?: number | null;
   distanceKm?: number;
-  deliveryEstimate?: { label?: string } | null;
+  // The one source of truth for the delivery promise — resolved server-side
+  // from zone + mode + service. Never reconstructed on the client.
+  deliveryEstimate?: { minDays?: number; maxDays?: number; label?: string } | null;
   billableWeightKg?: number;
   pricing?: {
     basePriceNaira?: number;
@@ -112,9 +113,7 @@ export default function PreCreateReview({
   const declared = values.insuranceValue ?? 0;
   const onBehalf = values.senderType === "ON_BEHALF_OF";
 
-  const deliveryTime =
-    quote?.deliveryEstimate?.label ??
-    (quote?.transitHours ? `~${quote.transitHours} hrs` : meta?.transitFallback ?? "—");
+  const deliveryTime = quote?.deliveryEstimate?.label ?? "—";
 
   const mins = secondsLeft !== null ? Math.floor(secondsLeft / 60) : null;
   const secs = secondsLeft !== null ? String(secondsLeft % 60).padStart(2, "0") : null;

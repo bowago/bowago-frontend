@@ -4,17 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog/dialog";
 import { useDeleteSurchargeMutation } from "@/store/slice/apiSlice";
 import AddSurchargeModal from "@/components/modals/AddSurchargeModal";
+import type { Surcharge } from "@/store/slice/types";
 
-export type Surcharge = {
-  id: string;
-  type: "FUEL" | "REMOTE_AREA" | "VAT" | "FRAGILE" | "INSURANCE" | "OVERSIZE";
-  label: string;
-  description?: string;
-  ratePercent?: number;
-  flatAmount?: number;
-  appliesTo: "ALL" | "ZONE" | "SERVICE";
-  isActive: boolean;
-};
+// Re-exported for existing imports; the canonical shape now lives in
+// store/slice/types/pricing.types.ts (appliesTo is a comma-list of tokens —
+// e.g. "ALL", "AIR", "STANDARD,ECONOMY" — not a single ALL/ZONE/SERVICE category).
+export type { Surcharge };
 
 export const SurchargeColumns: ColumnDef<Surcharge>[] = [
   {

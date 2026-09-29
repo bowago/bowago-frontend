@@ -18,6 +18,27 @@ import {
   IResetPassword,
   ISignup,
   IUpdateEmployee,
+  GetOfferingsRequest,
+  GetOfferingsResponse,
+  GenerateQuoteRequest,
+  GenerateQuoteResponse,
+  DeliverySLARow,
+  UpsertDeliverySLARequest,
+  ShipmentModeSetting,
+  UpdateShipmentModeRequest,
+  ServiceOffering,
+  CreateOfferingRequest,
+  UpdateOfferingRequest,
+  AddOfferingLaneRequest,
+  RateWarning,
+  ContractRate,
+  CreateContractRateRequest,
+  UpdateContractRateRequest,
+  PromoCode,
+  CreatePromoCodeRequest,
+  UpdatePromoCodeRequest,
+  Surcharge,
+  OfferingCoverageRow,
 } from "./types";
 import { RootState } from "../store";
 import {
@@ -183,6 +204,7 @@ export const apiSlice = createApi({
     "AdhocChargeRule",
     "AdhocSuggestion",
     "InsuranceDisclaimer",
+    "Offering",
   ],
   baseQuery: baseQueryWithReauth,
   endpoints: (builder) => ({
@@ -496,6 +518,10 @@ export const apiSlice = createApi({
       invalidatesTags: ["City"],
     }),
     // useCreateQuoteMutation
+    // useCreateQuoteMutation — POST /pricing/quote: a stateless preview price for
+    // ONE product (mode + service are both required — the engine has no
+    // fallback). Nothing is persisted; use useGeneratePersistedQuoteMutation
+    // to lock a bookable 15-minute quote.
     CreateQuote: builder.mutation<
       unknown,
       {
@@ -508,8 +534,8 @@ export const apiSlice = createApi({
         customLength?: number;
         customWidth?: number;
         customHeight?: number;
-        serviceType?: string;
-        shipmentMode?: "AIR" | "LAND" | "SEA"; // [V1 Feature 1]
+        serviceType: "EXPRESS" | "STANDARD" | "ECONOMY";
+        shipmentMode: "AIR" | "LAND" | "SEA";
         insuranceSelected?: boolean;
         declaredValue?: number;
         termsAccepted?: boolean;
@@ -533,6 +559,19 @@ export const apiSlice = createApi({
         }
       },
     }),
+
+    // useGetQuoteOfferingsMutation — POST /quotes/offerings: every shipping
+    // product actually available for a route + parcel, each fully priced with
+    // its own SLA. Replaces building a mode × service grid on the client, and
+    // replaces the old "pass an array of modes for a comparison" behaviour
+    // (the persisted-quote endpoint now rejects an array outright).
+    GetQuoteOfferings: builder.mutation<
+      { success: boolean; message: string; data: GetOfferingsResponse },
+      GetOfferingsRequest
+    >({
+      query: (body) => ({ url: "/quotes/offerings", method: "POST", body }),
+    }),
+
     // useAddBoxDimensionMutation
     AddBoxDimension: builder.mutation<
       unknown,
@@ -691,42 +730,31 @@ export const apiSlice = createApi({
 
     // useGeneratePersistedQuoteMutation — POST /quotes (15-min TTL, returns quoteId)
     // Use this for the booking flow so price is locked at quote time.
+    // useGeneratePersistedQuoteMutation — POST /quotes: locks ONE product
+    // (mode + service, or offeringId) as a bookable 15-minute quote. To
+    // compare several options first, call useGetQuoteOfferingsMutation
+    // (POST /quotes/offerings) — an array shipmentMode is no longer accepted
+    // here and is rejected with code OFFERING_REQUIRED.
     GeneratePersistedQuote: builder.mutation<
-      any,
-      {
-        originCity: string;
-        destinationCity: string;
-        weightKg?: number;
-        tons?: number;
-        cartons?: number;
-        lengthCm?: number;
-        widthCm?: number;
-        heightCm?: number;
-        boxDimensionId?: string;
-        serviceType?: string;
-        // [V1 Feature 1] Required — a single mode to generate & lock the
-        // official quote, or an array of modes to get a side-by-side
-        // comparison preview (no quote is persisted for a comparison call).
-        shipmentMode: "AIR" | "LAND" | "SEA" | Array<"AIR" | "LAND" | "SEA">;
-        insuranceSelected?: boolean;
-        // [V1 Feature 2] Always required now, insured or not.
-        declaredValue: number;
-        promoCode?: string;
-        termsAccepted: true; // Sprint 7: required — logged server-side in consent_logs
-      }
+      { success: boolean; message: string; data: GenerateQuoteResponse },
+      GenerateQuoteRequest
     >({
       query: (body) => ({ url: "/quotes", method: "POST", body }),
       async onQueryStarted(_, { queryFulfilled }) {
         try {
           await queryFulfilled;
-        } catch (e: any) {
+        } catch {
           /* silent — caller handles */
         }
       },
     }),
 
     // useAddContractRateMutation
-    AddContractRate: builder.mutation<unknown, any>({
+    // useAddContractRateMutation — a user may hold several contracts (e.g. one
+    // per mode); shipmentMode/serviceType empty = applies to all modes/services.
+    // A fixed ₦/kg card must name its mode (an absolute figure isn't
+    // meaningful across air/land/sea).
+    AddContractRate: builder.mutation<unknown, CreateContractRateRequest>({
       query: (formData) => ({
         url: "/contract-rates",
         method: "POST",
@@ -787,22 +815,8 @@ export const apiSlice = createApi({
     }),
 
     // useEditContractRateMutation
-    EditContractRate: builder.mutation<
-      unknown,
-      {
-        id: string;
-        label?: string;
-        serviceType?: string;
-        discountPercent?: number | null;
-        fixedPricePerKgByZone?: {
-          [zone: string]: number;
-        } | null;
-        isActive?: boolean;
-        validFrom?: string;
-        validUntil?: string;
-        notes?: string;
-      }
-    >({
+    // useEditContractRateMutation
+    EditContractRate: builder.mutation<unknown, UpdateContractRateRequest>({
       query: (formData) => {
         const { id, ...otherFormData } = formData;
         return {
@@ -883,7 +897,7 @@ export const apiSlice = createApi({
     // ── Promo Codes ────────────────────────────────────────────────────────
     // useGetPromoCodesQuery — admin list, with search/isActive filter + pagination
     GetPromoCodes: builder.query<
-      any,
+      { success: boolean; data: { promoCodes: PromoCode[]; meta?: unknown } },
       {
         search?: string;
         isActive?: boolean;
@@ -904,8 +918,8 @@ export const apiSlice = createApi({
       providesTags: ["PromoCode"],
     }),
 
-    // useAddPromoCodeMutation
-    AddPromoCode: builder.mutation<unknown, any>({
+    // useAddPromoCodeMutation — shipmentMode/serviceType empty = applies to all
+    AddPromoCode: builder.mutation<unknown, CreatePromoCodeRequest>({
       query: (formData) => ({
         url: "/promo-codes",
         method: "POST",
@@ -926,7 +940,7 @@ export const apiSlice = createApi({
     }),
 
     // useEditPromoCodeMutation
-    EditPromoCode: builder.mutation<unknown, any>({
+    EditPromoCode: builder.mutation<unknown, UpdatePromoCodeRequest>({
       query: (formData) => {
         const { id, ...otherFormData } = formData;
         return {
@@ -1333,18 +1347,99 @@ export const apiSlice = createApi({
       query: (quoteId) => ({ url: `/quotes/${quoteId}/refresh`, method: "POST" }),
     }),
 
-    // useGetShipmentModesQuery — GET /admin/shipment-modes (public read)
-    GetShipmentModes: builder.query<unknown, void>({
+    // useGetShipmentModesQuery — GET /admin/shipment-modes (public read).
+    // These are PHYSICAL settings only (volumetric divisor, weight/size caps,
+    // on/off) — never a delivery promise; that lives in DeliverySLA.
+    GetShipmentModes: builder.query<{ success: boolean; data: { modes: ShipmentModeSetting[] } }, void>({
       query: () => ({ url: "/shipment-modes", method: "GET" }),
       providesTags: ["ShipmentMode"],
     }),
-    // useUpdateShipmentModeMutation
-    UpdateShipmentMode: builder.mutation<
-      unknown,
-      { mode: "AIR" | "LAND" | "SEA"; volumetricDivisor?: number; transitHoursDefault?: number | null; isActive?: boolean }
-    >({
+    // useUpdateShipmentModeMutation — transitHoursDefault is deprecated and is
+    // rejected by the backend; configure delivery times per zone/mode/service
+    // under Delivery SLA instead.
+    UpdateShipmentMode: builder.mutation<unknown, UpdateShipmentModeRequest>({
       query: ({ mode, ...body }) => ({ url: `/admin/shipment-modes/${mode}`, method: "PATCH", body }),
       invalidatesTags: ["ShipmentMode"],
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Shipment mode settings updated");
+        } catch (e) {
+          errorToast(getApiErrorMessage((e as CustomError).error, "Update failed"));
+        }
+      },
+    }),
+
+    // ── Service offerings (admin) — the real, purchasable products BowaGO
+    // sells (mode + service). Combinations that are not defined here do not
+    // exist and can never be quoted. ─────────────────────────────────────────
+    // useGetOfferingsAdminQuery
+    GetOfferingsAdmin: builder.query<{ success: boolean; data: { offerings: ServiceOffering[] } }, void>({
+      query: () => ({ url: "/admin/offerings", method: "GET" }),
+      providesTags: ["Offering"],
+    }),
+    // useGetOfferingCoverageQuery — per-zone sellability detail for one offering
+    GetOfferingCoverage: builder.query<{ success: boolean; data: { offering: ServiceOffering; coverage: OfferingCoverageRow[] } }, string>({
+      query: (id) => ({ url: `/admin/offerings/${id}/coverage`, method: "GET" }),
+      providesTags: (result, error, id) => [{ type: "Offering", id }],
+    }),
+    // useGetOfferingRateWarningsQuery — advisory only (never blocks a save)
+    GetOfferingRateWarnings: builder.query<{ success: boolean; data: { advisory: true; probeKg: number; warnings: RateWarning[] } }, { probeKg?: number } | void>({
+      query: (params) => ({ url: "/admin/offerings/warnings", method: "GET", params: params ?? undefined }),
+    }),
+    // useCreateOfferingMutation — created inactive; activation is gated on
+    // coverage (a zone with both a usable rate and an SLA), unless the
+    // offering explicitly allows no-SLA service.
+    CreateOffering: builder.mutation<unknown, CreateOfferingRequest>({
+      query: (body) => ({ url: "/admin/offerings", method: "POST", body }),
+      invalidatesTags: ["Offering"],
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          successToast((data as { message?: string })?.message ?? "Offering created");
+        } catch (e) {
+          errorToast(getApiErrorMessage((e as CustomError).error, "Create failed"));
+        }
+      },
+    }),
+    // useUpdateOfferingMutation
+    UpdateOffering: builder.mutation<unknown, UpdateOfferingRequest>({
+      query: ({ id, ...body }) => ({ url: `/admin/offerings/${id}`, method: "PATCH", body }),
+      invalidatesTags: (result, error, { id }) => ["Offering", { type: "Offering", id }],
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Offering updated");
+        } catch (e) {
+          errorToast(getApiErrorMessage((e as CustomError).error, "Update failed"));
+        }
+      },
+    }),
+    // useAddOfferingLaneMutation — route/zone availability override
+    AddOfferingLane: builder.mutation<unknown, AddOfferingLaneRequest>({
+      query: ({ offeringId, ...body }) => ({ url: `/admin/offerings/${offeringId}/lanes`, method: "POST", body }),
+      invalidatesTags: (result, error, { offeringId }) => ["Offering", { type: "Offering", id: offeringId }],
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Lane rule added");
+        } catch (e) {
+          errorToast(getApiErrorMessage((e as CustomError).error, "Add failed"));
+        }
+      },
+    }),
+    // useRemoveOfferingLaneMutation
+    RemoveOfferingLane: builder.mutation<unknown, { offeringId: string; laneId: string }>({
+      query: ({ offeringId, laneId }) => ({ url: `/admin/offerings/${offeringId}/lanes/${laneId}`, method: "DELETE" }),
+      invalidatesTags: (result, error, { offeringId }) => ["Offering", { type: "Offering", id: offeringId }],
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Lane rule removed");
+        } catch (e) {
+          errorToast(getApiErrorMessage((e as CustomError).error, "Remove failed"));
+        }
+      },
     }),
 
     // ── Shipment drafts (review-before-create booking flow) ────────────────
@@ -1795,8 +1890,9 @@ export const apiSlice = createApi({
     }),
 
     // useGetSurchargesQuery
+    // appliesTo is a comma-list: ALL | EXPRESS|STANDARD|ECONOMY | AIR|LAND|SEA
     GetSurcharges: builder.query<
-      any,
+      { success: boolean; data: { surcharges: Surcharge[] } },
       {
         active?: boolean;
       }
@@ -2066,8 +2162,10 @@ export const apiSlice = createApi({
       query: (shipmentId) => `/reorder/${shipmentId}/prefill`,
     }),
 
+    // useGetContractRateQuery — admin list of contract rates (each includes
+    // the customer it belongs to)
     GetContractRate: builder.query<
-      any,
+      { success: boolean; data: { rates: (ContractRate & { user: { id: string; firstName: string; lastName: string; email: string } })[] } },
       {
         isActive?: boolean;
         search?: string;
@@ -3331,15 +3429,33 @@ export const apiSlice = createApi({
       invalidatesTags: ["FAQ"],
     }),
 
-    // useGetDeliverySLAQuery — fetches zone×serviceType delivery days for booking modal
-    GetDeliverySLA: builder.query<any, void>({
-      query: () => "/pricing/delivery-sla",
+    // useGetDeliverySLAQuery — optionally filter by zone/shipmentMode/serviceType
+    GetDeliverySLA: builder.query<
+      { success: boolean; data: { slas: DeliverySLARow[] } },
+      { zone?: number; shipmentMode?: "AIR" | "LAND" | "SEA"; serviceType?: "EXPRESS" | "STANDARD" | "ECONOMY" } | void
+    >({
+      query: (params) => ({ url: "/pricing/delivery-sla", method: "GET", params: params ?? undefined }),
       providesTags: ["DeliverySLA"],
     }),
 
-    // useUpdateDeliverySLAMutation — Super Admin: edit days for a zone×service
+    // useUpsertDeliverySLAMutation — Super Admin: create/replace the delivery
+    // promise for one zone + mode + service (PUT /pricing/delivery-sla).
+    UpsertDeliverySLA: builder.mutation<unknown, UpsertDeliverySLARequest>({
+      query: (body) => ({ url: "/pricing/delivery-sla", method: "PUT", body }),
+      invalidatesTags: ["DeliverySLA", "Offering"],
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Delivery SLA saved");
+        } catch (e) {
+          errorToast(getApiErrorMessage((e as CustomError).error, "Save failed"));
+        }
+      },
+    }),
+
+    // useUpdateDeliverySLAMutation — Super Admin: edit days for an existing row by id
     UpdateDeliverySLA: builder.mutation<
-      any,
+      unknown,
       { id: string; minDays: number; maxDays: number }
     >({
       query: ({ id, ...body }) => ({
@@ -3347,13 +3463,28 @@ export const apiSlice = createApi({
         method: "PATCH",
         body,
       }),
-      invalidatesTags: ["DeliverySLA"],
+      invalidatesTags: ["DeliverySLA", "Offering"],
       async onQueryStarted(_, { queryFulfilled }) {
         try {
           await queryFulfilled;
           successToast("Delivery SLA updated");
-        } catch (e: any) {
-          errorToast(getApiErrorMessage(e.error, "Update failed"));
+        } catch (e) {
+          errorToast(getApiErrorMessage((e as CustomError).error, "Update failed"));
+        }
+      },
+    }),
+
+    // useDeleteDeliverySLAMutation — removes the SLA; that product becomes
+    // unsellable in that zone (unless it allows no-SLA service).
+    DeleteDeliverySLA: builder.mutation<unknown, { id: string }>({
+      query: ({ id }) => ({ url: `/pricing/delivery-sla/${id}`, method: "DELETE" }),
+      invalidatesTags: ["DeliverySLA", "Offering"],
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Delivery SLA removed");
+        } catch (e) {
+          errorToast(getApiErrorMessage((e as CustomError).error, "Delete failed"));
         }
       },
     }),
@@ -3639,6 +3770,7 @@ export const {
   useEditPromoCodeMutation,
   useDeletePromoCodeMutation,
   useCreateQuoteMutation,
+  useGetQuoteOfferingsMutation,
   useGeneratePersistedQuoteMutation,
   useDeleteZoneMutation,
   usePauseZoneMutation,
@@ -3665,7 +3797,9 @@ export const {
   useGetReorderPrefillQuery,
   useGetRateOverviewQuery,
   useGetDeliverySLAQuery,
+  useUpsertDeliverySLAMutation,
   useUpdateDeliverySLAMutation,
+  useDeleteDeliverySLAMutation,
   useGetAdminDashboardQuery,
   useGetAdminInvoicesQuery,
   useVerifyPaymentMutation,
@@ -3727,6 +3861,14 @@ export const {
   useRefreshQuoteMutation,
   useGetShipmentModesQuery,
   useUpdateShipmentModeMutation,
+  // service offerings (admin)
+  useGetOfferingsAdminQuery,
+  useGetOfferingCoverageQuery,
+  useGetOfferingRateWarningsQuery,
+  useCreateOfferingMutation,
+  useUpdateOfferingMutation,
+  useAddOfferingLaneMutation,
+  useRemoveOfferingLaneMutation,
   useCreateShipmentDraftMutation,
   useGetShipmentDraftQuery,
   usePatchShipmentDraftMutation,

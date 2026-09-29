@@ -1,21 +1,15 @@
 import AddContractRateModal from "@/components/modals/AddContractRateModal";
-import AddStandardRateModal from "@/components/modals/AddStandardRateModal";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog/dialog";
 import { useDeleteContractRateMutation } from "@/store/slice/apiSlice";
+import type { ContractRate as CanonicalContractRate } from "@/store/slice/types";
 import { ColumnDef } from "@tanstack/react-table";
 import { useState } from "react";
 
-export type ContractRate = {
-  id: string;
-  label: string;
-  serviceType: "STANDARD" | "EXPRESS" | "ECONOMY";
-  discountPercent: number | null;
-  fixedPricePerKgByZone: Record<string, number> | null;
-  isActive: boolean;
-  validFrom: string | null;
-  validUntil: string | null;
-  notes?: string | null;
+// A contract rate here also carries the customer it belongs to. shipmentMode
+// and serviceType are both nullable (null = applies to all modes / all
+// services) — never coerce a null into a fake default.
+export type ContractRate = CanonicalContractRate & {
   user: {
     id: string;
     firstName: string;
@@ -23,6 +17,8 @@ export type ContractRate = {
     email: string;
   };
 };
+
+const MODE_LABEL: Record<string, string> = { AIR: "Air", LAND: "Land", SEA: "Sea" };
 
 export const ContractRateColumns: ColumnDef<ContractRate>[] = [
   {
@@ -50,17 +46,27 @@ export const ContractRateColumns: ColumnDef<ContractRate>[] = [
   {
     accessorKey: "label",
     header: "Label",
+    cell: ({ row }) => row.original.label ?? "—",
   },
 
-  // 🚚 Service Type
+  // ✈️🚚🚢 Scope — mode and service together, since a contract's scope is
+  // BOTH dimensions; null in either means "all" for that dimension.
   {
-    accessorKey: "serviceType",
-    header: "Service",
-    cell: ({ row }) => (
-      <span className="capitalize">
-        {row.getValue<string>("serviceType").toLowerCase()}
-      </span>
-    ),
+    id: "scope",
+    header: "Scope",
+    cell: ({ row }) => {
+      const { shipmentMode, serviceType } = row.original;
+      return (
+        <div className="text-xs">
+          <div className="font-medium capitalize">
+            {shipmentMode ? MODE_LABEL[shipmentMode] : "All modes"}
+          </div>
+          <div className="text-gray-400 capitalize">
+            {serviceType ? serviceType.toLowerCase() : "All services"}
+          </div>
+        </div>
+      );
+    },
   },
 
   // 💰 Pricing Type
@@ -70,7 +76,7 @@ export const ContractRateColumns: ColumnDef<ContractRate>[] = [
     cell: ({ row }) => {
       const { discountPercent, fixedPricePerKgByZone } = row.original;
 
-      if (discountPercent !== null) {
+      if (discountPercent !== null && discountPercent !== undefined) {
         return (
           <span className="text-blue-600 text-sm font-medium">
             {discountPercent}% Discount

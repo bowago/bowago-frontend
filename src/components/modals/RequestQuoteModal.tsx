@@ -19,7 +19,7 @@ import { useActiveShipmentModes, MODE_META } from "@/hooks/useActiveShipmentMode
 interface QuoteFormData {
   fromCity: string;
   toCity: string;
-  serviceType: string;
+  serviceType: "EXPRESS" | "STANDARD" | "ECONOMY";
   // [V1 Feature 1]
   shipmentMode: "AIR" | "LAND" | "SEA";
   weightKg: number;
@@ -74,10 +74,12 @@ type QuoteResponse = {
   total: number;
   currency: string;
   // [V1]
-  shipmentMode?: string;
-  serviceType?: string;
-  transitHours?: number | null;
-  deliveryEstimate?: { label?: string } | null;
+  shipmentMode?: "AIR" | "LAND" | "SEA";
+  serviceType?: "EXPRESS" | "STANDARD" | "ECONOMY";
+  // The one source of truth for the delivery promise — resolved server-side
+  // from zone + mode + service. Never reconstructed from a static per-service
+  // day range on the client.
+  deliveryEstimate?: { minDays: number; maxDays: number; label: string } | null;
 };
 
 type CreateQuoteResponse = {
@@ -105,7 +107,7 @@ export default function CreateQuoteModal({
   onCreateShipment?: (prefill: {
     fromCity: string;
     toCity: string;
-    serviceType?: string;
+    serviceType?: "EXPRESS" | "STANDARD" | "ECONOMY";
     // [V1 Feature 1/2]
     shipmentMode?: "AIR" | "LAND" | "SEA";
     hasInsurance?: boolean;
@@ -379,11 +381,13 @@ export default function CreateQuoteModal({
   // ─────────────────────────────
   const step2El = (
     <div className="flex flex-col gap-4">
-      {/* SERVICE TYPE — required for contract-rate pricing to apply.
-            Contract rates can be scoped to a specific service type (e.g. an
-            enterprise's Express-only rate), and the pricing lookup filters
-            on this value server-side. Without it, quotes silently defaulted
-            to STANDARD and any Express-scoped contract rate never matched. */}
+      {/* SERVICE TYPE — required for contract-rate pricing to apply, and the
+            actual delivery promise depends on this AND the mode and zone
+            together — never a fixed day range per service, since the same
+            "Express" can mean very different transit times by air vs land vs
+            sea, or between zones. The real, exact estimate is shown once the
+            quote is generated (Step 3), sourced from the server's
+            deliveryEstimate — never invented here. */}
       <Controller
         name="serviceType"
         control={control}
@@ -392,9 +396,9 @@ export default function CreateQuoteModal({
           <SelectInput
             label="Service Type"
             options={[
-              { label: "Express — 1–3 business days", value: "EXPRESS" },
-              { label: "Standard — 5–7 business days", value: "STANDARD" },
-              { label: "Economy — 10–14 business days", value: "ECONOMY" },
+              { label: "Express — fastest option", value: "EXPRESS" },
+              { label: "Standard — balanced speed & cost", value: "STANDARD" },
+              { label: "Economy — most economical", value: "ECONOMY" },
             ]}
             value={field.value}
             onValueChange={field.onChange}
@@ -854,9 +858,7 @@ export default function CreateQuoteModal({
           { label: "Service", value: quote?.serviceType ?? values.serviceType },
           {
             label: "Est. Delivery",
-            value:
-              quote?.deliveryEstimate?.label ??
-              (quote?.transitHours ? `~${quote.transitHours} hrs` : null),
+            value: quote?.deliveryEstimate?.label ?? null,
           },
           { label: "Pricing", value: quote?.pricingMode },
           { label: "Currency", value: quote?.currency },

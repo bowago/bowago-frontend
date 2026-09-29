@@ -5,13 +5,10 @@ import { useGetShipmentModesQuery } from "@/store/slice/apiSlice";
 
 export type ShipmentModeValue = "AIR" | "LAND" | "SEA";
 
-export const MODE_META: Record<
-  ShipmentModeValue,
-  { label: string; blurb: string; transitFallback: string }
-> = {
-  AIR: { label: "Air", blurb: "Fastest, higher cost", transitFallback: "Fastest" },
-  LAND: { label: "Land", blurb: "Balanced speed & cost", transitFallback: "Standard" },
-  SEA: { label: "Sea", blurb: "Slowest, lowest cost", transitFallback: "Slowest" },
+export const MODE_META: Record<ShipmentModeValue, { label: string; blurb: string }> = {
+  AIR: { label: "Air", blurb: "Fastest, higher cost" },
+  LAND: { label: "Land", blurb: "Balanced speed & cost" },
+  SEA: { label: "Sea", blurb: "Slowest, lowest cost" },
 };
 
 const ALL_MODES: ShipmentModeValue[] = ["AIR", "LAND", "SEA"];
@@ -20,6 +17,11 @@ const ALL_MODES: ShipmentModeValue[] = ["AIR", "LAND", "SEA"];
  * Modes an admin has left switched ON in Shipment Mode Settings — the single
  * source every quote/booking form should build its Mode picker from, so
  * deactivating a mode in the admin screen removes it everywhere at once.
+ *
+ * Delivery timing is NOT part of this hook — a mode has no delivery promise of
+ * its own; that always depends on the zone and service too, and comes back on
+ * the offerings/quote response as `deliveryEstimate`. Never fall back to a
+ * per-mode guess.
  *
  * If the settings request fails we fall back to all three rather than
  * leaving the form with no modes at all; the server also rejects an inactive
@@ -30,16 +32,12 @@ export function useActiveShipmentModes(
   onCurrentInvalid?: (fallback: ShipmentModeValue) => void,
 ) {
   const { data, isLoading, isError } = useGetShipmentModesQuery();
-  const rows: { mode: ShipmentModeValue; isActive: boolean; transitHoursDefault?: number | null }[] =
-    (data as any)?.data?.modes ?? [];
+  const rows: { mode: ShipmentModeValue; isActive: boolean }[] = data?.data?.modes ?? [];
 
   const active: ShipmentModeValue[] =
     isError || rows.length === 0
       ? ALL_MODES
       : ALL_MODES.filter((m) => rows.find((r) => r.mode === m)?.isActive !== false);
-
-  const transitHours = (mode: string) =>
-    rows.find((r) => r.mode === mode)?.transitHoursDefault ?? null;
 
   // If the currently selected mode was switched off, move to one that's on.
   useEffect(() => {
@@ -58,6 +56,5 @@ export function useActiveShipmentModes(
       description: MODE_META[m].blurb,
     })),
     isLoading,
-    transitHours,
   };
 }

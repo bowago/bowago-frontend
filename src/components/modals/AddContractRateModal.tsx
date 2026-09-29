@@ -14,7 +14,7 @@ import {
   useGetUsersQuery,
 } from "@/store/slice/apiSlice";
 
-import { ContractRate } from "../table/columns/contract-rate-column";
+import type { ContractRate } from "../table/columns/contract-rate-column";
 
 export default function AddContractRateModal({
   isOpen,
@@ -38,6 +38,8 @@ export default function AddContractRateModal({
     defaultValues: {
       pricingType: "discount",
       discountPercent: 0,
+      shipmentMode: "",
+      serviceType: "",
       isActive: true,
       fixedPricePerKgByZone: {
         "1": 0,
@@ -60,8 +62,9 @@ export default function AddContractRateModal({
 
       contractForm.reset({
         userId: editingRate.user?.id ?? "",
-        label: editingRate.label,
-        serviceType: editingRate.serviceType,
+        label: editingRate.label ?? "",
+        shipmentMode: editingRate.shipmentMode ?? "",
+        serviceType: editingRate.serviceType ?? "",
         pricingType: editingRate.fixedPricePerKgByZone ? "fixed" : "discount",
         discountPercent: editingRate.discountPercent ?? 0,
         fixedPricePerKgByZone: editingRate.fixedPricePerKgByZone ?? {
@@ -108,7 +111,10 @@ export default function AddContractRateModal({
   const onSubmit = (data: ContractRateFormData) => {
     const payload: any = {
       label: data.label,
-      serviceType: data.serviceType,
+      // Empty selection = "applies to all modes/services" — an explicit
+      // scope, sent as null rather than an empty string.
+      shipmentMode: data.shipmentMode || null,
+      serviceType: data.serviceType || null,
       isActive: data.isActive,
       validFrom: data.validFrom,
       validUntil: data.validUntil,
@@ -217,27 +223,62 @@ export default function AddContractRateModal({
                     control={control}
                     render={({ field }) => (
                       <RadioGroupCard
-                        label="Service Type"
-                        className="flex flex-row"
-                        value={field.value}
+                        label="Service Type (leave unselected to apply to all services)"
+                        className="flex flex-row flex-wrap"
+                        value={field.value || ""}
                         onValueChange={field.onChange}
                         error={errors.serviceType?.message}
                         options={[
                           {
+                            label: "All Services",
+                            description: "Applies regardless of service",
+                            value: "",
+                          },
+                          {
                             label: "Express",
-                            description: "1–3 business days",
+                            description: "Fastest option",
                             value: "EXPRESS",
                           },
                           {
                             label: "Standard",
-                            description: "5–7 business days",
+                            description: "Balanced speed & cost",
                             value: "STANDARD",
                           },
                           {
                             label: "Economy",
-                            description: "10–14 business days",
+                            description: "Most economical",
                             value: "ECONOMY",
                           },
+                        ]}
+                      />
+                    )}
+                  />
+                </div>
+
+                {/* Shipment Mode — required when pricing is a fixed ₦/kg card
+                    (an absolute price isn't meaningful across air/land/sea) */}
+                <div className="col-span-2">
+                  <Controller
+                    name="shipmentMode"
+                    control={control}
+                    render={({ field }) => (
+                      <RadioGroupCard
+                        label={
+                          pricingType === "fixed"
+                            ? "Shipment Mode (required for a fixed ₦/kg card)"
+                            : "Shipment Mode (leave unselected to apply to all modes)"
+                        }
+                        className="flex flex-row flex-wrap"
+                        value={field.value || ""}
+                        onValueChange={field.onChange}
+                        error={errors.shipmentMode?.message}
+                        options={[
+                          ...(pricingType === "fixed"
+                            ? []
+                            : [{ label: "All Modes", description: "Applies regardless of mode", value: "" }]),
+                          { label: "Air", description: "Fastest, higher cost", value: "AIR" },
+                          { label: "Land", description: "Balanced speed & cost", value: "LAND" },
+                          { label: "Sea", description: "Slowest, lowest cost", value: "SEA" },
                         ]}
                       />
                     )}
