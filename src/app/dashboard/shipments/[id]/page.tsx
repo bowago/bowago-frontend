@@ -33,6 +33,7 @@ import { RootState } from "@/store/store";
 import { Dialog, DialogContent } from "@/components/ui/dialog/dialog";
 import PriceAdjustmentResponseModal from "@/components/modals/PriceAdjustmentResponseModal";
 import CreatePriceAdjustmentForm from "@/components/form/CreatePriceAdjustmentForm";
+import ExpectedDeliveryIndicator from "@/components/shipment/ExpectedDeliveryIndicator";
 
 const STATUS_OPTIONS = [
   "PENDING",
@@ -331,6 +332,17 @@ export default function ShipmentDetails() {
           </button>
         </div>
       </div>
+
+      {/* Staff/dispatcher-only: how much time is left before the customer's
+          expected delivery — never shown to the customer viewing their own
+          shipment. */}
+      {(isAdmin || canDispatch) && (
+        <ExpectedDeliveryIndicator
+          estimatedDelivery={shipment.estimatedDelivery}
+          status={shipment.status}
+          delayAlert={shipment.delayAlert}
+        />
+      )}
 
       <Tabs defaultValue="shipment">
         <TabsList>

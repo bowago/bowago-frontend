@@ -25,6 +25,9 @@ type OverdueShipment = {
   estimatedDelivery?: string;
   status: string;
   customer?: { firstName?: string; lastName?: string; email?: string };
+  // Present once the automatic sweep already notified this customer — lets
+  // the admin avoid re-alerting someone who's already been told.
+  delayAlert?: { id: string; alertedAt?: string; reason?: string | null } | null;
 };
 
 function getShipments(response: any): OverdueShipment[] {
@@ -137,6 +140,14 @@ export default function DelayAlertsAdminPage() {
                   {s.trackingNumber}
                 </span>
                 <span className="text-gray-600 flex-1">{s.recipientCity}</span>
+                {s.delayAlert && (
+                  <span
+                    className="px-1.5 py-0.5 text-[10px] rounded-full font-medium bg-gray-100 text-gray-500"
+                    title={`Already notified${s.delayAlert.alertedAt ? ` on ${new Date(s.delayAlert.alertedAt).toLocaleDateString()}` : ""}`}
+                  >
+                    ✓ notified
+                  </span>
+                )}
                 <span className="text-gray-400 text-xs">
                   {s.customer?.firstName} {s.customer?.lastName}
                 </span>

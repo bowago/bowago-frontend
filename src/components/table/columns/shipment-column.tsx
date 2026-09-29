@@ -14,6 +14,7 @@ import CancelShipmentModal from "@/components/modals/CancelShipmentModal";
 import ViewShipmentModal, {
   PAST_CUTOFF_STATUSES,
 } from "@/components/modals/ViewShipmentModal";
+import ExpectedDeliveryIndicator from "@/components/shipment/ExpectedDeliveryIndicator";
 import RequestAddressChangeModal from "@/components/modals/RequestAddressChangeModal";
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
@@ -56,6 +57,8 @@ export type Shipment = {
   pickupDate: string;
   hasPendingAddressChange?: boolean;
   shipmentMode?: "AIR" | "LAND" | "SEA" | null;
+  estimatedDelivery?: string | null;
+  delayAlert?: { id: string; alertedAt?: string; reason?: string | null } | null;
 };
 
 // ─── Mark as Paid modal (admin only) ─────────────────────────────────────────
@@ -403,7 +406,13 @@ function ShipmentActionCell({ shipment }: { shipment: Shipment }) {
 }
 
 // ─── Column definitions ───────────────────────────────────────────────────────
-export const ShipmentColumns: ColumnDef<Shipment>[] = [
+// isStaff: true adds the staff/dispatcher-only "Expected Delivery" column —
+// never shown to a customer viewing their own shipments. Call sites that
+// know their viewer's role should use getShipmentColumns({ isStaff }); the
+// plain ShipmentColumns export below defaults to the customer-safe (no
+// admin column) shape for any caller that hasn't been updated yet.
+export function getShipmentColumns({ isStaff = false }: { isStaff?: boolean } = {}): ColumnDef<Shipment>[] {
+  const columns: ColumnDef<Shipment>[] = [
   {
     header: "S/N",
     cell: ({ row }) => <div className="text-gray-500">{row.index + 1}</div>,
@@ -519,6 +528,24 @@ export const ShipmentColumns: ColumnDef<Shipment>[] = [
       );
     },
   },
+  // Staff/dispatcher-only — how much time is left before the customer's
+  // expected delivery, color-coded by risk. Never shown to a customer.
+  ...(isStaff
+    ? [
+        {
+          id: "expectedDelivery",
+          header: "Expected Delivery",
+          cell: ({ row }: { row: { original: Shipment } }) => (
+            <ExpectedDeliveryIndicator
+              estimatedDelivery={row.original.estimatedDelivery}
+              status={row.original.status}
+              delayAlert={row.original.delayAlert}
+              variant="badge"
+            />
+          ),
+        } as ColumnDef<Shipment>,
+      ]
+    : []),
   {
     accessorKey: "pickupDate",
     header: "Pickup Date",
@@ -537,4 +564,10 @@ export const ShipmentColumns: ColumnDef<Shipment>[] = [
     header: "Action",
     cell: ({ row }) => <ShipmentActionCell shipment={row.original} />,
   },
-];
+  ];
+  return columns;
+}
+
+// Customer-safe default (no admin-only column) for any caller that hasn't
+// switched to getShipmentColumns({ isStaff }) yet.
+export const ShipmentColumns: ColumnDef<Shipment>[] = getShipmentColumns();

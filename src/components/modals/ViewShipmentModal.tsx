@@ -14,6 +14,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 import { SERVICE_OPTIONS } from "./CreateShipmentModal";
 import { CancelWithRefundPreview } from "./CancelWithRefundPreview";
+import ExpectedDeliveryIndicator from "@/components/shipment/ExpectedDeliveryIndicator";
 import { X, UserCheck, Loader2, Maximize2 } from "lucide-react";
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
@@ -317,6 +318,17 @@ export default function ViewShipmentModal({
                 </button>
               </Dialog.Close>
             </div>
+
+            {/* Staff-only: time remaining until the customer's expected
+                delivery — never shown when the viewer is the customer. */}
+            {isAdmin && !isLoading && shipment && (
+              <ExpectedDeliveryIndicator
+                estimatedDelivery={shipment.estimatedDelivery}
+                status={shipment.status}
+                delayAlert={shipment.delayAlert}
+                className="mt-3"
+              />
+            )}
 
             {/* Loading */}
             {isLoading && (

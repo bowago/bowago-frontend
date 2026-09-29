@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 import { AppTable } from "@/components/table/Table";
-import { ShipmentColumns } from "@/components/table/columns/shipment-column";
+import { getShipmentColumns, ShipmentColumns } from "@/components/table/columns/shipment-column";
 import { Shipment } from "@/components/table/columns/shipment-column";
 import CreateShipmentModal from "@/components/modals/CreateShipmentModal";
 import { Button } from "@/components/ui/button";
@@ -256,7 +256,7 @@ function AdminShipmentsList({
         </div>
       )}
       {!isLoading && shipments.length > 0 && (
-        <AppTable columns={ShipmentColumns} data={shipments} />
+        <AppTable columns={getShipmentColumns({ isStaff: true })} data={shipments} />
       )}
 
       <CreateShipmentModal
