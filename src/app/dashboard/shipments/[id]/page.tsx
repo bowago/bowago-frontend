@@ -35,8 +35,56 @@ import PriceAdjustmentResponseModal from "@/components/modals/PriceAdjustmentRes
 import CreatePriceAdjustmentForm from "@/components/form/CreatePriceAdjustmentForm";
 import ExpectedDeliveryIndicator from "@/components/shipment/ExpectedDeliveryIndicator";
 
+// Mirrors VALID_STATUS_TRANSITIONS in the backend shipment.controller. The
+// server is still the source of truth (it rejects invalid jumps); this map
+// lets the UI show which steps are unlocked so dispatchers don't skip one.
+const STATUS_TRANSITIONS: Record<string, string[]> = {
+  PENDING: [
+    "BOOKED",
+    "AWAITING_PICKUP",
+    "CONFIRMED",
+    "CANCELLED",
+    "PENDING_ADMIN_REVIEW",
+  ],
+  BOOKED: ["AWAITING_PICKUP", "CONFIRMED", "CANCELLED", "PENDING_ADMIN_REVIEW"],
+  AWAITING_PICKUP: [
+    "CONFIRMED",
+    "PICKED_UP",
+    "CANCELLED",
+    "PENDING_ADMIN_REVIEW",
+  ],
+  CONFIRMED: [
+    "AWAITING_PICKUP",
+    "PICKED_UP",
+    "CANCELLED",
+    "PENDING_ADMIN_REVIEW",
+  ],
+  PICKED_UP: ["IN_TRANSIT", "FAILED", "CANCELLED", "PENDING_ADMIN_REVIEW"],
+  IN_TRANSIT: [
+    "OUT_FOR_DELIVERY",
+    "DELIVERED",
+    "FAILED",
+    "RETURNED",
+    "PENDING_ADMIN_REVIEW",
+  ],
+  OUT_FOR_DELIVERY: ["DELIVERED", "FAILED", "RETURNED"],
+  FAILED: ["OUT_FOR_DELIVERY", "RETURNED", "CANCELLED"],
+  PENDING_ADMIN_REVIEW: [
+    "AWAITING_PICKUP",
+    "CONFIRMED",
+    "PICKED_UP",
+    "IN_TRANSIT",
+    "CANCELLED",
+  ],
+  DELIVERED: [],
+  CANCELLED: [],
+  RETURNED: [],
+};
+
 const STATUS_OPTIONS = [
   "PENDING",
+  "BOOKED",
+  "AWAITING_PICKUP",
   "CONFIRMED",
   "PICKED_UP",
   "IN_TRANSIT",
@@ -44,7 +92,20 @@ const STATUS_OPTIONS = [
   "DELIVERED",
   "FAILED",
   "RETURNED",
+  "CANCELLED",
+  "PENDING_ADMIN_REVIEW",
 ];
+
+// Happy-path steps shown in the progress guide.
+const STATUS_FLOW = [
+  "AWAITING_PICKUP",
+  "PICKED_UP",
+  "IN_TRANSIT",
+  "OUT_FOR_DELIVERY",
+  "DELIVERED",
+];
+
+const fmtStatus = (s: string) => s.replace(/_/g, " ");
 
 const statusColor: Record<string, string> = {
   PENDING: "bg-yellow-400 text-black",
@@ -219,6 +280,13 @@ export default function ShipmentDetails() {
 
   const handleStatusUpdate = async () => {
     if (!newStatus) return;
+    // Defensive: the select already locks skipped steps, but block here too.
+    if (
+      newStatus !== shipment.status &&
+      !(STATUS_TRANSITIONS[shipment.status] ?? []).includes(newStatus)
+    ) {
+      return;
+    }
     await updateStatus({
       id,
       status: newStatus,
@@ -637,6 +705,63 @@ export default function ShipmentDetails() {
                     {shipment.status}
                   </span>
                 </p>
+                {/* Progress guide — statuses must move in order; skipping a
+                    step is rejected by the server, so show what's next. */}
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-3">
+                  <p className="text-xs text-amber-800 flex items-start gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                    <span>
+                      Update statuses in order — don&apos;t skip a step. Steps
+                      that would skip ahead are locked.
+                      {(STATUS_TRANSITIONS[shipment.status] ?? []).length === 0
+                        ? " This shipment is in a final state and can't be changed."
+                        : ""}
+                    </span>
+                  </p>
+                  <ol className="flex flex-wrap items-center gap-1 text-[11px]">
+                    {STATUS_FLOW.map((step, i) => {
+                      const currentIdx = STATUS_FLOW.indexOf(shipment.status);
+                      const isCurrent = step === shipment.status;
+                      const isDone = currentIdx > -1 && i < currentIdx;
+                      const isNext =
+                        !isCurrent &&
+                        (STATUS_TRANSITIONS[shipment.status] ?? []).includes(
+                          step,
+                        );
+                      return (
+                        <li key={step} className="flex items-center gap-1">
+                          <span
+                            className={`px-2 py-0.5 rounded-full border ${
+                              isCurrent
+                                ? "bg-[#1F3A70] text-white border-[#1F3A70]"
+                                : isDone
+                                  ? "bg-green-100 text-green-700 border-green-200"
+                                  : isNext
+                                    ? "bg-white text-amber-700 border-amber-400 font-medium"
+                                    : "bg-white text-gray-400 border-gray-200"
+                            }`}
+                          >
+                            {isDone ? "✓ " : ""}
+                            {fmtStatus(step)}
+                          </span>
+                          {i < STATUS_FLOW.length - 1 && (
+                            <span className="text-gray-300">→</span>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ol>
+                  {(STATUS_TRANSITIONS[shipment.status] ?? []).length > 0 && (
+                    <p className="text-xs text-amber-800">
+                      Next allowed:{" "}
+                      <span className="font-medium">
+                        {(STATUS_TRANSITIONS[shipment.status] ?? [])
+                          .map(fmtStatus)
+                          .join(", ")}
+                      </span>
+                    </p>
+                  )}
+                </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">
                     New Status
@@ -647,11 +772,21 @@ export default function ShipmentDetails() {
                     className="border rounded-md p-2 text-sm w-full"
                   >
                     <option value="">Select status</option>
-                    {STATUS_OPTIONS.map((s) => (
-                      <option key={s} value={s}>
-                        {s.replace(/_/g, " ")}
-                      </option>
-                    ))}
+                    {STATUS_OPTIONS.map((s) => {
+                      const allowed =
+                        s === shipment.status ||
+                        (STATUS_TRANSITIONS[shipment.status] ?? []).includes(s);
+                      return (
+                        <option key={s} value={s} disabled={!allowed}>
+                          {fmtStatus(s)}
+                          {s === shipment.status
+                            ? " (current)"
+                            : !allowed
+                              ? " — locked"
+                              : ""}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 

@@ -448,7 +448,9 @@ export const apiSlice = createApi({
           const { data } = await queryFulfilled;
           if (data) successToast("Default card updated");
         } catch (e: any) {
-          errorToast(getApiErrorMessage(e.error, "Failed to update default card"));
+          errorToast(
+            getApiErrorMessage(e.error, "Failed to update default card"),
+          );
         }
       },
       invalidatesTags: ["SavedCard"],
@@ -1099,7 +1101,9 @@ export const apiSlice = createApi({
           const { data } = await queryFulfilled;
           if (data) successToast("Invoice ready");
         } catch (error: any) {
-          errorToast(getApiErrorMessage(error.error, "Failed to generate invoice"));
+          errorToast(
+            getApiErrorMessage(error.error, "Failed to generate invoice"),
+          );
         }
       },
       invalidatesTags: ["Shipment"],
@@ -1344,13 +1348,19 @@ export const apiSlice = createApi({
 
     // useRefreshQuoteMutation — POST /quotes/{id}/refresh
     RefreshQuote: builder.mutation<any, string>({
-      query: (quoteId) => ({ url: `/quotes/${quoteId}/refresh`, method: "POST" }),
+      query: (quoteId) => ({
+        url: `/quotes/${quoteId}/refresh`,
+        method: "POST",
+      }),
     }),
 
     // useGetShipmentModesQuery — GET /admin/shipment-modes (public read).
     // These are PHYSICAL settings only (volumetric divisor, weight/size caps,
     // on/off) — never a delivery promise; that lives in DeliverySLA.
-    GetShipmentModes: builder.query<{ success: boolean; data: { modes: ShipmentModeSetting[] } }, void>({
+    GetShipmentModes: builder.query<
+      { success: boolean; data: { modes: ShipmentModeSetting[] } },
+      void
+    >({
       query: () => ({ url: "/shipment-modes", method: "GET" }),
       providesTags: ["ShipmentMode"],
     }),
@@ -1358,14 +1368,20 @@ export const apiSlice = createApi({
     // rejected by the backend; configure delivery times per zone/mode/service
     // under Delivery SLA instead.
     UpdateShipmentMode: builder.mutation<unknown, UpdateShipmentModeRequest>({
-      query: ({ mode, ...body }) => ({ url: `/admin/shipment-modes/${mode}`, method: "PATCH", body }),
+      query: ({ mode, ...body }) => ({
+        url: `/admin/shipment-modes/${mode}`,
+        method: "PATCH",
+        body,
+      }),
       invalidatesTags: ["ShipmentMode"],
       async onQueryStarted(_, { queryFulfilled }) {
         try {
           await queryFulfilled;
           successToast("Shipment mode settings updated");
         } catch (e) {
-          errorToast(getApiErrorMessage((e as CustomError).error, "Update failed"));
+          errorToast(
+            getApiErrorMessage((e as CustomError).error, "Update failed"),
+          );
         }
       },
     }),
@@ -1374,18 +1390,40 @@ export const apiSlice = createApi({
     // sells (mode + service). Combinations that are not defined here do not
     // exist and can never be quoted. ─────────────────────────────────────────
     // useGetOfferingsAdminQuery
-    GetOfferingsAdmin: builder.query<{ success: boolean; data: { offerings: ServiceOffering[] } }, void>({
+    GetOfferingsAdmin: builder.query<
+      { success: boolean; data: { offerings: ServiceOffering[] } },
+      void
+    >({
       query: () => ({ url: "/admin/offerings", method: "GET" }),
       providesTags: ["Offering"],
     }),
     // useGetOfferingCoverageQuery — per-zone sellability detail for one offering
-    GetOfferingCoverage: builder.query<{ success: boolean; data: { offering: ServiceOffering; coverage: OfferingCoverageRow[] } }, string>({
-      query: (id) => ({ url: `/admin/offerings/${id}/coverage`, method: "GET" }),
+    GetOfferingCoverage: builder.query<
+      {
+        success: boolean;
+        data: { offering: ServiceOffering; coverage: OfferingCoverageRow[] };
+      },
+      string
+    >({
+      query: (id) => ({
+        url: `/admin/offerings/${id}/coverage`,
+        method: "GET",
+      }),
       providesTags: (result, error, id) => [{ type: "Offering", id }],
     }),
     // useGetOfferingRateWarningsQuery — advisory only (never blocks a save)
-    GetOfferingRateWarnings: builder.query<{ success: boolean; data: { advisory: true; probeKg: number; warnings: RateWarning[] } }, { probeKg?: number } | void>({
-      query: (params) => ({ url: "/admin/offerings/warnings", method: "GET", params: params ?? undefined }),
+    GetOfferingRateWarnings: builder.query<
+      {
+        success: boolean;
+        data: { advisory: true; probeKg: number; warnings: RateWarning[] };
+      },
+      { probeKg?: number } | void
+    >({
+      query: (params) => ({
+        url: "/admin/offerings/warnings",
+        method: "GET",
+        params: params ?? undefined,
+      }),
     }),
     // useCreateOfferingMutation — created inactive; activation is gated on
     // coverage (a zone with both a usable rate and an SLA), unless the
@@ -1396,55 +1434,91 @@ export const apiSlice = createApi({
       async onQueryStarted(_, { queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          successToast((data as { message?: string })?.message ?? "Offering created");
+          successToast(
+            (data as { message?: string })?.message ?? "Offering created",
+          );
         } catch (e) {
-          errorToast(getApiErrorMessage((e as CustomError).error, "Create failed"));
+          errorToast(
+            getApiErrorMessage((e as CustomError).error, "Create failed"),
+          );
         }
       },
     }),
     // useUpdateOfferingMutation
     UpdateOffering: builder.mutation<unknown, UpdateOfferingRequest>({
-      query: ({ id, ...body }) => ({ url: `/admin/offerings/${id}`, method: "PATCH", body }),
-      invalidatesTags: (result, error, { id }) => ["Offering", { type: "Offering", id }],
+      query: ({ id, ...body }) => ({
+        url: `/admin/offerings/${id}`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        "Offering",
+        { type: "Offering", id },
+      ],
       async onQueryStarted(_, { queryFulfilled }) {
         try {
           await queryFulfilled;
           successToast("Offering updated");
         } catch (e) {
-          errorToast(getApiErrorMessage((e as CustomError).error, "Update failed"));
+          errorToast(
+            getApiErrorMessage((e as CustomError).error, "Update failed"),
+          );
         }
       },
     }),
     // useAddOfferingLaneMutation — route/zone availability override
     AddOfferingLane: builder.mutation<unknown, AddOfferingLaneRequest>({
-      query: ({ offeringId, ...body }) => ({ url: `/admin/offerings/${offeringId}/lanes`, method: "POST", body }),
-      invalidatesTags: (result, error, { offeringId }) => ["Offering", { type: "Offering", id: offeringId }],
+      query: ({ offeringId, ...body }) => ({
+        url: `/admin/offerings/${offeringId}/lanes`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (result, error, { offeringId }) => [
+        "Offering",
+        { type: "Offering", id: offeringId },
+      ],
       async onQueryStarted(_, { queryFulfilled }) {
         try {
           await queryFulfilled;
           successToast("Lane rule added");
         } catch (e) {
-          errorToast(getApiErrorMessage((e as CustomError).error, "Add failed"));
+          errorToast(
+            getApiErrorMessage((e as CustomError).error, "Add failed"),
+          );
         }
       },
     }),
     // useRemoveOfferingLaneMutation
-    RemoveOfferingLane: builder.mutation<unknown, { offeringId: string; laneId: string }>({
-      query: ({ offeringId, laneId }) => ({ url: `/admin/offerings/${offeringId}/lanes/${laneId}`, method: "DELETE" }),
-      invalidatesTags: (result, error, { offeringId }) => ["Offering", { type: "Offering", id: offeringId }],
+    RemoveOfferingLane: builder.mutation<
+      unknown,
+      { offeringId: string; laneId: string }
+    >({
+      query: ({ offeringId, laneId }) => ({
+        url: `/admin/offerings/${offeringId}/lanes/${laneId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (result, error, { offeringId }) => [
+        "Offering",
+        { type: "Offering", id: offeringId },
+      ],
       async onQueryStarted(_, { queryFulfilled }) {
         try {
           await queryFulfilled;
           successToast("Lane rule removed");
         } catch (e) {
-          errorToast(getApiErrorMessage((e as CustomError).error, "Remove failed"));
+          errorToast(
+            getApiErrorMessage((e as CustomError).error, "Remove failed"),
+          );
         }
       },
     }),
 
     // ── Shipment drafts (review-before-create booking flow) ────────────────
     // useCreateShipmentDraftMutation
-    CreateShipmentDraft: builder.mutation<unknown, { quoteId: string; [key: string]: unknown }>({
+    CreateShipmentDraft: builder.mutation<
+      unknown,
+      { quoteId: string; [key: string]: unknown }
+    >({
       query: (body) => ({ url: "/shipment-drafts", method: "POST", body }),
       invalidatesTags: ["ShipmentDraft"],
     }),
@@ -1454,13 +1528,25 @@ export const apiSlice = createApi({
       providesTags: (result, error, id) => [{ type: "ShipmentDraft", id }],
     }),
     // usePatchShipmentDraftMutation
-    PatchShipmentDraft: builder.mutation<unknown, { id: string; [key: string]: unknown }>({
-      query: ({ id, ...body }) => ({ url: `/shipment-drafts/${id}`, method: "PATCH", body }),
-      invalidatesTags: (result, error, { id }) => [{ type: "ShipmentDraft", id }],
+    PatchShipmentDraft: builder.mutation<
+      unknown,
+      { id: string; [key: string]: unknown }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/shipment-drafts/${id}`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "ShipmentDraft", id },
+      ],
     }),
     // useConfirmShipmentDraftMutation — pass a fresh UUID as idempotencyKey
     // on every tap; a retry after a network error should reuse the SAME key.
-    ConfirmShipmentDraft: builder.mutation<unknown, { id: string; idempotencyKey: string }>({
+    ConfirmShipmentDraft: builder.mutation<
+      unknown,
+      { id: string; idempotencyKey: string }
+    >({
       query: ({ id, idempotencyKey }) => ({
         url: `/shipment-drafts/${id}/confirm`,
         method: "POST",
@@ -1470,54 +1556,115 @@ export const apiSlice = createApi({
     }),
 
     // ── Adhoc charge types (Admin) ──────────────────────────────────────────
-    GetAdhocChargeTypes: builder.query<unknown, { isActive?: boolean; search?: string; page?: number } | void>({
-      query: (params) => ({ url: "/admin/adhoc-charges", method: "GET", params: params ?? undefined }),
+    GetAdhocChargeTypes: builder.query<
+      unknown,
+      { isActive?: boolean; search?: string; page?: number } | void
+    >({
+      query: (params) => ({
+        url: "/admin/adhoc-charges",
+        method: "GET",
+        params: params ?? undefined,
+      }),
       providesTags: ["AdhocChargeType"],
     }),
     CreateAdhocChargeType: builder.mutation<unknown, Record<string, unknown>>({
       query: (body) => ({ url: "/admin/adhoc-charges", method: "POST", body }),
       invalidatesTags: ["AdhocChargeType"],
     }),
-    UpdateAdhocChargeType: builder.mutation<unknown, { id: string; [key: string]: unknown }>({
-      query: ({ id, ...body }) => ({ url: `/admin/adhoc-charges/${id}`, method: "PATCH", body }),
+    UpdateAdhocChargeType: builder.mutation<
+      unknown,
+      { id: string; [key: string]: unknown }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/admin/adhoc-charges/${id}`,
+        method: "PATCH",
+        body,
+      }),
       invalidatesTags: ["AdhocChargeType"],
     }),
-    DeactivateAdhocChargeType: builder.mutation<unknown, { id: string; reason?: string }>({
-      query: ({ id, ...body }) => ({ url: `/admin/adhoc-charges/${id}/deactivate`, method: "POST", body }),
+    DeactivateAdhocChargeType: builder.mutation<
+      unknown,
+      { id: string; reason?: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/admin/adhoc-charges/${id}/deactivate`,
+        method: "POST",
+        body,
+      }),
       invalidatesTags: ["AdhocChargeType"],
     }),
     GetAdhocChargeTypeHistory: builder.query<unknown, string>({
-      query: (id) => ({ url: `/admin/adhoc-charges/${id}/history`, method: "GET" }),
+      query: (id) => ({
+        url: `/admin/adhoc-charges/${id}/history`,
+        method: "GET",
+      }),
     }),
 
     // ── Adhoc charge suggestion rules (Admin) ───────────────────────────────
-    GetAdhocChargeRules: builder.query<unknown, { isActive?: boolean; behaviour?: string } | void>({
-      query: (params) => ({ url: "/admin/adhoc-rules", method: "GET", params: params ?? undefined }),
+    GetAdhocChargeRules: builder.query<
+      unknown,
+      { isActive?: boolean; behaviour?: string } | void
+    >({
+      query: (params) => ({
+        url: "/admin/adhoc-rules",
+        method: "GET",
+        params: params ?? undefined,
+      }),
       providesTags: ["AdhocChargeRule"],
     }),
     CreateAdhocChargeRule: builder.mutation<unknown, Record<string, unknown>>({
       query: (body) => ({ url: "/admin/adhoc-rules", method: "POST", body }),
       invalidatesTags: ["AdhocChargeRule"],
     }),
-    UpdateAdhocChargeRule: builder.mutation<unknown, { id: string; [key: string]: unknown }>({
-      query: ({ id, ...body }) => ({ url: `/admin/adhoc-rules/${id}`, method: "PATCH", body }),
+    UpdateAdhocChargeRule: builder.mutation<
+      unknown,
+      { id: string; [key: string]: unknown }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/admin/adhoc-rules/${id}`,
+        method: "PATCH",
+        body,
+      }),
       invalidatesTags: ["AdhocChargeRule"],
     }),
-    DeactivateAdhocChargeRule: builder.mutation<unknown, { id: string; reason?: string }>({
-      query: ({ id, ...body }) => ({ url: `/admin/adhoc-rules/${id}/deactivate`, method: "POST", body }),
+    DeactivateAdhocChargeRule: builder.mutation<
+      unknown,
+      { id: string; reason?: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/admin/adhoc-rules/${id}/deactivate`,
+        method: "POST",
+        body,
+      }),
       invalidatesTags: ["AdhocChargeRule"],
     }),
 
     // ── Adhoc suggestion queue (Admin) ──────────────────────────────────────
-    GetAdhocSuggestions: builder.query<unknown, { scope?: "quote" | "shipment" } | void>({
-      query: (params) => ({ url: "/admin/adhoc-suggestions", method: "GET", params: params ?? undefined }),
+    GetAdhocSuggestions: builder.query<
+      unknown,
+      { scope?: "quote" | "shipment" } | void
+    >({
+      query: (params) => ({
+        url: "/admin/adhoc-suggestions",
+        method: "GET",
+        params: params ?? undefined,
+      }),
       providesTags: ["AdhocSuggestion"],
     }),
     DecideAdhocSuggestion: builder.mutation<
       unknown,
-      { id: string; decision: "APPROVE" | "EDIT" | "DISMISS"; amountKobo?: number; reason?: string }
+      {
+        id: string;
+        decision: "APPROVE" | "EDIT" | "DISMISS";
+        amountKobo?: number;
+        reason?: string;
+      }
     >({
-      query: ({ id, ...body }) => ({ url: `/admin/adhoc-suggestions/${id}/decision`, method: "POST", body }),
+      query: ({ id, ...body }) => ({
+        url: `/admin/adhoc-suggestions/${id}/decision`,
+        method: "POST",
+        body,
+      }),
       invalidatesTags: ["AdhocSuggestion", "Shipment"],
     }),
 
@@ -1528,24 +1675,53 @@ export const apiSlice = createApi({
     }),
     PublishInsuranceDisclaimer: builder.mutation<
       unknown,
-      { version: string; body: string; liabilityLimitKobo: number; effectiveFrom?: string }
+      {
+        version: string;
+        body: string;
+        liabilityLimitKobo: number;
+        effectiveFrom?: string;
+      }
     >({
-      query: (body) => ({ url: "/admin/insurance-disclaimer", method: "POST", body }),
+      query: (body) => ({
+        url: "/admin/insurance-disclaimer",
+        method: "POST",
+        body,
+      }),
       invalidatesTags: ["InsuranceDisclaimer"],
     }),
     GetInsuranceDisclaimerHistory: builder.query<unknown, void>({
-      query: () => ({ url: "/admin/insurance-disclaimer/history", method: "GET" }),
+      query: () => ({
+        url: "/admin/insurance-disclaimer/history",
+        method: "GET",
+      }),
       providesTags: ["InsuranceDisclaimer"],
     }),
     UpdateInsuranceDisclaimer: builder.mutation<
       unknown,
-      { id: string; version?: string; body?: string; liabilityLimitKobo?: number; reason?: string }
+      {
+        id: string;
+        version?: string;
+        body?: string;
+        liabilityLimitKobo?: number;
+        reason?: string;
+      }
     >({
-      query: ({ id, ...body }) => ({ url: `/admin/insurance-disclaimer/${id}`, method: "PATCH", body }),
+      query: ({ id, ...body }) => ({
+        url: `/admin/insurance-disclaimer/${id}`,
+        method: "PATCH",
+        body,
+      }),
       invalidatesTags: ["InsuranceDisclaimer"],
     }),
-    DeleteInsuranceDisclaimer: builder.mutation<unknown, { id: string; reason?: string }>({
-      query: ({ id, ...body }) => ({ url: `/admin/insurance-disclaimer/${id}`, method: "DELETE", body }),
+    DeleteInsuranceDisclaimer: builder.mutation<
+      unknown,
+      { id: string; reason?: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/admin/insurance-disclaimer/${id}`,
+        method: "DELETE",
+        body,
+      }),
       invalidatesTags: ["InsuranceDisclaimer"],
     }),
 
@@ -1954,7 +2130,9 @@ export const apiSlice = createApi({
           if (data) successToast("Price band rolled back successfully");
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(getApiErrorMessage(errorM.error, "Failed to roll back price band"));
+          errorToast(
+            getApiErrorMessage(errorM.error, "Failed to roll back price band"),
+          );
         }
       },
       invalidatesTags: ["PriceBandAuditLog", "Surcharge"],
@@ -1987,7 +2165,9 @@ export const apiSlice = createApi({
             successToast("Price adjustment created. Customer notified.");
         } catch (error) {
           const e = error as CustomError;
-          errorToast(getApiErrorMessage(e.error, "Failed to create price adjustment"));
+          errorToast(
+            getApiErrorMessage(e.error, "Failed to create price adjustment"),
+          );
         }
       },
       invalidatesTags: ["PriceAdjustment", "Shipment"],
@@ -2018,7 +2198,9 @@ export const apiSlice = createApi({
           if (data) successToast("Downgrade processed successfully.");
         } catch (error) {
           const e = error as CustomError;
-          errorToast(getApiErrorMessage(e.error, "Failed to downgrade shipment"));
+          errorToast(
+            getApiErrorMessage(e.error, "Failed to downgrade shipment"),
+          );
         }
       },
       invalidatesTags: ["PriceAdjustment", "Shipment"],
@@ -2061,7 +2243,9 @@ export const apiSlice = createApi({
             );
         } catch (error) {
           const e = error as CustomError;
-          errorToast(getApiErrorMessage(e.error, "Failed to open support ticket"));
+          errorToast(
+            getApiErrorMessage(e.error, "Failed to open support ticket"),
+          );
         }
       },
       invalidatesTags: ["Ticket"],
@@ -2165,7 +2349,19 @@ export const apiSlice = createApi({
     // useGetContractRateQuery — admin list of contract rates (each includes
     // the customer it belongs to)
     GetContractRate: builder.query<
-      { success: boolean; data: { rates: (ContractRate & { user: { id: string; firstName: string; lastName: string; email: string } })[] } },
+      {
+        success: boolean;
+        data: {
+          rates: (ContractRate & {
+            user: {
+              id: string;
+              firstName: string;
+              lastName: string;
+              email: string;
+            };
+          })[];
+        };
+      },
       {
         isActive?: boolean;
         search?: string;
@@ -2307,7 +2503,9 @@ export const apiSlice = createApi({
           if (data) successToast("Ticket updated");
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(getApiErrorMessage(errorM.error, "Failed to update ticket"));
+          errorToast(
+            getApiErrorMessage(errorM.error, "Failed to update ticket"),
+          );
         }
       },
       invalidatesTags: ["Ticket"],
@@ -2578,13 +2776,15 @@ export const apiSlice = createApi({
       }),
       async onQueryStarted(args, { queryFulfilled }) {
         try {
-          const { data } = await queryFulfilled;
-          if (data) {
-            successToast("Payment verified successfully");
-          }
+          // Success toast is intentionally NOT fired here. The callback page
+          // owns it so it can show once per payment reference — otherwise every
+          // refresh of /dashboard/payment/callback re-verified and re-toasted.
+          await queryFulfilled;
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(getApiErrorMessage(errorM.error, "Payment verification failed"));
+          errorToast(
+            getApiErrorMessage(errorM.error, "Payment verification failed"),
+          );
         }
       },
       invalidatesTags: ["Shipment"],
@@ -2629,7 +2829,9 @@ export const apiSlice = createApi({
           successToast("Dispatcher assigned");
         } catch (error) {
           const e = error as CustomError;
-          errorToast(getApiErrorMessage(e.error, "Failed to assign dispatcher"));
+          errorToast(
+            getApiErrorMessage(e.error, "Failed to assign dispatcher"),
+          );
         }
       },
     }),
@@ -2691,7 +2893,9 @@ export const apiSlice = createApi({
               (data as any)?.message || "Custom role assigned successfully",
             );
         } catch (e: any) {
-          errorToast(getApiErrorMessage(e.error, "Failed to assign custom role"));
+          errorToast(
+            getApiErrorMessage(e.error, "Failed to assign custom role"),
+          );
         }
       },
       invalidatesTags: ["AdminRole", "User"],
@@ -2711,7 +2915,9 @@ export const apiSlice = createApi({
           const { data } = await queryFulfilled;
           if (data) successToast("Custom role updated successfully");
         } catch (e: any) {
-          errorToast(getApiErrorMessage(e.error, "Failed to update custom role"));
+          errorToast(
+            getApiErrorMessage(e.error, "Failed to update custom role"),
+          );
         }
       },
       invalidatesTags: ["AdminRole"],
@@ -2728,7 +2934,9 @@ export const apiSlice = createApi({
           if (data)
             successToast((data as any)?.message || "Custom role revoked");
         } catch (e: any) {
-          errorToast(getApiErrorMessage(e.error, "Failed to revoke custom role"));
+          errorToast(
+            getApiErrorMessage(e.error, "Failed to revoke custom role"),
+          );
         }
       },
       invalidatesTags: ["AdminRole", "User"],
@@ -2816,7 +3024,9 @@ export const apiSlice = createApi({
           const { data } = await queryFulfilled;
           if (data) successToast("Box dimension updated successfully");
         } catch (e: any) {
-          errorToast(getApiErrorMessage(e.error, "Box dimension update failed"));
+          errorToast(
+            getApiErrorMessage(e.error, "Box dimension update failed"),
+          );
         }
       },
       invalidatesTags: ["Dimension"],
@@ -2876,7 +3086,12 @@ export const apiSlice = createApi({
           const { data } = await queryFulfilled;
           if (data) successToast("Pricing sheet imported successfully");
         } catch (e: any) {
-          errorToast(getApiErrorMessage(e.error, "Import failed. Check the file format."));
+          errorToast(
+            getApiErrorMessage(
+              e.error,
+              "Import failed. Check the file format.",
+            ),
+          );
         }
       },
     }),
@@ -2931,9 +3146,18 @@ export const apiSlice = createApi({
       async onQueryStarted(_, { queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          if (data) successToast((data as { message?: string })?.message ?? "Zone & city data imported");
+          if (data)
+            successToast(
+              (data as { message?: string })?.message ??
+                "Zone & city data imported",
+            );
         } catch (e: any) {
-          errorToast(getApiErrorMessage(e.error, "Import failed. Check the file format."));
+          errorToast(
+            getApiErrorMessage(
+              e.error,
+              "Import failed. Check the file format.",
+            ),
+          );
         }
       },
     }),
@@ -3128,7 +3352,9 @@ export const apiSlice = createApi({
           dispatch(setMfaVerified(new Date().toISOString()));
         } catch (error) {
           const errorM = error as CustomError;
-          errorToast(getApiErrorMessage(errorM.error, "Invalid or expired code"));
+          errorToast(
+            getApiErrorMessage(errorM.error, "Invalid or expired code"),
+          );
         }
       },
     }),
@@ -3325,7 +3551,9 @@ export const apiSlice = createApi({
           await queryFulfilled;
           successToast("Packaging guide created");
         } catch (e: any) {
-          errorToast(getApiErrorMessage(e.error, "Failed to create packaging guide"));
+          errorToast(
+            getApiErrorMessage(e.error, "Failed to create packaging guide"),
+          );
         }
       },
       invalidatesTags: ["PackagingGuide"],
@@ -3355,7 +3583,9 @@ export const apiSlice = createApi({
           await queryFulfilled;
           successToast("Packaging guide updated");
         } catch (e: any) {
-          errorToast(getApiErrorMessage(e.error, "Failed to update packaging guide"));
+          errorToast(
+            getApiErrorMessage(e.error, "Failed to update packaging guide"),
+          );
         }
       },
       invalidatesTags: ["PackagingGuide"],
@@ -3372,7 +3602,9 @@ export const apiSlice = createApi({
           await queryFulfilled;
           successToast("Packaging guide deleted");
         } catch (e: any) {
-          errorToast(getApiErrorMessage(e.error, "Failed to delete packaging guide"));
+          errorToast(
+            getApiErrorMessage(e.error, "Failed to delete packaging guide"),
+          );
         }
       },
       invalidatesTags: ["PackagingGuide"],
@@ -3418,7 +3650,9 @@ export const apiSlice = createApi({
           await queryFulfilled;
           successToast("Policy deactivated");
         } catch (e: any) {
-          errorToast(getApiErrorMessage(e.error, "Failed to deactivate policy"));
+          errorToast(
+            getApiErrorMessage(e.error, "Failed to deactivate policy"),
+          );
         }
       },
       invalidatesTags: ["Policy"],
@@ -3487,9 +3721,17 @@ export const apiSlice = createApi({
     // useGetDeliverySLAQuery — optionally filter by zone/shipmentMode/serviceType
     GetDeliverySLA: builder.query<
       { success: boolean; data: { slas: DeliverySLARow[] } },
-      { zone?: number; shipmentMode?: "AIR" | "LAND" | "SEA"; serviceType?: "EXPRESS" | "STANDARD" | "ECONOMY" } | void
+      {
+        zone?: number;
+        shipmentMode?: "AIR" | "LAND" | "SEA";
+        serviceType?: "EXPRESS" | "STANDARD" | "ECONOMY";
+      } | void
     >({
-      query: (params) => ({ url: "/pricing/delivery-sla", method: "GET", params: params ?? undefined }),
+      query: (params) => ({
+        url: "/pricing/delivery-sla",
+        method: "GET",
+        params: params ?? undefined,
+      }),
       providesTags: ["DeliverySLA"],
     }),
 
@@ -3503,7 +3745,9 @@ export const apiSlice = createApi({
           await queryFulfilled;
           successToast("Delivery SLA saved");
         } catch (e) {
-          errorToast(getApiErrorMessage((e as CustomError).error, "Save failed"));
+          errorToast(
+            getApiErrorMessage((e as CustomError).error, "Save failed"),
+          );
         }
       },
     }),
@@ -3524,7 +3768,9 @@ export const apiSlice = createApi({
           await queryFulfilled;
           successToast("Delivery SLA updated");
         } catch (e) {
-          errorToast(getApiErrorMessage((e as CustomError).error, "Update failed"));
+          errorToast(
+            getApiErrorMessage((e as CustomError).error, "Update failed"),
+          );
         }
       },
     }),
@@ -3532,14 +3778,19 @@ export const apiSlice = createApi({
     // useDeleteDeliverySLAMutation — removes the SLA; that product becomes
     // unsellable in that zone (unless it allows no-SLA service).
     DeleteDeliverySLA: builder.mutation<unknown, { id: string }>({
-      query: ({ id }) => ({ url: `/pricing/delivery-sla/${id}`, method: "DELETE" }),
+      query: ({ id }) => ({
+        url: `/pricing/delivery-sla/${id}`,
+        method: "DELETE",
+      }),
       invalidatesTags: ["DeliverySLA", "Offering"],
       async onQueryStarted(_, { queryFulfilled }) {
         try {
           await queryFulfilled;
           successToast("Delivery SLA removed");
         } catch (e) {
-          errorToast(getApiErrorMessage((e as CustomError).error, "Delete failed"));
+          errorToast(
+            getApiErrorMessage((e as CustomError).error, "Delete failed"),
+          );
         }
       },
     }),
@@ -3716,11 +3967,11 @@ export const apiSlice = createApi({
       async onQueryStarted(_, { queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          successToast(
-            (data as any)?.message || "Team member status updated",
-          );
+          successToast((data as any)?.message || "Team member status updated");
         } catch (e: any) {
-          errorToast(getApiErrorMessage(e.error, "Failed to update team member status"));
+          errorToast(
+            getApiErrorMessage(e.error, "Failed to update team member status"),
+          );
         }
       },
       invalidatesTags: ["TeamMember"],

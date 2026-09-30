@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useVerifyPaymentMutation } from "@/store/slice/apiSlice";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { successToast } from "@/lib/toast/toast";
 
 function PaymentCallbackInner() {
   const searchParams = useSearchParams();
@@ -12,7 +13,9 @@ function PaymentCallbackInner() {
   const statusHint = searchParams.get("status"); // from backend redirect — used for initial UI only
 
   const [verify] = useVerifyPaymentMutation();
-  const [state, setState] = useState<"loading" | "success" | "failed">("loading");
+  const [state, setState] = useState<"loading" | "success" | "failed">(
+    "loading",
+  );
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -32,8 +35,23 @@ function PaymentCallbackInner() {
       .then((data: any) => {
         const paymentStatus = data?.data?.payment?.status;
         if (paymentStatus === "PAID") {
+          // Show the toast only the first time this reference is confirmed in
+          // this browser tab. Refreshing the page re-verifies (harmless, the
+          // backend is idempotent) but must not re-announce success.
+          const toastKey = `payment-toast:${reference}`;
+          try {
+            if (!sessionStorage.getItem(toastKey)) {
+              sessionStorage.setItem(toastKey, "1");
+              successToast("Payment verified successfully");
+            }
+          } catch {
+            // sessionStorage unavailable (private mode etc.) — skip the toast
+            // rather than risk repeating it.
+          }
           setState("success");
-          setMessage("Your payment was successful! Your shipment is now confirmed.");
+          setMessage(
+            "Your payment was successful! Your shipment is now confirmed.",
+          );
         } else {
           // Paystack returned success but our DB says otherwise —
           // could be a race; show soft message
@@ -41,7 +59,7 @@ function PaymentCallbackInner() {
           setMessage(
             statusHint === "success"
               ? "Payment received but confirmation is still processing. Check your shipments in a moment."
-              : "Payment could not be confirmed. Please contact support."
+              : "Payment could not be confirmed. Please contact support.",
           );
         }
       })
@@ -51,7 +69,8 @@ function PaymentCallbackInner() {
         // payment we created — likely a duplicate tab or stale redirect.
         setState("failed");
         setMessage(
-          msg || "Payment verification failed. Please check your shipments or contact support."
+          msg ||
+            "Payment verification failed. Please check your shipments or contact support.",
         );
       });
   }, [reference]);
@@ -59,11 +78,12 @@ function PaymentCallbackInner() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="bg-white rounded-2xl shadow-sm border p-10 max-w-md w-full text-center">
-
         {state === "loading" && (
           <>
             <Loader2 className="animate-spin w-12 h-12 text-brand mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-800">Verifying Payment...</h2>
+            <h2 className="text-xl font-semibold text-gray-800">
+              Verifying Payment...
+            </h2>
             <p className="text-gray-500 text-sm mt-2">
               {statusHint === "success"
                 ? "Payment received — confirming your shipment..."
@@ -75,7 +95,9 @@ function PaymentCallbackInner() {
         {state === "success" && (
           <>
             <CheckCircle className="w-14 h-14 text-green-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-800">Payment Successful!</h2>
+            <h2 className="text-xl font-semibold text-gray-800">
+              Payment Successful!
+            </h2>
             <p className="text-gray-500 text-sm mt-2">{message}</p>
             {reference && (
               <p className="font-mono text-xs text-gray-400 mt-2 bg-gray-50 px-3 py-1.5 rounded-lg">
@@ -109,7 +131,9 @@ function PaymentCallbackInner() {
         {state === "failed" && (
           <>
             <XCircle className="w-14 h-14 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-800">Payment Not Confirmed</h2>
+            <h2 className="text-xl font-semibold text-gray-800">
+              Payment Not Confirmed
+            </h2>
             <p className="text-gray-500 text-sm mt-2">{message}</p>
             <div className="flex flex-col gap-3 mt-6">
               <button
@@ -134,11 +158,13 @@ function PaymentCallbackInner() {
 
 export default function PaymentCallbackPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="animate-spin w-8 h-8 text-gray-400" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <Loader2 className="animate-spin w-8 h-8 text-gray-400" />
+        </div>
+      }
+    >
       <PaymentCallbackInner />
     </Suspense>
   );
