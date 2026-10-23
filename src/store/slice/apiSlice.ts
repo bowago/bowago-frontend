@@ -184,6 +184,7 @@ export const apiSlice = createApi({
     "Claim",
     "FAQ",
     "FailedWebhook",
+    "Integration",
     "AdminRole",
     "User",
     "SavedCard",
@@ -3976,6 +3977,143 @@ export const apiSlice = createApi({
       },
       invalidatesTags: ["TeamMember"],
     }),
+
+    // ─── Third-party app integrations (admin) ─────────────────────────────────
+    // useGetIntegrationAppsQuery
+    GetIntegrationApps: builder.query<any, void>({
+      query: () => "/admin/integrations",
+      providesTags: ["Integration"],
+    }),
+    // useGetIntegrationAppQuery
+    GetIntegrationApp: builder.query<any, string>({
+      query: (id) => `/admin/integrations/${id}`,
+      providesTags: ["Integration"],
+    }),
+    // useCreateIntegrationAppMutation
+    CreateIntegrationApp: builder.mutation<any, Record<string, any>>({
+      query: (body) => ({ url: "/admin/integrations", method: "POST", body }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("App registered");
+        } catch (e: any) {
+          errorToast(getApiErrorMessage(e.error, "Failed to register app"));
+        }
+      },
+      invalidatesTags: ["Integration"],
+    }),
+    // useUpdateIntegrationAppMutation
+    UpdateIntegrationApp: builder.mutation<any, { id: string; body: Record<string, any> }>({
+      query: ({ id, body }) => ({ url: `/admin/integrations/${id}`, method: "PATCH", body }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("App updated");
+        } catch (e: any) {
+          errorToast(getApiErrorMessage(e.error, "Failed to update app"));
+        }
+      },
+      invalidatesTags: ["Integration"],
+    }),
+    // useIntegrationAppActionMutation — approve | reject | suspend | reactivate | ping | webhook-secret | keys
+    // Approve, key rotation and secret rotation return credentials ONCE in the response body.
+    IntegrationAppAction: builder.mutation<
+      any,
+      { id: string; action: string; body?: Record<string, any> }
+    >({
+      query: ({ id, action, body }) => ({
+        url: `/admin/integrations/${id}/${action}`,
+        method: "POST",
+        body: body ?? {},
+      }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+        } catch (e: any) {
+          errorToast(getApiErrorMessage(e.error, "Action failed"));
+        }
+      },
+      invalidatesTags: ["Integration"],
+    }),
+    // useRevokeIntegrationKeyMutation
+    RevokeIntegrationKey: builder.mutation<any, { id: string; keyId: string }>({
+      query: ({ id, keyId }) => ({ url: `/admin/integrations/${id}/keys/${keyId}`, method: "DELETE" }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Key revoked");
+        } catch (e: any) {
+          errorToast(getApiErrorMessage(e.error, "Failed to revoke key"));
+        }
+      },
+      invalidatesTags: ["Integration"],
+    }),
+    // useGetIntegrationSharesQuery
+    GetIntegrationShares: builder.query<any, { id: string; status?: string }>({
+      query: ({ id, status }) => `/admin/integrations/${id}/shipments${status ? `?status=${status}` : ""}`,
+      providesTags: ["Integration"],
+    }),
+    // useShareShipmentWithAppMutation
+    ShareShipmentWithApp: builder.mutation<any, { id: string; shipmentId: string }>({
+      query: ({ id, shipmentId }) => ({ url: `/admin/integrations/${id}/shipments`, method: "POST", body: { shipmentId } }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Shipment shared. The app has been notified.");
+        } catch (e: any) {
+          errorToast(getApiErrorMessage(e.error, "Failed to share shipment"));
+        }
+      },
+      invalidatesTags: ["Integration", "Shipment"],
+    }),
+    // useCancelIntegrationShareMutation
+    CancelIntegrationShare: builder.mutation<any, { id: string; syncId: string }>({
+      query: ({ id, syncId }) => ({ url: `/admin/integrations/${id}/shipments/${syncId}/cancel`, method: "POST" }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Share cancelled");
+        } catch (e: any) {
+          errorToast(getApiErrorMessage(e.error, "Failed to cancel share"));
+        }
+      },
+      invalidatesTags: ["Integration", "Shipment"],
+    }),
+    // useGetIntegrationDeliveriesQuery
+    GetIntegrationDeliveries: builder.query<any, { id: string; state?: string }>({
+      query: ({ id, state }) => `/admin/integrations/${id}/deliveries${state ? `?state=${state}` : ""}`,
+      providesTags: ["Integration"],
+    }),
+    // useRetryIntegrationDeliveryMutation
+    RetryIntegrationDelivery: builder.mutation<any, { id: string; deliveryId: string }>({
+      query: ({ id, deliveryId }) => ({ url: `/admin/integrations/${id}/deliveries/${deliveryId}/retry`, method: "POST" }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Retried");
+        } catch (e: any) {
+          errorToast(getApiErrorMessage(e.error, "Retry failed"));
+        }
+      },
+      invalidatesTags: ["Integration"],
+    }),
+    // useGetShipmentStopsQuery / useReplaceShipmentStopsMutation (multi-stop routes)
+    GetShipmentStops: builder.query<any, string>({
+      query: (id) => `/shipments/${id}/stops`,
+      providesTags: (_r, _e, id) => [{ type: "Shipment", id }],
+    }),
+    ReplaceShipmentStops: builder.mutation<any, { id: string; stops: any[] }>({
+      query: ({ id, stops }) => ({ url: `/shipments/${id}/stops`, method: "PUT", body: { stops } }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          successToast("Route updated");
+        } catch (e: any) {
+          errorToast(getApiErrorMessage(e.error, "Failed to update route"));
+        }
+      },
+      invalidatesTags: ["Shipment", "Integration"],
+    }),
   }),
 });
 
@@ -4118,6 +4256,19 @@ export const {
   useUpdateCustomRoleMutation,
   useRevokeCustomRoleMutation,
   useGetFailedWebhooksQuery,
+  useGetIntegrationAppsQuery,
+  useGetIntegrationAppQuery,
+  useCreateIntegrationAppMutation,
+  useUpdateIntegrationAppMutation,
+  useIntegrationAppActionMutation,
+  useRevokeIntegrationKeyMutation,
+  useGetIntegrationSharesQuery,
+  useShareShipmentWithAppMutation,
+  useCancelIntegrationShareMutation,
+  useGetIntegrationDeliveriesQuery,
+  useRetryIntegrationDeliveryMutation,
+  useGetShipmentStopsQuery,
+  useReplaceShipmentStopsMutation,
   useRetryFailedWebhookMutation,
   useDismissFailedWebhookMutation,
   useImportPricingSheetMutation,

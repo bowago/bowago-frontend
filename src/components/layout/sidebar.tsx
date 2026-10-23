@@ -14,6 +14,7 @@ import {
   FileText,
   Ticket,
   AlertTriangle,
+  Plug,
   HelpCircle,
   Settings,
   LogOut,
@@ -223,6 +224,13 @@ const adminMenuList: MenuItem[] = [
     href: "/dashboard/invoice",
     roles: ["ADMIN"],
     icon: <Receipt className={ICON_CLS} />,
+  },
+  {
+    label: "Integrations",
+    href: "/dashboard/integrations",
+    roles: ["ADMIN"],
+    subRoles: SUPER,
+    icon: <Plug className={ICON_CLS} />,
   },
   {
     label: "Failed Webhooks",

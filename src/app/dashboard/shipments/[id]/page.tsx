@@ -34,6 +34,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog/dialog";
 import PriceAdjustmentResponseModal from "@/components/modals/PriceAdjustmentResponseModal";
 import CreatePriceAdjustmentForm from "@/components/form/CreatePriceAdjustmentForm";
 import ExpectedDeliveryIndicator from "@/components/shipment/ExpectedDeliveryIndicator";
+import StopsEditor from "@/components/shipment/StopsEditor";
 
 // Mirrors VALID_STATUS_TRANSITIONS in the backend shipment.controller. The
 // server is still the source of truth (it rejects invalid jumps); this map
@@ -575,6 +576,9 @@ export default function ShipmentDetails() {
                   </p>
                 </div>
               </div>
+
+              {/* Multi-stop route: everyone sees it; internal ops can edit it before pickup */}
+              <StopsEditor shipment={shipment} canEdit={isInternalOps} />
 
               {/* Package details */}
               <div className="bg-white border rounded-lg p-4">
